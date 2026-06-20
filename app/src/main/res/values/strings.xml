@@ -25,4 +25,13 @@
     <string name="match_songs">Match songs</string>
     <string name="quickstart_default_name">Quickstart</string>
     <string name="drag_hint">Long-press to drag</string>
+    <string name="update_app_checking">Checking for updates…</string>
+    <string name="update_app_downloading">Downloading update…</string>
+    <string name="update_app_downloading_percent">Downloading update… %1$d%%</string>
+    <string name="update_app_up_to_date">Already up to date (%1$s)</string>
+    <string name="update_app_ready">Update %1$s downloaded — opening installer…</string>
+    <string name="update_app_failed">Update failed: %1$s</string>
+    <string name="update_app_needs_permission">Allow installs from this app, then try updating again.</string>
+    <string name="update_app_snackbar_prompt">Version %1$s is available. Update now?</string>
+    <string name="update_app_snackbar_action">Update now</string>
 </resources>

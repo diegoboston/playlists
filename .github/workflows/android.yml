@@ -14,7 +14,7 @@ jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     outputs:
       version: ${{ steps.version.outputs.version }}
 
@@ -48,24 +48,25 @@ jobs:
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon
 
-      - name: Build release APK (arm64-v8a)
-        run: ./gradlew :app:assembleRelease -Pabi=arm64-v8a --stacktrace --no-daemon
-
-      - name: Stage release artifacts
+      - name: Build release APKs (arm64 + armeabi-v7a)
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          src="$(ls app/build/outputs/apk/release/*.apk | head -n1)"
-          cp "$src" "artifacts/app-${VERSION}.apk"
+          ./gradlew :app:assembleRelease -Pabi=arm64-v8a --stacktrace --no-daemon
+          cp "$(ls app/build/outputs/apk/release/*.apk | head -n1)" "artifacts/app-${VERSION}-arm64-v8a.apk"
+          ./gradlew :app:assembleRelease -Pabi=armeabi-v7a --stacktrace --no-daemon
+          cp "$(ls app/build/outputs/apk/release/*.apk | head -n1)" "artifacts/app-${VERSION}-armeabi-v7a.apk"
+          cp "artifacts/app-${VERSION}-arm64-v8a.apk" artifacts/app-arm64-v8a.apk
+          cp "artifacts/app-${VERSION}-armeabi-v7a.apk" artifacts/app-armeabi-v7a.apk
           ls -la artifacts/
 
-      - name: Upload release artifact
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v5
         with:
           name: app-${{ steps.version.outputs.version }}
-          path: artifacts/app-${{ steps.version.outputs.version }}.apk
+          path: artifacts/*.apk
           if-no-files-found: error
 
   release:
@@ -77,16 +78,11 @@ jobs:
       contents: write
 
     steps:
-      - name: Download APK artifact
+      - name: Download APK artifacts
         uses: actions/download-artifact@v5
         with:
           name: app-${{ needs.build.outputs.version }}
           path: artifacts
-
-      - name: Stage stable release filename
-        env:
-          VERSION: ${{ needs.build.outputs.version }}
-        run: cp "artifacts/app-${VERSION}.apk" artifacts/app.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -96,5 +92,7 @@ jobs:
           generate_release_notes: true
           make_latest: true
           files: |
-            artifacts/app-${{ needs.build.outputs.version }}.apk
-            artifacts/app.apk
+            artifacts/app-${{ needs.build.outputs.version }}-arm64-v8a.apk
+            artifacts/app-${{ needs.build.outputs.version }}-armeabi-v7a.apk
+            artifacts/app-arm64-v8a.apk
+            artifacts/app-armeabi-v7a.apk
