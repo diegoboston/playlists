@@ -21,35 +21,28 @@ class AppUpdateTest {
     }
 
     @Test
-    fun parseRelease_findsAbiSpecificAsset() {
+    fun parseRelease_findsStableApkAsset() {
         val json = """
             {
               "tag_name": "v1.0.99",
               "assets": [
                 {
-                  "name": "app-1.0.99-arm64-v8a.apk",
-                  "browser_download_url": "https://example.com/versioned-arm64.apk"
+                  "name": "app-1.0.99.apk",
+                  "browser_download_url": "https://example.com/versioned.apk"
                 },
                 {
-                  "name": "app-arm64-v8a.apk",
-                  "browser_download_url": "https://example.com/app-arm64-v8a.apk"
-                },
-                {
-                  "name": "app-armeabi-v7a.apk",
-                  "browser_download_url": "https://example.com/app-armeabi-v7a.apk"
+                  "name": "app.apk",
+                  "browser_download_url": "https://example.com/app.apk"
                 }
               ]
             }
         """.trimIndent()
 
-        val release = AppUpdate.parseRelease(json, abi = "arm64-v8a")
+        val release = AppUpdate.parseRelease(json)
         assertNotNull(release)
         assertEquals(99L, release!!.versionCode)
-        assertEquals("https://example.com/app-arm64-v8a.apk", release.downloadUrl)
-
-        val release32 = AppUpdate.parseRelease(json, abi = "armeabi-v7a")
-        assertNotNull(release32)
-        assertEquals("https://example.com/app-armeabi-v7a.apk", release32!!.downloadUrl)
+        assertEquals("1.0.99", release.versionName)
+        assertEquals("https://example.com/app.apk", release.downloadUrl)
     }
 
     @Test
@@ -59,22 +52,16 @@ class AppUpdateTest {
               "tag_name": "v1.0.5",
               "assets": [
                 {
-                  "name": "app-1.0.5-armeabi-v7a.apk",
+                  "name": "app-1.0.5.apk",
                   "browser_download_url": "https://example.com/fallback.apk"
                 }
               ]
             }
         """.trimIndent()
 
-        val release = AppUpdate.parseRelease(json, abi = "armeabi-v7a")
+        val release = AppUpdate.parseRelease(json)
         assertNotNull(release)
         assertEquals(5L, release!!.versionCode)
         assertEquals("https://example.com/fallback.apk", release.downloadUrl)
-    }
-
-    @Test
-    fun apkAssetName_mapsKnownAbis() {
-        assertEquals("app-arm64-v8a.apk", AppUpdate.apkAssetName("arm64-v8a"))
-        assertEquals("app-armeabi-v7a.apk", AppUpdate.apkAssetName("armeabi-v7a"))
     }
 }

@@ -1,6 +1,5 @@
 package com.playlists.app.ui
 
-import android.graphics.Bitmap
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -46,7 +45,7 @@ class PdfPageFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             val bitmap = withContext(Dispatchers.IO) {
                 val width = resources.displayMetrics.widthPixels.coerceAtLeast(1)
-                PdfHelper.renderPage(requireContext(), file, page, width)
+                PdfHelper.renderPage(file, page, width)
             }
             bitmap?.let { image.setImageBitmap(it) }
         }

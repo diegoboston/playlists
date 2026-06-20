@@ -2,9 +2,9 @@ package com.playlists.app.ui.screens
 
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import com.playlists.app.PlaylistsApp
 import com.playlists.app.databinding.ActivityImportSongBinding
@@ -21,15 +21,11 @@ class ImportSongActivity : AppCompatActivity() {
         binding = ActivityImportSongBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        pending = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getSerializableExtra(EXTRA_PENDING, PendingImport::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getSerializableExtra(EXTRA_PENDING) as? PendingImport
-        } ?: run {
-            finish()
-            return
-        }
+        pending = IntentCompat.getParcelableExtra(intent, EXTRA_PENDING, PendingImport::class.java)
+            ?: run {
+                finish()
+                return
+            }
 
         binding.titleInput.setText(pending.suggestedTitle)
         binding.save.setOnClickListener { saveAndFinish() }

@@ -2,34 +2,31 @@ package com.playlists.app.util
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
+import android.content.pm.PackageManager
 import androidx.core.content.FileProvider
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Checks GitHub Releases for a newer signed APK matching this device's CPU ABI.
+ * Checks GitHub Releases for a newer signed APK and hands it to the system package installer.
  *
- * CI publishes stable per-ABI assets:
- * - [APK_ASSET_ARM64] for 64-bit ARM phones
- * - [APK_ASSET_ARM32] for 32-bit ARM phones (incl. most Android 4.3 devices)
+ * CI publishes a stable asset named [APK_ASSET_NAME] on every main-branch build.
  */
 object AppUpdate {
 
     const val REPO = "diegoboston/playlists"
-    const val APK_ASSET_ARM64 = "app-arm64-v8a.apk"
-    const val APK_ASSET_ARM32 = "app-armeabi-v7a.apk"
+    const val APK_ASSET_NAME = "app.apk"
     const val UPDATE_APK_FILENAME = "playlists-update.apk"
     private const val LATEST_RELEASE_API =
         "https://api.github.com/repos/$REPO/releases/latest"
+    const val LATEST_APK_URL =
+        "https://github.com/$REPO/releases/latest/download/$APK_ASSET_NAME"
 
     data class ReleaseInfo(
         val versionCode: Long,
         val versionName: String,
         val downloadUrl: String,
-        val abi: String,
     )
 
     sealed class InstallResult {
@@ -37,40 +34,13 @@ object AppUpdate {
         data object NeedsPermission : InstallResult()
     }
 
-    fun apkAssetName(abi: String): String = when (abi) {
-        "arm64-v8a" -> APK_ASSET_ARM64
-        "armeabi-v7a" -> APK_ASSET_ARM32
-        else -> "app-$abi.apk"
-    }
-
-    fun latestApkUrl(abi: String): String =
-        "https://github.com/$REPO/releases/latest/download/${apkAssetName(abi)}"
-
-    /** Primary CPU ABI used to pick the correct release APK. */
-    fun deviceAbi(): String {
-        val abis = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            Build.SUPPORTED_ABIS.toList()
-        } else {
-            @Suppress("DEPRECATION")
-            listOfNotNull(Build.CPU_ABI, Build.CPU_ABI2)
-        }
-        return when {
-            abis.contains("arm64-v8a") -> "arm64-v8a"
-            abis.contains("armeabi-v7a") -> "armeabi-v7a"
-            abis.contains("x86_64") -> "x86_64"
-            abis.contains("x86") -> "x86"
-            else -> "armeabi-v7a"
-        }
-    }
-
     fun installedVersionCode(context: Context): Long {
-        val pi = context.packageManager.getPackageInfo(context.packageName, 0)
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            pi.longVersionCode
-        } else {
-            @Suppress("DEPRECATION")
-            pi.versionCode.toLong()
-        }
+        val pi = context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.GET_META_DATA,
+        )
+        @Suppress("DEPRECATION")
+        return pi.versionCode.toLong()
     }
 
     fun parseVersionCodeFromTag(tagName: String): Long? {
@@ -79,15 +49,14 @@ object AppUpdate {
             .toLongOrNull()
     }
 
-    fun parseRelease(jsonBody: String, abi: String = deviceAbi()): ReleaseInfo? {
+    fun parseRelease(jsonBody: String): ReleaseInfo? {
         val tagName = extractJsonString(jsonBody, "tag_name") ?: return null
         val versionCode = parseVersionCodeFromTag(tagName) ?: return null
-        val preferredName = apkAssetName(abi)
         var downloadUrl: String? = null
         var fallbackUrl: String? = null
         for ((name, url) in extractReleaseAssets(jsonBody)) {
             when {
-                name == preferredName -> downloadUrl = url
+                name == APK_ASSET_NAME -> downloadUrl = url
                 name.endsWith(".apk", ignoreCase = true) && fallbackUrl == null -> fallbackUrl = url
             }
         }
@@ -96,7 +65,6 @@ object AppUpdate {
             versionCode = versionCode,
             versionName = tagName.removePrefix("v").removePrefix("V"),
             downloadUrl = resolved,
-            abi = abi,
         )
     }
 
@@ -112,7 +80,7 @@ object AppUpdate {
         return pattern.findAll(json).map { it.groupValues[1] to it.groupValues[2] }.toList()
     }
 
-    fun fetchLatestRelease(abi: String = deviceAbi()): ReleaseInfo {
+    fun fetchLatestRelease(): ReleaseInfo {
         val conn = openGet(LATEST_RELEASE_API)
         try {
             val code = conn.responseCode
@@ -121,8 +89,8 @@ object AppUpdate {
                 error("GitHub API HTTP $code${detail?.let { ": $it" } ?: ""}")
             }
             val body = conn.inputStream.bufferedReader().readText()
-            return parseRelease(body, abi)
-                ?: error("Release has no ${apkAssetName(abi)} asset or unparseable tag")
+            return parseRelease(body)
+                ?: error("Release has no $APK_ASSET_NAME asset or unparseable tag")
         } finally {
             conn.disconnect()
         }
@@ -176,9 +144,7 @@ object AppUpdate {
     }
 
     fun launchInstaller(context: Context, apk: File): InstallResult {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            !context.packageManager.canRequestPackageInstalls()
-        ) {
+        if (!context.packageManager.canRequestPackageInstalls()) {
             return InstallResult.NeedsPermission
         }
         val uri = FileProvider.getUriForFile(

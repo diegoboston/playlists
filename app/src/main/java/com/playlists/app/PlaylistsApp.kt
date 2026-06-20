@@ -1,9 +1,7 @@
 package com.playlists.app
 
 import android.app.Application
-import android.content.Context
 import android.util.Log
-import androidx.multidex.MultiDex
 import com.playlists.app.data.AppDatabase
 import com.playlists.app.data.PlaylistRepository
 import com.playlists.app.data.SongRepository
@@ -15,11 +13,6 @@ import kotlinx.coroutines.launch
 
 class PlaylistsApp : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    override fun attachBaseContext(base: Context) {
-        super.attachBaseContext(base)
-        MultiDex.install(this)
-    }
 
     lateinit var songRepository: SongRepository
         private set

@@ -2,7 +2,6 @@ package com.playlists.app.ui
 
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
@@ -32,9 +31,7 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) {
         pendingApkInstall?.let { apk ->
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
-                packageManager.canRequestPackageInstalls()
-            ) {
+            if (packageManager.canRequestPackageInstalls()) {
                 installAppUpdate(apk)
             } else {
                 Toast.makeText(this, R.string.update_app_needs_permission, Toast.LENGTH_LONG).show()

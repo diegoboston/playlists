@@ -2,7 +2,6 @@ package com.playlists.app.ui.screens
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -11,7 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
-import com.github.chrisbanes.photoview.PhotoView
+import coil.load
 import com.playlists.app.PlaylistsApp
 import com.playlists.app.data.FileType
 import com.playlists.app.data.PlaylistSongWithDetails
@@ -49,7 +48,7 @@ class PlaylistPlaybackActivity : AppCompatActivity() {
             }
             val playlist = PlaylistsApp.from(application).playlistRepository.getById(playlistId)
             supportActionBar?.title = playlist?.name
-            binding.pager.adapter = PlaybackAdapter(songs)
+            binding.pager.adapter = PlaybackAdapter(this@PlaylistPlaybackActivity, songs)
             binding.pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) = updateIndicator(position)
             })
@@ -64,6 +63,7 @@ class PlaylistPlaybackActivity : AppCompatActivity() {
     }
 
     private class PlaybackAdapter(
+        private val activity: AppCompatActivity,
         private val songs: List<PlaylistSongWithDetails>,
     ) : RecyclerView.Adapter<PlaybackAdapter.VH>() {
         inner class VH(val container: FrameLayout) : RecyclerView.ViewHolder(container)
@@ -84,30 +84,28 @@ class PlaylistPlaybackActivity : AppCompatActivity() {
             val song = songs[position]
             holder.container.removeAllViews()
             val file = File(song.filePath)
-            val context = holder.container.context
             when (FileType.valueOf(song.fileType)) {
                 FileType.IMAGE -> {
-                    val photo = PhotoView(context).apply {
+                    val image = ImageView(holder.container.context).apply {
                         layoutParams = FrameLayout.LayoutParams(
                             FrameLayout.LayoutParams.MATCH_PARENT,
                             FrameLayout.LayoutParams.MATCH_PARENT,
                         )
-                        setImageBitmap(BitmapFactory.decodeFile(file.absolutePath))
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        load(file)
                     }
-                    holder.container.addView(photo)
+                    holder.container.addView(image)
                 }
                 FileType.PDF -> {
-                    val pager = ViewPager2(context).apply {
+                    val pager = ViewPager2(holder.container.context).apply {
                         layoutParams = FrameLayout.LayoutParams(
                             FrameLayout.LayoutParams.MATCH_PARENT,
                             FrameLayout.LayoutParams.MATCH_PARENT,
                         )
                     }
                     holder.container.addView(pager)
-                    (context as? AppCompatActivity)?.lifecycleScope?.launch {
-                        val count = withContext(Dispatchers.IO) {
-                            PdfHelper.pageCount(context, file)
-                        }
+                    activity.lifecycleScope.launch {
+                        val count = withContext(Dispatchers.IO) { PdfHelper.pageCount(file) }
                         pager.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
                             override fun getItemCount() = count
                             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -124,10 +122,10 @@ class PlaylistPlaybackActivity : AppCompatActivity() {
 
                             override fun onBindViewHolder(holder: RecyclerView.ViewHolder, page: Int) {
                                 val image = holder.itemView as ImageView
-                                (context as? AppCompatActivity)?.lifecycleScope?.launch {
+                                activity.lifecycleScope.launch {
                                     val bitmap = withContext(Dispatchers.IO) {
-                                        val width = context.resources.displayMetrics.widthPixels
-                                        PdfHelper.renderPage(context, file, page, width)
+                                        val width = activity.resources.displayMetrics.widthPixels
+                                        PdfHelper.renderPage(file, page, width)
                                     }
                                     bitmap?.let { image.setImageBitmap(it) }
                                 }

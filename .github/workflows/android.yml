@@ -14,7 +14,7 @@ jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     outputs:
       version: ${{ steps.version.outputs.version }}
 
@@ -48,18 +48,18 @@ jobs:
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon
 
-      - name: Build release APKs (arm64 + armeabi-v7a)
+      - name: Build release APK (arm64-v8a)
+        run: ./gradlew :app:assembleRelease --stacktrace --no-daemon
+
+      - name: Stage release artifacts
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          ./gradlew :app:assembleRelease -Pabi=arm64-v8a --stacktrace --no-daemon
-          cp "$(ls app/build/outputs/apk/release/*.apk | head -n1)" "artifacts/app-${VERSION}-arm64-v8a.apk"
-          ./gradlew :app:assembleRelease -Pabi=armeabi-v7a --stacktrace --no-daemon
-          cp "$(ls app/build/outputs/apk/release/*.apk | head -n1)" "artifacts/app-${VERSION}-armeabi-v7a.apk"
-          cp "artifacts/app-${VERSION}-arm64-v8a.apk" artifacts/app-arm64-v8a.apk
-          cp "artifacts/app-${VERSION}-armeabi-v7a.apk" artifacts/app-armeabi-v7a.apk
+          src="$(ls app/build/outputs/apk/release/*.apk | head -n1)"
+          cp "$src" "artifacts/app-${VERSION}.apk"
+          cp "$src" artifacts/app.apk
           ls -la artifacts/
 
       - name: Upload release artifacts
@@ -92,7 +92,5 @@ jobs:
           generate_release_notes: true
           make_latest: true
           files: |
-            artifacts/app-${{ needs.build.outputs.version }}-arm64-v8a.apk
-            artifacts/app-${{ needs.build.outputs.version }}-armeabi-v7a.apk
-            artifacts/app-arm64-v8a.apk
-            artifacts/app-armeabi-v7a.apk
+            artifacts/app-${{ needs.build.outputs.version }}.apk
+            artifacts/app.apk

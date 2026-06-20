@@ -2,17 +2,17 @@ package com.playlists.app.ui.screens
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.widget.ViewPager2
+import coil.load
+import com.playlists.app.PlaylistsApp
 import com.playlists.app.data.FileType
 import com.playlists.app.databinding.ActivitySongViewBinding
-import com.playlists.app.ui.PdfPagerAdapter
 import com.playlists.app.ui.PdfHelper
-import com.playlists.app.PlaylistsApp
+import com.playlists.app.ui.PdfPagerAdapter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,7 +37,7 @@ class SongViewActivity : AppCompatActivity() {
                 finish()
                 return@launch
             }
-            supportActionBar?.title = song.title
+            title = song.title
             val file = File(song.filePath)
             if (!file.exists()) {
                 finish()
@@ -54,16 +54,14 @@ class SongViewActivity : AppCompatActivity() {
         binding.imageView.visibility = View.VISIBLE
         binding.pdfPager.visibility = View.GONE
         binding.pageIndicator.visibility = View.GONE
-        binding.imageView.setImageBitmap(BitmapFactory.decodeFile(file.absolutePath))
+        binding.imageView.load(file)
     }
 
     private fun showPdf(file: File) {
         binding.imageView.visibility = View.GONE
         binding.pdfPager.visibility = View.VISIBLE
         lifecycleScope.launch {
-            val count = withContext(Dispatchers.IO) {
-                PdfHelper.pageCount(this@SongViewActivity, file)
-            }
+            val count = withContext(Dispatchers.IO) { PdfHelper.pageCount(file) }
             if (count <= 0) {
                 finish()
                 return@launch

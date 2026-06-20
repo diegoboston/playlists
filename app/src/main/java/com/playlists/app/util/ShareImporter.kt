@@ -5,21 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.webkit.URLUtil
+import androidx.core.content.IntentCompat
 import com.playlists.app.data.FileType
 import com.playlists.app.data.Song
 import com.playlists.app.data.SongRepository
 import java.io.File
-
-data class PendingImport(
-    val file: File,
-    val fileType: FileType,
-    val mimeType: String,
-    val suggestedTitle: String,
-) : java.io.Serializable {
-    companion object {
-        private const val serialVersionUID = 1L
-    }
-}
 
 object ShareImporter {
     fun parseIntent(context: Context, intent: Intent): PendingImport? {
@@ -43,7 +33,11 @@ object ShareImporter {
                 }
             }
             type.startsWith("image/") || type == "application/pdf" -> {
-                val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM) ?: return null
+                val uri = IntentCompat.getParcelableExtra(
+                    intent,
+                    Intent.EXTRA_STREAM,
+                    Uri::class.java,
+                ) ?: return null
                 importFromUri(context, uri, type)
             }
             else -> null
@@ -64,7 +58,7 @@ object ShareImporter {
         } ?: return null
         val fileType = if (mimeType.contains("pdf")) FileType.PDF else FileType.IMAGE
         val title = suggestTitle(resolver, uri, file)
-        return PendingImport(file, fileType, mimeType, title)
+        return PendingImport.from(file, fileType, mimeType, title)
     }
 
     private fun importFromUrl(context: Context, url: String): PendingImport? {
@@ -73,7 +67,7 @@ object ShareImporter {
         val file = FileStorage.storeBytes(context, bytes, ext)
         val fileType = if (mime.contains("pdf")) FileType.PDF else FileType.IMAGE
         val title = url.substringAfterLast('/').substringBefore('?').ifBlank { "Shared link" }
-        return PendingImport(file, fileType, mime, title)
+        return PendingImport.from(file, fileType, mime, title)
     }
 
     private fun suggestTitle(resolver: ContentResolver, uri: Uri, file: File): String {
