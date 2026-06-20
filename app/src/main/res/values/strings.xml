@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Playlists</string>
+    <string name="tab_songs">Songs</string>
+    <string name="tab_playlists">Playlists</string>
+    <string name="empty_songs">Share a PDF or image to add your first song.</string>
+    <string name="empty_playlists">Create a playlist to get started.</string>
+    <string name="new_playlist">New playlist</string>
+    <string name="playlist_name_hint">Playlist name</string>
+    <string name="create">Create</string>
+    <string name="save">Save</string>
+    <string name="import_song">Import song</string>
+    <string name="title_hint">Title</string>
+    <string name="key_hint">Key</string>
+    <string name="notes_hint">Notes</string>
+    <string name="add_song">Add song</string>
+    <string name="search_songs">Search songs…</string>
+    <string name="rename_playlist">Rename playlist</string>
+    <string name="duplicate">Duplicate</string>
+    <string name="play">Play</string>
+    <string name="remove">Remove</string>
+    <string name="empty_playlist">Long-press and drag to reorder. Tap + to add songs.</string>
+    <string name="quickstart">Quickstart playlist</string>
+    <string name="quickstart_hint">Paste a set list or song titles (one per line)…</string>
+    <string name="match_songs">Match songs</string>
+    <string name="quickstart_default_name">Quickstart</string>
+    <string name="drag_hint">Long-press to drag</string>
+</resources>

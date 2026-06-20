@@ -1,0 +1,100 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: 8.10.2
+
+      - name: Bootstrap Gradle wrapper
+        run: gradle wrapper --gradle-version 8.10.2 --distribution-type bin
+
+      - name: Resolve version
+        id: version
+        run: echo "version=1.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon
+
+      - name: Build release APK (arm64-v8a)
+        run: ./gradlew :app:assembleRelease -Pabi=arm64-v8a --stacktrace --no-daemon
+
+      - name: Stage release artifacts
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          src="$(ls app/build/outputs/apk/release/*.apk | head -n1)"
+          cp "$src" "artifacts/app-${VERSION}.apk"
+          ls -la artifacts/
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: app-${{ steps.version.outputs.version }}
+          path: artifacts/app-${{ steps.version.outputs.version }}.apk
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: app-${{ needs.build.outputs.version }}
+          path: artifacts
+
+      - name: Stage stable release filename
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: cp "artifacts/app-${VERSION}.apk" artifacts/app.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build.outputs.version }}
+          name: Playlists ${{ needs.build.outputs.version }}
+          generate_release_notes: true
+          make_latest: true
+          files: |
+            artifacts/app-${{ needs.build.outputs.version }}.apk
+            artifacts/app.apk
