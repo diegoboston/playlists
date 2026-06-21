@@ -33,7 +33,7 @@
             android:maxLines="1"
             android:paddingHorizontal="8dp"
             android:paddingVertical="8dp"
-            android:textAppearance="?attr/textAppearanceBody1"
+            android:textAppearance="?attr/textAppearanceBodyLarge"
             android:textStyle="bold" />
 
         <View

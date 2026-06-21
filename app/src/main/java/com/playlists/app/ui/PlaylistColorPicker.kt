@@ -8,6 +8,7 @@ import android.widget.GridLayout
 import android.widget.LinearLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.playlists.app.R
 
@@ -50,7 +51,7 @@ object PlaylistColorPicker {
                 setStroke(2, ContextCompat.getColor(context, R.color.playlist_color_bubble_border_on))
             } else {
                 setColor(ContextCompat.getColor(context, android.R.color.transparent))
-                setStroke(2, ContextCompat.getColor(context, com.google.android.material.R.color.material_on_surface_stroke))
+                setStroke(2, themeColor(context, com.google.android.material.R.attr.colorOutline))
             }
         }
 
@@ -103,11 +104,11 @@ object PlaylistColorPicker {
                 setColor(ContextCompat.getColor(context, android.R.color.transparent))
                 setStroke(
                     (2 * context.resources.displayMetrics.density).toInt(),
-                    ContextCompat.getColor(
-                        context,
-                        if (selected) R.color.primary
-                        else com.google.android.material.R.color.material_on_surface_stroke,
-                    ),
+                    if (selected) {
+                        ContextCompat.getColor(context, R.color.primary)
+                    } else {
+                        themeColor(context, com.google.android.material.R.attr.colorOutline)
+                    },
                 )
             }
             setOnClickListener { onPick() }
@@ -116,14 +117,12 @@ object PlaylistColorPicker {
                     (size * 0.55f).toInt(),
                     (2 * context.resources.displayMetrics.density).toInt(),
                 ).apply { gravity = Gravity.CENTER }
-                setBackgroundColor(
-                    ContextCompat.getColor(
-                        context,
-                        com.google.android.material.R.color.material_on_surface_emphasis_medium,
-                    ),
-                )
+                setBackgroundColor(themeColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant))
                 rotation = 45f
             })
         }
     }
+
+    private fun themeColor(context: Context, attr: Int): Int =
+        MaterialColors.getColor(context, attr, "PlaylistColorPicker")
 }

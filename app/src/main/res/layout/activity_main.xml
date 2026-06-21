@@ -24,7 +24,7 @@
                 android:id="@+id/updateBannerText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textAppearance="?attr/textAppearanceCaption"
+                android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="?attr/colorOnPrimary" />
 
             <ProgressBar

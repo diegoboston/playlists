@@ -1,10 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="primary">#1565C0</color>
-    <color name="primary_dark">#0D47A1</color>
-    <color name="accent">#FF6F00</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#D1E4FF</color>
+    <color name="on_primary_container">#001D36</color>
+    <color name="secondary">#FF6F00</color>
+    <color name="on_secondary">#FFFFFF</color>
+    <color name="secondary_container">#FFDBC8</color>
+    <color name="on_secondary_container">#2B1700</color>
+    <color name="surface">#FDFCFF</color>
+    <color name="on_surface">#1A1C1E</color>
+    <color name="surface_variant">#DFE2EB</color>
+    <color name="on_surface_variant">#42474E</color>
+    <color name="outline">#73777F</color>
+    <color name="outline_variant">#C3C7CF</color>
+    <color name="error">#BA1A1A</color>
+    <color name="on_error">#FFFFFF</color>
     <color name="deleted_song">#C62828</color>
-    <color name="card_stroke">#1F000000</color>
-    <color name="on_surface_variant">#99000000</color>
     <color name="playlist_color_bubble_border_on">#66000000</color>
 </resources>
