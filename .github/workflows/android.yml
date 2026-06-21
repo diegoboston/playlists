@@ -46,7 +46,8 @@ jobs:
         run: echo "version=1.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
       - name: Unit tests
-        run: ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon
+        run: |
+          ./gradlew :app:compileDebugKotlin :app:testDebugUnitTest --stacktrace --no-daemon
 
       - name: Build release APK (arm64-v8a)
         run: ./gradlew :app:assembleRelease --stacktrace --no-daemon
@@ -88,7 +89,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.build.outputs.version }}
-          name: Playlists ${{ needs.build.outputs.version }}
+          name: Stage Manager ${{ needs.build.outputs.version }}
           generate_release_notes: true
           make_latest: true
           files: |

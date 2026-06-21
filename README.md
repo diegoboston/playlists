@@ -1,4 +1,4 @@
-# Playlists
+# Stage Manager
 
 Android app for building and playing ordered song lists from shared PDFs and images. Each imported file becomes a **song** in an archive; songs can be grouped into **playlists** with drag-to-reorder, full-text search, and swipe-through playback.
 
@@ -15,13 +15,13 @@ Designed for sideloading on recent 64-bit ARM phones (not Google Play). CI build
 | **Package** | `com.playlists.app` |
 | **JDK** | 17 (required for Gradle/AGP) |
 
-**Note:** Android version numbers and API levels are different. Android **12** is API **31** — well above the minimum. This app does not target old devices (no Multidex, Pdfium, or 32-bit builds).
+**Note:** Android version numbers and API levels are different. Android **12** is API **31** — well above the minimum.
 
 ## Features
 
 ### Song archive
 
-- **Share to import** — Share an image, PDF, or URL from another app. Playlists appears in the share sheet.
+- **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**.
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
 - **Song list** — Shows title, key, and notes preview (first ~20 characters), plus file type badge.
@@ -32,7 +32,7 @@ Designed for sideloading on recent 64-bit ARM phones (not Google Play). CI build
 - **Create / rename** — New playlists get an editable name.
 - **Ordered sequences** — A playlist is an ordered list of songs from the archive.
 - **Add songs** — Search dialog with full-text match across title, key, and notes.
-- **Drag reorder** — Long-press and drag; center-vs-center swap logic in `ReorderLogic` / `ReorderTouchHelper`.
+- **Drag reorder** — Long-press and drag rows in the Songs tab, Playlists tab, or playlist detail screen. Uses the same center-vs-center swap logic as NoTube (`DraggableItem` + `ReorderLogic`).
 - **Duplicate playlist** — Copies name (with “(copy)”) and full song order.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs).
 - **Remote play** — Wi‑Fi icon on the playlist toolbar starts a local HTTP server; open the URL on another device on the same network (tablet, laptop) for a fullscreen browser view. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. A banner shows the active URL and **Stop**.
@@ -47,7 +47,7 @@ Sketch of the main flows (not to scale):
 
 ```
 ┌─────────────────────────────────────┐
-│ Playlists                           │
+│ Stage Manager                       │
 ├─────────────────────────────────────┤
 │ [ Songs ]  [ Playlists ]            │
 ├─────────────────────────────────────┤
@@ -57,32 +57,11 @@ Sketch of the main flows (not to scale):
 │  │ Amazing Grace          PDF │🗑│  │
 │  │ Key: G · intro notes · 2 pg│    │
 │  └─────────────────────────────┘    │
-│  ┌─────────────────────────────┐    │
-│  │ Blue Moon             IMAGE│🗑│  │
-│  │ Key: C · verse 1 · 1 pg    │    │
-│  └─────────────────────────────┘    │
 │                                     │
 │  tap row → fullscreen viewer        │
+│  long-press drag → reorder          │
 │  🗑 → remove from archive (soft)    │
 │                                     │
-└─────────────────────────────────────┘
-
-┌─────────────────────────────────────┐
-│ Playlists                           │
-├─────────────────────────────────────┤
-│ [ Songs ]  [ Playlists ]            │
-├─────────────────────────────────────┤
-│                                     │
-│  PLAYLISTS TAB                      │
-│  ┌─────────────────────────────┐    │
-│  │▌Sunday set        ○  ✎     │    │
-│  └─────────────────────────────┘    │
-│  ┌─────────────────────────────┐    │
-│  │▌Rehearsal         ○  ✎     │    │  ← long-press drag to reorder
-│  └─────────────────────────────┘    │
-│                                     │
-│  [ Quickstart playlist ]            │
-│                              [ + ]  │  ← new playlist
 └─────────────────────────────────────┘
 
         share from another app
@@ -94,7 +73,6 @@ Sketch of the main flows (not to scale):
 │ Title  [________________]           │
 │ Key    [________________]           │
 │ Notes  [________________]         │
-│                                     │
 │              [ Save ]               │
 └─────────────────────────────────────┘
 
@@ -111,63 +89,19 @@ Sketch of the main flows (not to scale):
 ├─────────────────────────────────────┤
 │  Amazing Grace                      │
 │  (G) intro                          │
-│  How Great Thou Art          🗑     │  ← red if deleted from archive
-│  (Bb)                               │
+│  How Great Thou Art          Remove │  ← red if deleted from archive
 │                                     │
 │  empty: “Tap + above to add songs.” │
-└─────────────────────────────────────┘
-
-        ▶ play
-                 │
-                 ▼
-┌─────────────────────────────────────┐
-│ ← Sunday set                        │
-├─────────────────────────────────────┤
-│ 1/5: Amazing Grace · page 2/3       │
-├─────────────────────────────────────┤
-│                                     │
-│         [ sheet music / image ]     │
-│         swipe ↔ next song           │
-│         pinch to zoom               │
-│                                     │
-└─────────────────────────────────────┘
-
-        tap song in archive
-                 │
-                 ▼
-┌─────────────────────────────────────┐
-│ Amazing Grace                       │
-├─────────────────────────────────────┤
-│                                     │
-│         [ fullscreen image/PDF ]    │
-│         PDF: swipe ↔ pages          │
-│         pinch to zoom               │
-│              2 / 3                  │
-└─────────────────────────────────────┘
-
-        Quickstart playlist
-                 │
-                 ▼
-┌─────────────────────────────────────┐
-│ Quickstart playlist                 │
-├─────────────────────────────────────┤
-│ paste set list (one title per line) │
-│ ┌─────────────────────────────────┐ │
-│ │ Amazing Grace                   │ │
-│ │ Blue Moon                       │ │
-│ └─────────────────────────────────┘ │
-│                                     │
-│ [ Match songs ]  →  review  → Create│
 └─────────────────────────────────────┘
 ```
 
 ## Usage
 
-1. **Import a song** — Gallery or browser → Share → Playlists → fill Title, Key, Notes → Save.
+1. **Import a song** — Gallery or browser → Share → Stage Manager → fill Title, Key, Notes → Save.
 2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen.
-3. **New playlist** — **Playlists** tab → **+** → enter name.
-4. **Add songs** — Open a playlist → **Add song** → search → tap a result.
-5. **Reorder** — Long-press a row in the playlist and drag.
+3. **New playlist** — **Playlists** tab → **New playlist** → enter name.
+4. **Add songs** — Open a playlist → **+** → search → tap a result.
+5. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 6. **Play** — Open a playlist → **Play** → swipe between songs.
 7. **Remote play** — Open a playlist → **Wi‑Fi** → open the URL on another device on the same LAN; swipe there to change songs/pages. **Stop** ends the server.
 8. **Quickstart** — **Playlists** tab → **Quickstart playlist** → paste text → **Match songs** → **Create**.
@@ -184,8 +118,14 @@ playlists/
 │   └── src/main/java/com/playlists/app/
 │       ├── data/                   # Room: Song, Playlist, PlaylistSong
 │       ├── remote/                 # Local HTTP server + browser remote UI
-│       ├── ui/                     # Adapters, drag reorder, PDF helper, MainViewModel
-│       ├── ui/screens/             # Activities
+│       ├── ui/
+│       │   ├── MainActivity.kt     # Single Compose entry + share intents
+│       │   ├── PlaylistsViewModel.kt
+│       │   ├── navigation/         # NavHost routes
+│       │   ├── screens/            # Compose screens
+│       │   ├── components/         # Media viewer, dialogs
+│       │   ├── reorder/            # DraggableItem + list drag handler
+│       │   └── theme/              # Material 3 theme
 │       └── util/                   # Share import, quickstart matcher, AppUpdate
 └── gradle/wrapper/
 ```
@@ -201,6 +141,8 @@ playlists/
 ```
 
 Requires Android SDK (API 34 platform + build-tools 34.0.0) and JDK 17. Set `sdk.dir` in `local.properties` or via `ANDROID_HOME`.
+
+CI bootstraps the Gradle wrapper on each run (`gradlew` is not committed; see `.gitignore`).
 
 ## Signing
 
@@ -218,7 +160,7 @@ This is a personal sideload key, not a Play Store key.
 
 On push to `main` or `master`, GitHub Actions (`.github/workflows/android.yml`):
 
-1. Runs unit tests
+1. Compiles and runs unit tests
 2. Builds an arm64-v8a release APK
 3. Publishes a GitHub Release tagged `v1.0.<run>` with:
    - `app-1.0.<run>.apk` (versioned)
@@ -234,12 +176,10 @@ On cold start the app checks GitHub Releases for a newer build:
 
 1. **Check** — `GET https://api.github.com/repos/diegoboston/playlists/releases/latest`, read `tag_name` (e.g. `v1.0.42`), parse `versionCode` `42`, compare to the installed app.
 2. **Prompt** — If remote is newer, a snackbar offers to update.
-3. **Download** — Progress bar at the top of the main screen; fetches `app.apk` from the release.
+3. **Download** — Progress banner; fetches `app.apk` from the release.
 4. **Install** — Opens the system package installer via `FileProvider`.
 
-The stable URL is only for downloading. Version detection uses the GitHub API release tag, not the APK filename.
-
-Implementation: `AppUpdate.kt`, `MainViewModel.kt`, `MainActivity.kt`. Change `AppUpdate.REPO` if the GitHub repo slug differs.
+Implementation: `AppUpdate.kt`, `PlaylistsViewModel.kt`, `MainActivity.kt`. Change `AppUpdate.REPO` if the GitHub repo slug differs.
 
 ## Remote play
 
@@ -248,7 +188,7 @@ Control playback from a **second screen** on the same Wi‑Fi network (e.g. iPad
 1. **Start** — Open a playlist → tap the **Wi‑Fi** toolbar icon. The phone starts a small HTTP server and opens the URL in the browser (or copy it from the banner).
 2. **Browser UI** — Fullscreen sheet music / image for the current song and page. Title bar shows playlist name and `3/12: Song title · page 2/3`.
 3. **Navigate** — Swipe left/right (or laptop arrow keys) for next/previous song; multi-page PDFs advance page before moving to the next song.
-4. **Stop** — Tap **Stop** on the banner in the app, or leave the playlist screen (server stops when the playlist detail activity is destroyed).
+4. **Stop** — Tap **Stop** on the banner in the app, or leave the playlist screen (server stops when the screen is disposed).
 
 Requires Wi‑Fi with a LAN IP (not cellular-only). HTTP is cleartext on the local network (`usesCleartextTraffic`). Implementation: `PlayRemoteController.kt`, `PlayRemoteServer.kt`, `assets/remote/play.html`.
 
@@ -267,16 +207,17 @@ Interactive script to pull sources from a remote machine (via rsync), review cha
 
 ## Data model
 
-- **Song** — title, key, notes, file path, type (IMAGE/PDF), mime type. Multiple songs can point at the same file with different metadata.
-- **Playlist** — name, creation time.
+- **Song** — title, key, notes, file path, type (IMAGE/PDF), mime type, sort order. Multiple songs can point at the same file with different metadata.
+- **Playlist** — name, optional accent color, creation time.
 - **PlaylistSong** — playlist + song + position (ordered).
 
 Files are stored in app-internal storage (`files/songs/`). Metadata lives in Room (`playlists.db`).
 
 ## Tech stack
 
-- Kotlin, View Binding, Material Components
+- Kotlin, **Jetpack Compose**, Material 3
+- Single-activity navigation (`NavHost`)
 - Room + KSP
 - Coroutines / Flow
-- Coil (images)
-- Platform `PdfRenderer` + ViewPager2 (multi-page PDFs)
+- Coil (images in Compose)
+- Platform `PdfRenderer` + Compose `HorizontalPager` (multi-page PDFs)
