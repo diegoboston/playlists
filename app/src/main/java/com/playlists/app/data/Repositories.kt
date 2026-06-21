@@ -9,9 +9,11 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun getById(id: Long): Song? = songDao.getById(id)
 
-    suspend fun insert(song: Song): Long = songDao.insert(song)
+    suspend fun insert(song: Song): Long = songDao.insertAtTop(song)
 
     suspend fun delete(id: Long) = songDao.markDeleted(id, System.currentTimeMillis())
+
+    suspend fun reorder(idsInOrder: List<Long>) = songDao.replaceOrder(idsInOrder)
 
     suspend fun search(query: String): List<Song> {
         val trimmed = query.trim()
@@ -88,11 +90,20 @@ class PlaylistRepository(
 
     suspend fun removeSong(entryId: Long) = playlistSongDao.deleteById(entryId)
 
-    suspend fun reorder(playlistId: Long, songIdsInOrder: List<Long>) {
-        playlistSongDao.replaceOrder(playlistId, songIdsInOrder)
+    suspend fun reorder(playlistId: Long, entryIdsInOrder: List<Long>) {
+        playlistSongDao.replaceOrder(playlistId, entryIdsInOrder)
     }
 
     suspend fun setSongs(playlistId: Long, songIds: List<Long>) {
-        playlistSongDao.replaceOrder(playlistId, songIds)
+        playlistSongDao.deleteAllForPlaylist(playlistId)
+        songIds.forEachIndexed { index, songId ->
+            playlistSongDao.insert(
+                PlaylistSong(
+                    playlistId = playlistId,
+                    songId = songId,
+                    position = index,
+                )
+            )
+        }
     }
 }

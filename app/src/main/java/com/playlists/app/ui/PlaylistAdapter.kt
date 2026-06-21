@@ -23,21 +23,20 @@ class PlaylistAdapter(
         override fun areContentsTheSame(a: Playlist, b: Playlist) = a == b
     }
 
-    init {
-        reorderHelper.getKey = { pos ->
-            if (pos in 0 until itemCount) getItem(pos).id.toString() else ""
-        }
-    }
-
     inner class VH(private val binding: ItemPlaylistBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(playlist: Playlist) {
+            val color = playlist.colorArgb
             binding.name.text = playlist.name
+            if (color != null) {
+                binding.name.setTextColor(color)
+            } else {
+                binding.name.setTextColor(themeColor(com.google.android.material.R.attr.colorOnSurface))
+            }
             binding.name.setOnClickListener { onClick(playlist) }
             binding.root.setOnClickListener { onClick(playlist) }
             binding.edit.setOnClickListener { onEdit(playlist) }
             binding.colorBubble.setOnClickListener { onColor(playlist) }
 
-            val color = playlist.colorArgb
             if (color != null) {
                 binding.accentStripe.setBackgroundColor(color)
                 binding.colorBubble.background = PlaylistColorPicker.circleDrawable(binding.root.context, color)

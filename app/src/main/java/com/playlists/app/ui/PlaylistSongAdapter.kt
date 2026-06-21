@@ -24,12 +24,6 @@ class PlaylistSongAdapter(
             a == b
     }
 
-    init {
-        reorderHelper.getKey = { pos ->
-            if (pos in 0 until itemCount) getItem(pos).songId.toString() else ""
-        }
-    }
-
     inner class VH(private val binding: ItemPlaylistSongBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(entry: PlaylistSongWithDetails) {
             binding.title.text = entry.title

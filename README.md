@@ -35,6 +35,7 @@ Designed for sideloading on recent 64-bit ARM phones (not Google Play). CI build
 - **Drag reorder** — Long-press and drag; center-vs-center swap logic in `ReorderLogic` / `ReorderTouchHelper`.
 - **Duplicate playlist** — Copies name (with “(copy)”) and full song order.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs).
+- **Remote play** — Wi‑Fi icon on the playlist toolbar starts a local HTTP server; open the URL on another device on the same network (tablet, laptop) for a fullscreen browser view. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. A banner shows the active URL and **Stop**.
 
 ### Quickstart playlist
 
@@ -103,8 +104,10 @@ Sketch of the main flows (not to scale):
 ┌─────────────────────────────────────┐
 │ ← Sunday set                        │
 ├─────────────────────────────────────┤
-│  +   ▶   ✎   ⧉   ○   🗑             │
-│ add play rename dup color delete      │
+│  +   ▶   📶  ✎   ⧉   ○   🗑            │
+│ add play remote rename dup color delete  │
+├─────────────────────────────────────┤
+│ http://192.168.1.5:8080/    [ Stop ]  │  ← remote play banner (when active)
 ├─────────────────────────────────────┤
 │  Amazing Grace                      │
 │  (G) intro                          │
@@ -166,19 +169,21 @@ Sketch of the main flows (not to scale):
 4. **Add songs** — Open a playlist → **Add song** → search → tap a result.
 5. **Reorder** — Long-press a row in the playlist and drag.
 6. **Play** — Open a playlist → **Play** → swipe between songs.
-7. **Quickstart** — **Playlists** tab → **Quickstart playlist** → paste text → **Match songs** → **Create**.
+7. **Remote play** — Open a playlist → **Wi‑Fi** → open the URL on another device on the same LAN; swipe there to change songs/pages. **Stop** ends the server.
+8. **Quickstart** — **Playlists** tab → **Quickstart playlist** → paste text → **Match songs** → **Create**.
 
 ## Project layout
 
 ```
 playlists/
 ├── .github/workflows/android.yml   # CI: test → build → GitHub Release
-├── update.sh                       # Sync from shared6, commit, push
+├── update.sh                       # Interactive rsync sync, commit, push
 ├── app/
 │   ├── build.gradle.kts
 │   ├── keystore/playlists.keystore # Shared sideload signing key (committed)
 │   └── src/main/java/com/playlists/app/
 │       ├── data/                   # Room: Song, Playlist, PlaylistSong
+│       ├── remote/                 # Local HTTP server + browser remote UI
 │       ├── ui/                     # Adapters, drag reorder, PDF helper, MainViewModel
 │       ├── ui/screens/             # Activities
 │       └── util/                   # Share import, quickstart matcher, AppUpdate
@@ -236,16 +241,27 @@ The stable URL is only for downloading. Version detection uses the GitHub API re
 
 Implementation: `AppUpdate.kt`, `MainViewModel.kt`, `MainActivity.kt`. Change `AppUpdate.REPO` if the GitHub repo slug differs.
 
+## Remote play
+
+Control playback from a **second screen** on the same Wi‑Fi network (e.g. iPad on a music stand while the phone sits on a stand).
+
+1. **Start** — Open a playlist → tap the **Wi‑Fi** toolbar icon. The phone starts a small HTTP server and opens the URL in the browser (or copy it from the banner).
+2. **Browser UI** — Fullscreen sheet music / image for the current song and page. Title bar shows playlist name and `3/12: Song title · page 2/3`.
+3. **Navigate** — Swipe left/right (or laptop arrow keys) for next/previous song; multi-page PDFs advance page before moving to the next song.
+4. **Stop** — Tap **Stop** on the banner in the app, or leave the playlist screen (server stops when the playlist detail activity is destroyed).
+
+Requires Wi‑Fi with a LAN IP (not cellular-only). HTTP is cleartext on the local network (`usesCleartextTraffic`). Implementation: `PlayRemoteController.kt`, `PlayRemoteServer.kt`, `assets/remote/play.html`.
+
 ## update.sh
 
-Interactive sync script (run from another machine to pull sources from `shared6`):
+Interactive script to pull sources from a remote machine (via rsync), review changes, commit, and push to `origin main`:
 
 ```bash
 ./update.sh
 ```
 
 1. Cleans local build artifacts
-2. Rsyncs from `shared6:code/d-a/playlists` into the parent directory
+2. Rsyncs from the configured remote into the parent directory (edit the host/path in the script if needed)
 3. Shows `git status` / `git diff` with confirmation prompts
 4. Commits (min 10-char message) and pushes to `origin main`
 

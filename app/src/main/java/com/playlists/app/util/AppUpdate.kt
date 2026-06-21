@@ -167,7 +167,7 @@ object AppUpdate {
         conn.connectTimeout = 30_000
         conn.readTimeout = 120_000
         conn.setRequestProperty("Accept", "application/vnd.github+json")
-        conn.setRequestProperty("User-Agent", "Playlists-Android")
+        conn.setRequestProperty("User-Agent", "StageManager-Android")
         conn.instanceFollowRedirects = true
         return conn
     }

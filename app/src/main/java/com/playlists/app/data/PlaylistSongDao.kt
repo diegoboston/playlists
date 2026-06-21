@@ -46,17 +46,13 @@ interface PlaylistSongDao {
     @Query("SELECT COALESCE(MAX(position), -1) FROM playlist_songs WHERE playlistId = :playlistId")
     suspend fun maxPosition(playlistId: Long): Int
 
+    @Query("UPDATE playlist_songs SET position = :position WHERE id = :entryId AND playlistId = :playlistId")
+    suspend fun updatePosition(playlistId: Long, entryId: Long, position: Int)
+
     @Transaction
-    suspend fun replaceOrder(playlistId: Long, songIdsInOrder: List<Long>) {
-        deleteAllForPlaylist(playlistId)
-        songIdsInOrder.forEachIndexed { index, songId ->
-            insert(
-                PlaylistSong(
-                    playlistId = playlistId,
-                    songId = songId,
-                    position = index,
-                )
-            )
+    suspend fun replaceOrder(playlistId: Long, entryIdsInOrder: List<Long>) {
+        entryIdsInOrder.forEachIndexed { index, entryId ->
+            updatePosition(playlistId, entryId, index)
         }
     }
 }

@@ -38,7 +38,6 @@ class PlaylistsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         reorderHelper = ReorderTouchHelper(
             recyclerView = binding.list,
-            getKey = { _ -> "" },
             onOrderChanged = { keys ->
                 val ids = keys.mapNotNull { it.toLongOrNull() }
                 viewLifecycleOwner.lifecycleScope.launch {

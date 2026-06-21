@@ -20,6 +20,7 @@ class SongAdapter(
     private val onClick: (Song) -> Unit,
     private val showDelete: Boolean = false,
     private val onDelete: ((Song) -> Unit)? = null,
+    private val reorderHelper: ReorderTouchHelper? = null,
 ) : ListAdapter<Song, SongAdapter.VH>(Diff) {
 
     object Diff : DiffUtil.ItemCallback<Song>() {
@@ -35,6 +36,7 @@ class SongAdapter(
             binding.content.setOnClickListener { onClick(song) }
             binding.delete.visibility = if (showDelete) View.VISIBLE else View.GONE
             binding.delete.setOnClickListener { onDelete?.invoke(song) }
+            reorderHelper?.attachToViewHolder(this)
 
             binding.root.tag = song.id
             scope.launch {

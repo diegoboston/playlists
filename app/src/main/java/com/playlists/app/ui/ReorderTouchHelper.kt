@@ -14,11 +14,11 @@ import com.playlists.app.R
  */
 class ReorderTouchHelper(
     private val recyclerView: RecyclerView,
-    var getKey: (Int) -> String,
     private val onOrderChanged: (List<String>) -> Unit,
     var onItemMoved: ((from: Int, to: Int) -> Unit)? = null,
 ) {
     private var draggingKey: String? = null
+    private var draggedView: View? = null
     private var dragVisualTop = 0f
     private var dragOffset = 0f
     private var dragStartRawY = 0f
@@ -34,6 +34,9 @@ class ReorderTouchHelper(
             displayedKeys.addAll(value)
         }
 
+    private fun keyAt(position: Int): String =
+        displayedKeys.getOrNull(position).orEmpty()
+
     @SuppressLint("ClickableViewAccessibility")
     fun attachToViewHolder(holder: RecyclerView.ViewHolder, dragEnabled: Boolean = true) {
         if (holder.itemView.getTag(R.id.reorder_attached) == true) return
@@ -47,7 +50,9 @@ class ReorderTouchHelper(
             private val longPressRunnable = Runnable {
                 if (movedPastSlop || !dragEnabled) return@Runnable
                 longPressTriggered = true
-                val key = getKey(holder.bindingAdapterPosition)
+                val position = holder.bindingAdapterPosition
+                if (position == RecyclerView.NO_POSITION) return@Runnable
+                val key = keyAt(position)
                 if (key.isEmpty()) return@Runnable
                 startDrag(key, downRawY, itemView)
                 itemView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
@@ -73,7 +78,7 @@ class ReorderTouchHelper(
                         } else {
                             dragOffset += event.rawY - dragStartRawY
                             dragStartRawY = event.rawY
-                            dragVisualTop = itemView.top + dragOffset
+                            draggedView?.let { dragVisualTop = it.top + dragOffset }
                             updateLiftVisuals()
                             if (performSwap()) orderDirty = true
                             return true
@@ -94,6 +99,7 @@ class ReorderTouchHelper(
 
     private fun startDrag(key: String, rawY: Float, itemView: View) {
         draggingKey = key
+        draggedView = itemView
         dragStartRawY = rawY
         dragOffset = 0f
         dragVisualTop = itemView.top.toFloat()
@@ -104,6 +110,7 @@ class ReorderTouchHelper(
     private fun endDrag() {
         val key = draggingKey
         draggingKey = null
+        draggedView = null
         dragOffset = 0f
         recyclerView.requestDisallowInterceptTouchEvent(false)
         resetVisuals()
@@ -121,7 +128,7 @@ class ReorderTouchHelper(
             val child = recyclerView.getChildAt(i)
             val pos = recyclerView.getChildAdapterPosition(child)
             if (pos == RecyclerView.NO_POSITION) continue
-            val childKey = getKey(pos)
+            val childKey = keyAt(pos)
             tops[childKey] = child.top.toFloat()
             heights[childKey] = child.height.toFloat()
         }
@@ -130,6 +137,10 @@ class ReorderTouchHelper(
             val toIdx = displayedKeys.indexOf(key)
             if (toIdx >= 0 && toIdx != fromIdx) {
                 onItemMoved?.invoke(fromIdx, toIdx)
+                dragOffset = 0f
+                draggedView?.let { view ->
+                    dragVisualTop = view.top.toFloat()
+                }
             }
             return true
         }
@@ -137,14 +148,12 @@ class ReorderTouchHelper(
     }
 
     private fun updateLiftVisuals() {
-        val key = draggingKey ?: return
+        val dragged = draggedView ?: return
         for (i in 0 until recyclerView.childCount) {
             val child = recyclerView.getChildAt(i)
-            val pos = recyclerView.getChildAdapterPosition(child)
-            if (pos == RecyclerView.NO_POSITION) continue
-            val childKey = getKey(pos)
-            child.translationZ = if (childKey == key) 8f else 0f
-            child.translationY = if (childKey == key) dragOffset else 0f
+            val isDragged = child === dragged
+            child.translationZ = if (isDragged) 8f else 0f
+            child.translationY = if (isDragged) dragOffset else 0f
         }
     }
 

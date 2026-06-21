@@ -3,14 +3,15 @@ package com.playlists.app.data
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SongDao {
-    @Query("SELECT * FROM songs WHERE deletedAt IS NULL ORDER BY createdAt DESC")
+    @Query("SELECT * FROM songs WHERE deletedAt IS NULL ORDER BY sortOrder ASC, id ASC")
     fun observeAll(): Flow<List<Song>>
 
-    @Query("SELECT * FROM songs WHERE deletedAt IS NULL ORDER BY createdAt DESC")
+    @Query("SELECT * FROM songs WHERE deletedAt IS NULL ORDER BY sortOrder ASC, id ASC")
     suspend fun getAll(): List<Song>
 
     @Query("SELECT * FROM songs WHERE id = :id")
@@ -33,4 +34,23 @@ interface SongDao {
         """
     )
     suspend fun search(query: String): List<Song>
+
+    @Query("UPDATE songs SET sortOrder = :order WHERE id = :id")
+    suspend fun updateSortOrder(id: Long, order: Int)
+
+    @Query("UPDATE songs SET sortOrder = sortOrder + 1 WHERE deletedAt IS NULL")
+    suspend fun incrementAllSortOrders()
+
+    @Transaction
+    suspend fun insertAtTop(song: Song): Long {
+        incrementAllSortOrders()
+        return insert(song.copy(sortOrder = 0))
+    }
+
+    @Transaction
+    suspend fun replaceOrder(idsInOrder: List<Long>) {
+        idsInOrder.forEachIndexed { index, id ->
+            updateSortOrder(id, index)
+        }
+    }
 }

@@ -96,7 +96,7 @@
                 android:layout_weight="1"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/playlist_color"
-                android:padding="10dp"
+                android:padding="14dp"
                 android:scaleType="centerInside"
                 android:src="@drawable/ic_color_circle"
                 app:tint="?attr/colorControlNormal" />

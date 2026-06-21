@@ -19,6 +19,7 @@ class SongsFragment : Fragment() {
     private var _binding: FragmentSongsBinding? = null
     private val binding get() = _binding!!
     private lateinit var adapter: SongAdapter
+    private lateinit var reorderHelper: ReorderTouchHelper
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -30,8 +31,20 @@ class SongsFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        reorderHelper = ReorderTouchHelper(
+            recyclerView = binding.list,
+            onOrderChanged = { keys ->
+                val ids = keys.mapNotNull { it.toLongOrNull() }
+                viewLifecycleOwner.lifecycleScope.launch {
+                    PlaylistsApp.from(requireActivity().application).songRepository.reorder(ids)
+                }
+            },
+            onItemMoved = { from, to -> adapter.notifyItemMoved(from, to) },
+        )
+
         adapter = SongAdapter(
             scope = viewLifecycleOwner.lifecycleScope,
+            reorderHelper = reorderHelper,
             onClick = { song ->
                 startActivity(SongViewActivity.intent(requireContext(), song.id))
             },
@@ -45,6 +58,7 @@ class SongsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             repo.observeAll().collectLatest { songs ->
                 adapter.submitList(songs)
+                reorderHelper.keys = songs.map { it.id.toString() }
                 binding.empty.visibility = if (songs.isEmpty()) View.VISIBLE else View.GONE
             }
         }

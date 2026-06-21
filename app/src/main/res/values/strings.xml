@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Playlists</string>
+    <string name="app_name">Stage Manager</string>
     <string name="tab_songs">Songs</string>
     <string name="tab_playlists">Playlists</string>
     <string name="empty_songs">Share a PDF or image to add your first song.</string>

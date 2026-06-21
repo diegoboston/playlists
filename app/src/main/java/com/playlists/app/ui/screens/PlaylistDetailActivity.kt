@@ -47,11 +47,10 @@ class PlaylistDetailActivity : AppCompatActivity() {
 
         reorderHelper = ReorderTouchHelper(
             recyclerView = binding.list,
-            getKey = { _ -> "" },
             onOrderChanged = { keys ->
-                val songIds = keys.mapNotNull { it.toLongOrNull() }
+                val entryIds = keys.mapNotNull { it.toLongOrNull() }
                 lifecycleScope.launch {
-                    PlaylistsApp.from(application).playlistRepository.reorder(playlistId, songIds)
+                    PlaylistsApp.from(application).playlistRepository.reorder(playlistId, entryIds)
                 }
             },
             onItemMoved = { from, to -> adapter.notifyItemMoved(from, to) },
@@ -87,7 +86,7 @@ class PlaylistDetailActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repo.observeSongs(playlistId).collectLatest { entries ->
                 adapter.submitList(entries)
-                reorderHelper.keys = entries.map { it.songId.toString() }
+                reorderHelper.keys = entries.map { it.id.toString() }
                 binding.empty.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
             }
         }
@@ -154,14 +153,13 @@ class PlaylistDetailActivity : AppCompatActivity() {
     }
 
     private fun updateColorButton(colorArgb: Int?) {
+        val out = TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, out, true)
+        binding.color.setBackgroundResource(out.resourceId)
         if (colorArgb != null) {
-            binding.color.setImageDrawable(null)
-            binding.color.background = PlaylistColorPicker.circleDrawable(this, colorArgb)
+            binding.color.setImageDrawable(PlaylistColorPicker.circleDrawable(this, colorArgb))
         } else {
             binding.color.setImageResource(R.drawable.ic_color_circle)
-            val out = TypedValue()
-            theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, out, true)
-            binding.color.setBackgroundResource(out.resourceId)
         }
     }
 
