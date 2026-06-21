@@ -2,7 +2,7 @@
 
 Android app for building and playing ordered song lists from shared PDFs and images. Each imported file becomes a **song** in an archive; songs can be grouped into **playlists** with drag-to-reorder, full-text search, and swipe-through playback.
 
-Designed for sideloading on recent 64-bit ARM phones (not Google Play). CI builds a signed arm64 release APK and publishes it to GitHub Releases.
+Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 release APK and publishes it to GitHub Releases.
 
 ## Requirements
 
