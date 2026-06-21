@@ -16,18 +16,12 @@
 
         <activity
             android:name=".ui.MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-
-        <activity
-            android:name=".ui.screens.ShareReceiverActivity"
-            android:exported="true"
-            android:label="@string/import_song"
-            android:theme="@style/Theme.Playlists.Transparent">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -56,16 +50,6 @@
                 <data android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
-
-        <activity android:name=".ui.screens.ImportSongActivity" />
-        <activity
-            android:name=".ui.screens.SongViewActivity"
-            android:theme="@style/Theme.Playlists.Fullscreen" />
-        <activity android:name=".ui.screens.PlaylistDetailActivity" />
-        <activity
-            android:name=".ui.screens.PlaylistPlaybackActivity"
-            android:theme="@style/Theme.Playlists.Fullscreen" />
-        <activity android:name=".ui.screens.QuickstartActivity" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
