@@ -52,14 +52,14 @@ class SongViewActivity : AppCompatActivity() {
 
     private fun showImage(file: File) {
         binding.imageView.visibility = View.VISIBLE
-        binding.pdfPager.visibility = View.GONE
+        binding.pdfHost.visibility = View.GONE
         binding.pageIndicator.visibility = View.GONE
         binding.imageView.load(file)
     }
 
     private fun showPdf(file: File) {
         binding.imageView.visibility = View.GONE
-        binding.pdfPager.visibility = View.VISIBLE
+        binding.pdfHost.visibility = View.VISIBLE
         lifecycleScope.launch {
             val count = withContext(Dispatchers.IO) { PdfHelper.pageCount(file) }
             if (count <= 0) {

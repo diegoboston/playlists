@@ -1,9 +1,9 @@
 package com.playlists.app.ui
 
-import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import com.google.android.material.color.MaterialColors
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -63,11 +63,8 @@ class PlaylistAdapter(
             return argb and 0x00FFFFFF or (alpha shl 24)
         }
 
-        private fun themeColor(attr: Int): Int {
-            val typed = TypedValue()
-            binding.root.context.theme.resolveAttribute(attr, typed, true)
-            return typed.data
-        }
+        private fun themeColor(attr: Int): Int =
+            MaterialColors.getColor(binding.root.context, attr, "PlaylistAdapter")
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {

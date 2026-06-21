@@ -11,11 +11,17 @@
         android:contentDescription="@string/app_name"
         android:visibility="gone" />
 
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/pdfPager"
+    <com.playlists.app.ui.NestedScrollableHost
+        android:id="@+id/pdfHost"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone" />
+        android:visibility="gone">
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/pdfPager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </com.playlists.app.ui.NestedScrollableHost>
 
     <TextView
         android:id="@+id/pageIndicator"

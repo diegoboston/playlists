@@ -4,5 +4,5 @@
     <solid android:color="@android:color/transparent" />
     <stroke
         android:width="2dp"
-        android:color="?attr/colorOutline" />
+        android:color="@color/playlist_color_bubble_border_on" />
 </shape>

@@ -6,9 +6,11 @@ import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.View
+import android.view.ViewParent
 import android.view.ScaleGestureDetector
 import androidx.appcompat.widget.AppCompatImageView
-import kotlin.math.max
+import androidx.viewpager2.widget.ViewPager2
 import kotlin.math.min
 
 class ZoomImageView @JvmOverloads constructor(
@@ -19,23 +21,32 @@ class ZoomImageView @JvmOverloads constructor(
     private val baseMatrix = Matrix()
     private val suppMatrix = Matrix()
     private val displayMatrix = Matrix()
-    private var minScale = 1f
-    private var maxScale = 4f
-    private var lastFocusX = 0f
-    private var lastFocusY = 0f
+    private var baseScale = 1f
+    private val minRelativeScale = 1f
+    private val maxRelativeScale = 4f
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            setParentIntercept(true)
+            return true
+        }
+
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            val scale = currentScale()
-            val factor = detector.scaleFactor
-            val target = (scale * factor).coerceIn(minScale, maxScale)
-            val applied = target / scale
+            val relative = relativeScale()
+            val target = (relative * detector.scaleFactor).coerceIn(minRelativeScale, maxRelativeScale)
+            val applied = target / relative
             if (applied != 1f) {
                 suppMatrix.postScale(applied, applied, detector.focusX, detector.focusY)
                 applyMatrix()
-                updateParentIntercept()
+                setParentIntercept(isZoomed())
             }
             return true
+        }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            if (!isZoomed()) {
+                setParentIntercept(false)
+            }
         }
     })
 
@@ -46,7 +57,8 @@ class ZoomImageView @JvmOverloads constructor(
             distanceX: Float,
             distanceY: Float,
         ): Boolean {
-            if (currentScale() > minScale + 0.01f) {
+            if (isZoomed()) {
+                setParentIntercept(true)
                 suppMatrix.postTranslate(-distanceX, -distanceY)
                 applyMatrix()
                 return true
@@ -55,11 +67,10 @@ class ZoomImageView @JvmOverloads constructor(
         }
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
-            if (currentScale() > minScale + 0.01f) {
+            if (isZoomed()) {
                 resetZoom()
-                return true
             }
-            return false
+            return true
         }
     })
 
@@ -80,25 +91,29 @@ class ZoomImageView @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.pointerCount > 1 || scaleDetector.isInProgress) {
+            setParentIntercept(true)
+        }
+
         scaleDetector.onTouchEvent(event)
         gestureDetector.onTouchEvent(event)
-        val zoomed = currentScale() > minScale + 0.01f
-        if (zoomed || scaleDetector.isInProgress) {
-            updateParentIntercept()
-            return true
-        }
+
         when (event.actionMasked) {
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
-                parent?.requestDisallowInterceptTouchEvent(false)
+                if (!isZoomed() && !scaleDetector.isInProgress) {
+                    setParentIntercept(false)
+                }
         }
-        return false
+
+        // Must consume the stream so ScaleGestureDetector receives MOVE events.
+        return true
     }
 
     fun resetZoom() {
         suppMatrix.reset()
         computeBaseMatrix()
         applyMatrix()
-        updateParentIntercept()
+        setParentIntercept(false)
     }
 
     private fun computeBaseMatrix() {
@@ -117,8 +132,15 @@ class ZoomImageView @JvmOverloads constructor(
         val dy = paddingTop + (viewHeight - drawableHeight * scale) / 2f
         baseMatrix.postScale(scale, scale)
         baseMatrix.postTranslate(dx, dy)
-        minScale = 1f
+        baseScale = scale
     }
+
+    private fun relativeScale(): Float {
+        if (baseScale <= 0f) return 1f
+        return currentScale() / baseScale
+    }
+
+    private fun isZoomed(): Boolean = relativeScale() > minRelativeScale + 0.01f
 
     private fun currentScale(): Float {
         val values = FloatArray(9)
@@ -132,7 +154,14 @@ class ZoomImageView @JvmOverloads constructor(
         imageMatrix = displayMatrix
     }
 
-    private fun updateParentIntercept() {
-        parent?.requestDisallowInterceptTouchEvent(currentScale() > minScale + 0.01f)
+    private fun setParentIntercept(disallow: Boolean) {
+        var parent: ViewParent? = parent
+        while (parent != null) {
+            parent.requestDisallowInterceptTouchEvent(disallow)
+            if (parent is ViewPager2) {
+                parent.isUserInputEnabled = !disallow
+            }
+            parent = parent.parent
+        }
     }
 }

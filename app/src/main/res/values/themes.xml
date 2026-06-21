@@ -5,6 +5,10 @@
         <item name="colorPrimaryVariant">@color/primary_dark</item>
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSecondary">@color/accent</item>
+        <!-- M3 attrs used in layouts; not set by MaterialComponents parent -->
+        <item name="colorOutlineVariant">@color/card_stroke</item>
+        <item name="colorOutline">@color/playlist_color_bubble_border_on</item>
+        <item name="colorOnSurfaceVariant">@color/on_surface_variant</item>
     </style>
 
     <style name="Theme.Playlists.Fullscreen" parent="Theme.Playlists">
