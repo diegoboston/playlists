@@ -3,6 +3,7 @@ package com.playlists.app.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -11,8 +12,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.playlists.app.PlaylistsApp
 import com.playlists.app.R
-import com.playlists.app.data.PlaylistSongWithDetails
+import com.playlists.app.data.Playlist
 import com.playlists.app.databinding.ActivityPlaylistDetailBinding
+import com.playlists.app.ui.PlaylistColorPicker
 import com.playlists.app.ui.PlaylistSongAdapter
 import com.playlists.app.ui.ReorderTouchHelper
 import kotlinx.coroutines.flow.collectLatest
@@ -21,6 +23,7 @@ import kotlinx.coroutines.launch
 class PlaylistDetailActivity : AppCompatActivity() {
     private lateinit var binding: ActivityPlaylistDetailBinding
     private var playlistId: Long = -1
+    private var playlist: Playlist? = null
     private lateinit var adapter: PlaylistSongAdapter
     private lateinit var reorderHelper: ReorderTouchHelper
 
@@ -63,13 +66,17 @@ class PlaylistDetailActivity : AppCompatActivity() {
         binding.play.setOnClickListener {
             startActivity(PlaylistPlaybackActivity.intent(this, playlistId))
         }
-        binding.duplicate.setOnClickListener { duplicatePlaylist() }
         binding.rename.setOnClickListener { promptRename() }
+        binding.duplicate.setOnClickListener { promptDuplicate() }
+        binding.color.setOnClickListener { showColorPicker() }
+        binding.deletePlaylist.setOnClickListener { confirmDeletePlaylist() }
 
         val repo = PlaylistsApp.from(application).playlistRepository
         lifecycleScope.launch {
-            repo.getById(playlistId)?.let { playlist ->
-                supportActionBar?.title = playlist.name
+            repo.getById(playlistId)?.let { loaded ->
+                playlist = loaded
+                supportActionBar?.title = loaded.name
+                updateColorButton(loaded.colorArgb)
             }
         }
         lifecycleScope.launch {
@@ -78,6 +85,18 @@ class PlaylistDetailActivity : AppCompatActivity() {
                 reorderHelper.keys = entries.map { it.songId.toString() }
                 binding.empty.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
             }
+        }
+    }
+
+    private fun updateColorButton(colorArgb: Int?) {
+        if (colorArgb != null) {
+            binding.color.setImageDrawable(null)
+            binding.color.background = PlaylistColorPicker.circleDrawable(this, colorArgb)
+        } else {
+            binding.color.setImageResource(R.drawable.ic_color_circle)
+            val out = TypedValue()
+            theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, out, true)
+            binding.color.setBackgroundResource(out.resourceId)
         }
     }
 
@@ -91,12 +110,12 @@ class PlaylistDetailActivity : AppCompatActivity() {
             .setNegativeButton(android.R.string.cancel, null)
             .create()
 
-        val searchAdapter = com.playlists.app.ui.SongAdapter { song ->
+        val searchAdapter = com.playlists.app.ui.SongAdapter(lifecycleScope, onClick = { song ->
             lifecycleScope.launch {
                 PlaylistsApp.from(application).playlistRepository.addSong(playlistId, song.id)
                 dialog.dismiss()
             }
-        }
+        })
         resultsList.layoutManager = LinearLayoutManager(this)
         resultsList.adapter = searchAdapter
 
@@ -118,18 +137,32 @@ class PlaylistDetailActivity : AppCompatActivity() {
         }
     }
 
-    private fun duplicatePlaylist() {
-        lifecycleScope.launch {
-            val newId = PlaylistsApp.from(application).playlistRepository.duplicate(playlistId)
-            if (newId != null) {
-                startActivity(intent(this@PlaylistDetailActivity, newId))
+    private fun promptDuplicate() {
+        val current = playlist ?: return
+        val input = layoutInflater.inflate(R.layout.dialog_text_input, null) as TextInputEditText
+        input.setText(getString(R.string.duplicate_default_name, current.name))
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.duplicate)
+            .setView(input)
+            .setPositiveButton(R.string.create) { _, _ ->
+                val name = input.text?.toString()?.trim().orEmpty()
+                if (name.isNotEmpty()) {
+                    lifecycleScope.launch {
+                        val newId = PlaylistsApp.from(application)
+                            .playlistRepository.duplicate(playlistId, name)
+                        if (newId != null) {
+                            startActivity(intent(this@PlaylistDetailActivity, newId))
+                        }
+                    }
+                }
             }
-        }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun promptRename() {
         val input = layoutInflater.inflate(R.layout.dialog_text_input, null) as TextInputEditText
-        input.setText(supportActionBar?.title)
+        input.setText(playlist?.name ?: supportActionBar?.title)
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.rename_playlist)
             .setView(input)
@@ -138,8 +171,34 @@ class PlaylistDetailActivity : AppCompatActivity() {
                 if (name.isNotEmpty()) {
                     lifecycleScope.launch {
                         PlaylistsApp.from(application).playlistRepository.rename(playlistId, name)
+                        playlist = playlist?.copy(name = name)
                         supportActionBar?.title = name
                     }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showColorPicker() {
+        PlaylistColorPicker.show(this, playlist?.colorArgb) { argb ->
+            lifecycleScope.launch {
+                PlaylistsApp.from(application).playlistRepository.setColor(playlistId, argb)
+                playlist = playlist?.copy(colorArgb = argb)
+                updateColorButton(argb)
+            }
+        }
+    }
+
+    private fun confirmDeletePlaylist() {
+        val name = playlist?.name ?: supportActionBar?.title?.toString() ?: return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.delete_playlist)
+            .setMessage(getString(R.string.delete_playlist_confirm, name))
+            .setPositiveButton(R.string.delete_playlist) { _, _ ->
+                lifecycleScope.launch {
+                    PlaylistsApp.from(application).playlistRepository.delete(playlistId)
+                    finish()
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)

@@ -7,10 +7,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SongDao {
-    @Query("SELECT * FROM songs ORDER BY createdAt DESC")
+    @Query("SELECT * FROM songs WHERE deletedAt IS NULL ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<Song>>
 
-    @Query("SELECT * FROM songs ORDER BY createdAt DESC")
+    @Query("SELECT * FROM songs WHERE deletedAt IS NULL ORDER BY createdAt DESC")
     suspend fun getAll(): List<Song>
 
     @Query("SELECT * FROM songs WHERE id = :id")
@@ -19,15 +19,16 @@ interface SongDao {
     @Insert
     suspend fun insert(song: Song): Long
 
-    @Query("DELETE FROM songs WHERE id = :id")
-    suspend fun deleteById(id: Long)
+    @Query("UPDATE songs SET deletedAt = :deletedAt WHERE id = :id")
+    suspend fun markDeleted(id: Long, deletedAt: Long)
 
     @Query(
         """
         SELECT * FROM songs
-        WHERE title LIKE '%' || :query || '%'
+        WHERE deletedAt IS NULL
+          AND (title LIKE '%' || :query || '%'
            OR keySignature LIKE '%' || :query || '%'
-           OR notes LIKE '%' || :query || '%'
+           OR notes LIKE '%' || :query || '%')
         ORDER BY title COLLATE NOCASE ASC
         """
     )

@@ -12,7 +12,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.playlists.app.PlaylistsApp
 import com.playlists.app.R
+import com.playlists.app.data.Playlist
 import com.playlists.app.databinding.FragmentPlaylistsBinding
+import com.playlists.app.ui.PlaylistColorPicker
 import com.playlists.app.ui.screens.PlaylistDetailActivity
 import com.playlists.app.ui.screens.QuickstartActivity
 import kotlinx.coroutines.flow.collectLatest
@@ -22,6 +24,7 @@ class PlaylistsFragment : Fragment() {
     private var _binding: FragmentPlaylistsBinding? = null
     private val binding get() = _binding!!
     private lateinit var adapter: PlaylistAdapter
+    private lateinit var reorderHelper: ReorderTouchHelper
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -33,9 +36,26 @@ class PlaylistsFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        adapter = PlaylistAdapter { playlist ->
-            startActivity(PlaylistDetailActivity.intent(requireContext(), playlist.id))
-        }
+        reorderHelper = ReorderTouchHelper(
+            recyclerView = binding.list,
+            getKey = { _ -> "" },
+            onOrderChanged = { keys ->
+                val ids = keys.mapNotNull { it.toLongOrNull() }
+                viewLifecycleOwner.lifecycleScope.launch {
+                    PlaylistsApp.from(requireActivity().application).playlistRepository.reorder(ids)
+                }
+            },
+            onItemMoved = { from, to -> adapter.notifyItemMoved(from, to) },
+        )
+
+        adapter = PlaylistAdapter(
+            reorderHelper = reorderHelper,
+            onClick = { playlist ->
+                startActivity(PlaylistDetailActivity.intent(requireContext(), playlist.id))
+            },
+            onEdit = { playlist -> promptRename(playlist) },
+            onColor = { playlist -> showColorPicker(playlist) },
+        )
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         binding.list.adapter = adapter
 
@@ -48,6 +68,7 @@ class PlaylistsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             repo.observeAll().collectLatest { playlists ->
                 adapter.submitList(playlists)
+                reorderHelper.keys = playlists.map { it.id.toString() }
                 binding.empty.visibility = if (playlists.isEmpty()) View.VISIBLE else View.GONE
             }
         }
@@ -71,6 +92,34 @@ class PlaylistsFragment : Fragment() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    private fun promptRename(playlist: Playlist) {
+        val input = layoutInflater.inflate(R.layout.dialog_text_input, null) as TextInputEditText
+        input.setText(playlist.name)
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.rename_playlist)
+            .setView(input)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val name = input.text?.toString()?.trim().orEmpty()
+                if (name.isNotEmpty()) {
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        PlaylistsApp.from(requireActivity().application)
+                            .playlistRepository.rename(playlist.id, name)
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showColorPicker(playlist: Playlist) {
+        PlaylistColorPicker.show(requireContext(), playlist.colorArgb) { argb ->
+            viewLifecycleOwner.lifecycleScope.launch {
+                PlaylistsApp.from(requireActivity().application)
+                    .playlistRepository.setColor(playlist.id, argb)
+            }
+        }
     }
 
     override fun onDestroyView() {

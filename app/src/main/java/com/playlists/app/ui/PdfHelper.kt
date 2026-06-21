@@ -4,11 +4,22 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import com.playlists.app.data.FileType
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 object PdfHelper {
+    private val pageCountCache = ConcurrentHashMap<String, Int>()
+
+    fun pageCount(file: File, fileType: FileType): Int = when (fileType) {
+        FileType.IMAGE -> 1
+        FileType.PDF -> pageCount(file)
+    }
+
     fun pageCount(file: File): Int =
-        openRenderer(file)?.use { it.pageCount } ?: 0
+        pageCountCache.getOrPut(file.absolutePath) {
+            openRenderer(file)?.use { it.pageCount } ?: 0
+        }
 
     fun renderPage(file: File, pageIndex: Int, width: Int): Bitmap? {
         val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)

@@ -13,6 +13,7 @@ data class Song(
     val fileType: String,
     val mimeType: String,
     val createdAt: Long = System.currentTimeMillis(),
+    val deletedAt: Long? = null,
 )
 
 enum class FileType {

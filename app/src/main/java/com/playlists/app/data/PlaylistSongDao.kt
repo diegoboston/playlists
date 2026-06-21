@@ -11,7 +11,8 @@ interface PlaylistSongDao {
     @Query(
         """
         SELECT ps.id, ps.playlistId, ps.songId, ps.position,
-               s.title, s.keySignature, s.notes, s.filePath, s.fileType
+               s.title, s.keySignature, s.notes, s.filePath, s.fileType,
+               (s.deletedAt IS NOT NULL) AS isDeleted
         FROM playlist_songs ps
         INNER JOIN songs s ON s.id = ps.songId
         WHERE ps.playlistId = :playlistId
@@ -23,7 +24,8 @@ interface PlaylistSongDao {
     @Query(
         """
         SELECT ps.id, ps.playlistId, ps.songId, ps.position,
-               s.title, s.keySignature, s.notes, s.filePath, s.fileType
+               s.title, s.keySignature, s.notes, s.filePath, s.fileType,
+               (s.deletedAt IS NOT NULL) AS isDeleted
         FROM playlist_songs ps
         INNER JOIN songs s ON s.id = ps.songId
         WHERE ps.playlistId = :playlistId

@@ -25,7 +25,7 @@ Designed for sideloading on recent 64-bit ARM phones (not Google Play). CI build
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**.
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
 - **Song list** — Shows title, key, and notes preview (first ~20 characters), plus file type badge.
-- **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`).
+- **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages.
 
 ### Playlists
 
@@ -39,6 +39,124 @@ Designed for sideloading on recent 64-bit ARM phones (not Google Play). CI build
 ### Quickstart playlist
 
 Paste a block of text (one song title per line, e.g. a set list). The app fuzzy-matches lines against the archive and assembles a playlist from the best hits. Review matches, then create the playlist.
+
+## Screens
+
+Sketch of the main flows (not to scale):
+
+```
+┌─────────────────────────────────────┐
+│ Playlists                           │
+├─────────────────────────────────────┤
+│ [ Songs ]  [ Playlists ]            │
+├─────────────────────────────────────┤
+│                                     │
+│  SONGS TAB                          │
+│  ┌─────────────────────────────┐    │
+│  │ Amazing Grace          PDF │🗑│  │
+│  │ Key: G · intro notes · 2 pg│    │
+│  └─────────────────────────────┘    │
+│  ┌─────────────────────────────┐    │
+│  │ Blue Moon             IMAGE│🗑│  │
+│  │ Key: C · verse 1 · 1 pg    │    │
+│  └─────────────────────────────┘    │
+│                                     │
+│  tap row → fullscreen viewer        │
+│  🗑 → remove from archive (soft)    │
+│                                     │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│ Playlists                           │
+├─────────────────────────────────────┤
+│ [ Songs ]  [ Playlists ]            │
+├─────────────────────────────────────┤
+│                                     │
+│  PLAYLISTS TAB                      │
+│  ┌─────────────────────────────┐    │
+│  │▌Sunday set        ○  ✎     │    │
+│  └─────────────────────────────┘    │
+│  ┌─────────────────────────────┐    │
+│  │▌Rehearsal         ○  ✎     │    │  ← long-press drag to reorder
+│  └─────────────────────────────┘    │
+│                                     │
+│  [ Quickstart playlist ]            │
+│                              [ + ]  │  ← new playlist
+└─────────────────────────────────────┘
+
+        share from another app
+                 │
+                 ▼
+┌─────────────────────────────────────┐
+│ Import song                         │
+├─────────────────────────────────────┤
+│ Title  [________________]           │
+│ Key    [________________]           │
+│ Notes  [________________]         │
+│                                     │
+│              [ Save ]               │
+└─────────────────────────────────────┘
+
+        tap playlist row
+                 │
+                 ▼
+┌─────────────────────────────────────┐
+│ ← Sunday set                        │
+├─────────────────────────────────────┤
+│  +   ▶   ✎   ⧉   ○   🗑             │
+│ add play rename dup color delete      │
+├─────────────────────────────────────┤
+│  Amazing Grace                      │
+│  (G) intro                          │
+│  How Great Thou Art          🗑     │  ← red if deleted from archive
+│  (Bb)                               │
+│                                     │
+│  empty: “Tap + above to add songs.” │
+└─────────────────────────────────────┘
+
+        ▶ play
+                 │
+                 ▼
+┌─────────────────────────────────────┐
+│ ← Sunday set                        │
+├─────────────────────────────────────┤
+│ 1/5: Amazing Grace · page 2/3       │
+├─────────────────────────────────────┤
+│                                     │
+│         [ sheet music / image ]     │
+│         swipe ↔ next song           │
+│         pinch to zoom               │
+│                                     │
+└─────────────────────────────────────┘
+
+        tap song in archive
+                 │
+                 ▼
+┌─────────────────────────────────────┐
+│ Amazing Grace                       │
+├─────────────────────────────────────┤
+│                                     │
+│         [ fullscreen image/PDF ]    │
+│         PDF: swipe ↔ pages          │
+│         pinch to zoom               │
+│              2 / 3                  │
+└─────────────────────────────────────┘
+
+        Quickstart playlist
+                 │
+                 ▼
+┌─────────────────────────────────────┐
+│ Quickstart playlist                 │
+├─────────────────────────────────────┤
+│ paste set list (one title per line) │
+│ ┌─────────────────────────────────┐ │
+│ │ Amazing Grace                   │ │
+│ │ Blue Moon                       │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ [ Match songs ]  →  review  → Create│
+└─────────────────────────────────────┘
+```
 
 ## Usage
 

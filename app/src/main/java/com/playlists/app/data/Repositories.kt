@@ -11,7 +11,7 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun insert(song: Song): Long = songDao.insert(song)
 
-    suspend fun delete(id: Long) = songDao.deleteById(id)
+    suspend fun delete(id: Long) = songDao.markDeleted(id, System.currentTimeMillis())
 
     suspend fun search(query: String): List<Song> {
         val trimmed = query.trim()
@@ -29,20 +29,33 @@ class PlaylistRepository(
     suspend fun getById(id: Long): Playlist? = playlistDao.getById(id)
 
     suspend fun create(name: String): Long =
-        playlistDao.insert(Playlist(name = name))
+        playlistDao.insertAtTop(Playlist(name = name))
 
     suspend fun rename(id: Long, name: String) {
         val playlist = playlistDao.getById(id) ?: return
         playlistDao.update(playlist.copy(name = name))
     }
 
+    suspend fun setColor(id: Long, colorArgb: Int?) {
+        val playlist = playlistDao.getById(id) ?: return
+        playlistDao.update(playlist.copy(colorArgb = colorArgb))
+    }
+
+    suspend fun reorder(idsInOrder: List<Long>) {
+        playlistDao.replaceOrder(idsInOrder)
+    }
+
     suspend fun delete(id: Long) = playlistDao.deleteById(id)
 
-    suspend fun duplicate(id: Long): Long? {
+    suspend fun duplicate(id: Long, name: String): Long? {
         val source = playlistDao.getById(id) ?: return null
         val entries = playlistSongDao.getForPlaylist(id)
         val newId = playlistDao.insert(
-            Playlist(name = "${source.name} (copy)")
+            Playlist(
+                name = name,
+                sortOrder = playlistDao.maxSortOrder() + 1,
+                colorArgb = source.colorArgb,
+            )
         )
         entries.forEach { entry ->
             playlistSongDao.insert(

@@ -7,7 +7,9 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.playlists.app.PlaylistsApp
+import com.playlists.app.R
 import com.playlists.app.databinding.FragmentSongsBinding
 import com.playlists.app.ui.screens.SongViewActivity
 import kotlinx.coroutines.flow.collectLatest
@@ -28,9 +30,14 @@ class SongsFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        adapter = SongAdapter { song ->
-            startActivity(SongViewActivity.intent(requireContext(), song.id))
-        }
+        adapter = SongAdapter(
+            scope = viewLifecycleOwner.lifecycleScope,
+            onClick = { song ->
+                startActivity(SongViewActivity.intent(requireContext(), song.id))
+            },
+            showDelete = true,
+            onDelete = { song -> confirmDelete(song) },
+        )
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         binding.list.adapter = adapter
 
@@ -41,6 +48,19 @@ class SongsFragment : Fragment() {
                 binding.empty.visibility = if (songs.isEmpty()) View.VISIBLE else View.GONE
             }
         }
+    }
+
+    private fun confirmDelete(song: com.playlists.app.data.Song) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.delete_song)
+            .setMessage(getString(R.string.delete_song_confirm, song.title))
+            .setPositiveButton(R.string.delete_song) { _, _ ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    PlaylistsApp.from(requireActivity().application).songRepository.delete(song.id)
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     override fun onDestroyView() {

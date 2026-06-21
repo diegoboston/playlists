@@ -3,4 +3,6 @@
     <color name="primary">#1565C0</color>
     <color name="primary_dark">#0D47A1</color>
     <color name="accent">#FF6F00</color>
+    <color name="deleted_song">#C62828</color>
+    <color name="playlist_color_bubble_border_on">#66000000</color>
 </resources>

@@ -4,12 +4,11 @@
     android:layout_height="match_parent"
     android:background="@android:color/black">
 
-    <ImageView
+    <com.playlists.app.ui.ZoomImageView
         android:id="@+id/imageView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:contentDescription="@string/app_name"
-        android:scaleType="fitCenter"
         android:visibility="gone" />
 
     <androidx.viewpager2.widget.ViewPager2

@@ -66,7 +66,7 @@ class SongViewActivity : AppCompatActivity() {
                 finish()
                 return@launch
             }
-            binding.pdfPager.adapter = PdfPagerAdapter(this@SongViewActivity, file, count)
+            binding.pdfPager.adapter = PdfPagerAdapter(this@SongViewActivity, file, count, zoomEnabled = true)
             binding.pageIndicator.visibility = if (count > 1) View.VISIBLE else View.GONE
             binding.pdfPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
