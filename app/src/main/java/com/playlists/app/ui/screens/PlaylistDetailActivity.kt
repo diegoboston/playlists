@@ -2,9 +2,11 @@ package com.playlists.app.ui.screens
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -14,6 +16,7 @@ import com.playlists.app.PlaylistsApp
 import com.playlists.app.R
 import com.playlists.app.data.Playlist
 import com.playlists.app.databinding.ActivityPlaylistDetailBinding
+import com.playlists.app.remote.PlayRemoteController
 import com.playlists.app.ui.PlaylistColorPicker
 import com.playlists.app.ui.PlaylistSongAdapter
 import com.playlists.app.ui.ReorderTouchHelper
@@ -66,6 +69,8 @@ class PlaylistDetailActivity : AppCompatActivity() {
         binding.play.setOnClickListener {
             startActivity(PlaylistPlaybackActivity.intent(this, playlistId))
         }
+        binding.remote.setOnClickListener { startRemote() }
+        binding.remoteStop.setOnClickListener { stopRemote() }
         binding.rename.setOnClickListener { promptRename() }
         binding.duplicate.setOnClickListener { promptDuplicate() }
         binding.color.setOnClickListener { showColorPicker() }
@@ -85,6 +90,66 @@ class PlaylistDetailActivity : AppCompatActivity() {
                 reorderHelper.keys = entries.map { it.songId.toString() }
                 binding.empty.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
             }
+        }
+        updateRemoteBar()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateRemoteBar()
+    }
+
+    override fun onDestroy() {
+        if (PlayRemoteController.isRunningFor(playlistId)) {
+            PlayRemoteController.stop()
+        }
+        super.onDestroy()
+    }
+
+    private fun startRemote() {
+        if (PlayRemoteController.isRunningFor(playlistId)) {
+            PlayRemoteController.currentUrl()?.let { openRemoteUrl(it) }
+            return
+        }
+        lifecycleScope.launch {
+            val repo = PlaylistsApp.from(application).playlistRepository
+            val entries = repo.getSongs(playlistId)
+            if (entries.isEmpty()) {
+                Toast.makeText(this@PlaylistDetailActivity, R.string.remote_empty, Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            val name = playlist?.name ?: supportActionBar?.title?.toString().orEmpty()
+            PlayRemoteController.start(this@PlaylistDetailActivity, playlistId, name, entries)
+                .onSuccess { url ->
+                    updateRemoteBar()
+                    openRemoteUrl(url)
+                    Toast.makeText(this@PlaylistDetailActivity, R.string.remote_started, Toast.LENGTH_SHORT).show()
+                }
+                .onFailure { error ->
+                    val message = when {
+                        error.message?.contains("LAN IP") == true -> getString(R.string.remote_no_network)
+                        else -> getString(R.string.remote_failed, error.message ?: "unknown")
+                    }
+                    Toast.makeText(this@PlaylistDetailActivity, message, Toast.LENGTH_LONG).show()
+                }
+        }
+    }
+
+    private fun openRemoteUrl(url: String) {
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+
+    private fun stopRemote() {
+        PlayRemoteController.stop()
+        updateRemoteBar()
+    }
+
+    private fun updateRemoteBar() {
+        val active = PlayRemoteController.isRunningFor(playlistId)
+        val url = PlayRemoteController.currentUrl()
+        binding.remoteBar.visibility = if (active && url != null) View.VISIBLE else View.GONE
+        if (url != null) {
+            binding.remoteUrl.text = getString(R.string.remote_url_label, url)
         }
     }
 
@@ -197,6 +262,9 @@ class PlaylistDetailActivity : AppCompatActivity() {
             .setMessage(getString(R.string.delete_playlist_confirm, name))
             .setPositiveButton(R.string.delete_playlist) { _, _ ->
                 lifecycleScope.launch {
+                    if (PlayRemoteController.isRunningFor(playlistId)) {
+                        PlayRemoteController.stop()
+                    }
                     PlaylistsApp.from(application).playlistRepository.delete(playlistId)
                     finish()
                 }

@@ -11,7 +11,8 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Playlists">
+        android:theme="@style/Theme.Playlists"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".ui.MainActivity"

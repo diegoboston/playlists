@@ -95,6 +95,8 @@ dependencies {
 
     implementation("io.coil-kt:coil:2.7.0")
 
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
 
     testImplementation("junit:junit:4.13.2")

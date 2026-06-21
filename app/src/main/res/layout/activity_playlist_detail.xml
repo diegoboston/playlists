@@ -54,6 +54,18 @@
                 app:tint="?attr/colorControlNormal" />
 
             <ImageButton
+                android:id="@+id/remote"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/remote_play"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_remote"
+                app:tint="?attr/colorControlNormal" />
+
+            <ImageButton
                 android:id="@+id/rename"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
@@ -100,6 +112,33 @@
                 android:scaleType="centerInside"
                 android:src="@drawable/ic_delete"
                 app:tint="?attr/colorError" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/remoteBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/colorSurfaceVariant"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/remoteUrl"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textAppearance="?attr/textAppearanceBody2"
+                android:textIsSelectable="true" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/remoteStop"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/remote_stop" />
         </LinearLayout>
 
         <FrameLayout

@@ -23,6 +23,13 @@
     <string name="delete_playlist">Delete playlist</string>
     <string name="delete_playlist_confirm">Delete “%1$s”? This cannot be undone.</string>
     <string name="play">Play</string>
+    <string name="remote_play">Remote play</string>
+    <string name="remote_stop">Stop</string>
+    <string name="remote_url_label">Remote: %1$s</string>
+    <string name="remote_started">Remote play started</string>
+    <string name="remote_empty">Add songs before starting remote play.</string>
+    <string name="remote_no_network">Connect to Wi‑Fi to use remote play.</string>
+    <string name="remote_failed">Remote play failed: %1$s</string>
     <string name="remove">Remove</string>
     <string name="empty_playlist">Tap + above to add songs.</string>
     <string name="quickstart">Quickstart playlist</string>

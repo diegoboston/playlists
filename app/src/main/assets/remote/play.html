@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Playlists Remote</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #000; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: pan-y; }
+    #bar { background: rgba(0,0,0,.8); padding: 10px 12px; text-align: center; font-size: 14px; line-height: 1.4; }
+    #title { font-weight: 700; }
+    #meta { opacity: .85; font-size: 13px; margin-top: 2px; }
+    #stage { height: calc(100% - 56px); display: flex; align-items: center; justify-content: center; position: relative; }
+    #media { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+    #hint { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; opacity: .55; font-size: 12px; pointer-events: none; }
+    #empty { padding: 24px; text-align: center; opacity: .8; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <div id="title">Playlists</div>
+    <div id="meta"></div>
+  </div>
+  <div id="stage">
+    <img id="media" alt="" hidden />
+    <div id="empty" hidden>No songs in this playlist.</div>
+    <div id="hint">Swipe or flick ← → · arrow keys</div>
+  </div>
+  <script>
+    const media = document.getElementById('media');
+    const titleEl = document.getElementById('title');
+    const metaEl = document.getElementById('meta');
+    const emptyEl = document.getElementById('empty');
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let busy = false;
+
+    async function refresh() {
+      const res = await fetch('/api/state');
+      const s = await res.json();
+      titleEl.textContent = s.playlistName || 'Playlist';
+      if (!s.songs || s.songs.length === 0) {
+        media.hidden = true;
+        emptyEl.hidden = false;
+        metaEl.textContent = '';
+        return;
+      }
+      emptyEl.hidden = true;
+      media.hidden = false;
+      const song = s.songs[s.songIndex];
+      const pageCount = song.pageCount || 1;
+      const pageLabel = pageCount > 1 ? ` · page ${s.pageIndex + 1}/${pageCount}` : '';
+      metaEl.textContent = `${s.songIndex + 1}/${s.songs.length}: ${song.title}${pageLabel}`;
+      media.src = `/api/media?song=${s.songIndex}&page=${s.pageIndex}&t=${Date.now()}`;
+    }
+
+    async function navigate(direction) {
+      if (busy) return;
+      busy = true;
+      try {
+        await fetch('/api/navigate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ direction }),
+        });
+        await refresh();
+      } finally {
+        busy = false;
+      }
+    }
+
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].clientX;
+      touchStartY = e.changedTouches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
+      navigate(dx < 0 ? 'next' : 'prev');
+    }, { passive: true });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate('next');
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') navigate('prev');
+    });
+
+    refresh();
+    setInterval(refresh, 3000);
+  </script>
+</body>
+</html>
