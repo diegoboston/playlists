@@ -8,6 +8,7 @@ import com.playlists.app.data.Song
 import com.playlists.app.ui.PdfHelper
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.FileStorage
+import com.playlists.app.util.SongTitles
 import fi.iki.elonen.NanoHTTPD
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,17 +48,31 @@ object PlayRemoteController {
         appContext = context.applicationContext
         val songs = entriesToRemoteSongs(entries)
         val html = context.assets.open("remote/play.html").bufferedReader().readText()
+        val editHtml = context.assets.open("remote/edit.html").bufferedReader().readText()
         val port = AppPrefs.getRemotePort(context)
         val remote = PlayRemoteServer(
             port = port,
             playlistName = playlistName,
             songs = songs,
             html = html,
+            editHtml = editHtml,
             onStopRequested = { stop() },
             onUpload = { title, key, notes, tempFile, mimeType ->
                 runBlocking {
                     handleUpload(playlistId, title, key, notes, tempFile, mimeType)
                 }
+            },
+            onReorder = { entryIds ->
+                runBlocking { mutatePlaylist(playlistId) { app -> app.playlistRepository.reorder(playlistId, entryIds) } }
+            },
+            onRemove = { entryId ->
+                runBlocking { mutatePlaylist(playlistId) { app -> app.playlistRepository.removeSong(entryId) } }
+            },
+            onAdd = { songId ->
+                runBlocking { mutatePlaylist(playlistId) { app -> app.playlistRepository.addSong(playlistId, songId) } }
+            },
+            onSearchSongs = { query ->
+                runBlocking { searchSongs(query) }
             },
         )
         return try {
@@ -103,12 +118,49 @@ object PlayRemoteController {
                 1
             }
             PlayRemoteServer.RemoteSong(
+                entryId = entry.id,
+                songId = entry.songId,
                 title = entry.title,
+                keySignature = entry.keySignature,
+                notes = entry.notes,
                 fileType = entry.fileType,
                 filePath = entry.filePath,
                 pageCount = pageCount.coerceAtLeast(1),
+                isDeleted = entry.isDeleted,
             )
         }
+
+    private suspend fun mutatePlaylist(
+        playlistId: Long,
+        block: suspend (PlaylistsApp) -> Unit,
+    ): Result<Unit> {
+        val ctx = appContext ?: return Result.failure(IllegalStateException("Server not ready"))
+        val app = PlaylistsApp.from(ctx as android.app.Application)
+        return try {
+            block(app)
+            val entries = app.playlistRepository.getSongs(playlistId)
+            if (entries.isEmpty()) {
+                return Result.failure(IllegalStateException("Playlist is empty"))
+            }
+            server?.replaceSongs(entriesToRemoteSongs(entries))
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun searchSongs(query: String): List<PlayRemoteServer.SearchSong> {
+        val ctx = appContext ?: return emptyList()
+        val app = PlaylistsApp.from(ctx as android.app.Application)
+        return app.songRepository.search(query).map { song ->
+            PlayRemoteServer.SearchSong(
+                id = song.id,
+                title = song.title,
+                keySignature = song.keySignature,
+                notes = song.notes,
+            )
+        }
+    }
 
     private suspend fun handleUpload(
         playlistId: Long,
@@ -126,7 +178,8 @@ object PlayRemoteController {
             val fileType = if (mimeType.contains("pdf")) FileType.PDF else FileType.IMAGE
             val songId = app.songRepository.insert(
                 Song(
-                    title = title.trim().ifBlank { "Uploaded song" },
+                    title = title.trim().ifBlank { SongTitles.fromFilename(tempFile.name) }
+                        .ifBlank { "Uploaded song" },
                     keySignature = key.trim(),
                     notes = notes.trim(),
                     filePath = stored.absolutePath,

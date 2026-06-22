@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -19,6 +20,9 @@ interface SongDao {
 
     @Insert
     suspend fun insert(song: Song): Long
+
+    @Update
+    suspend fun update(song: Song)
 
     @Query("UPDATE songs SET deletedAt = :deletedAt WHERE id = :id")
     suspend fun markDeleted(id: Long, deletedAt: Long)

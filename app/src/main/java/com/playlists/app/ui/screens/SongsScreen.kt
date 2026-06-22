@@ -12,12 +12,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,6 +53,7 @@ fun SongsScreen(
     val displayedKeys = remember { mutableStateListOf<String>() }
     val dragState = remember { ReorderDragState() }
     var deleteTarget by remember { mutableStateOf<Song?>(null) }
+    var editTarget by remember { mutableStateOf<Song?>(null) }
 
     LaunchedEffect(songs, dragState.draggingKey) {
         syncDisplayedKeys(displayedKeys, dragState.draggingKey, songs.map { "s:${it.id}" })
@@ -97,10 +100,22 @@ fun SongsScreen(
                 SongRow(
                     song = song,
                     pageCount = viewModel.pageCount(song),
+                    onEdit = { editTarget = song },
                     onDelete = { deleteTarget = song },
                 )
             }
         }
+    }
+
+    editTarget?.let { song ->
+        EditSongDialog(
+            song = song,
+            onDismiss = { editTarget = null },
+            onSave = { title, key, notes ->
+                viewModel.updateSong(song.id, title, key, notes)
+                editTarget = null
+            },
+        )
     }
 
     deleteTarget?.let { song ->
@@ -126,9 +141,63 @@ fun SongsScreen(
 }
 
 @Composable
+private fun EditSongDialog(
+    song: Song,
+    onDismiss: () -> Unit,
+    onSave: (title: String, key: String, notes: String) -> Unit,
+) {
+    var title by remember(song.id) { mutableStateOf(song.title) }
+    var key by remember(song.id) { mutableStateOf(song.keySignature) }
+    var notes by remember(song.id) { mutableStateOf(song.notes) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.edit_song)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(stringResource(R.string.title_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = key,
+                    onValueChange = { key = it },
+                    label = { Text(stringResource(R.string.key_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text(stringResource(R.string.notes_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(title, key, notes) },
+                enabled = title.trim().isNotEmpty(),
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
 private fun SongRow(
     song: Song,
     pageCount: Int,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(
@@ -165,6 +234,9 @@ private fun SongRow(
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(end = 4.dp),
             )
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit_song))
+            }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_song))
             }

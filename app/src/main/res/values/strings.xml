@@ -46,6 +46,7 @@
     <string name="match_songs">Match songs</string>
     <string name="quickstart_default_name">Quickstart</string>
     <string name="delete_song">Delete song</string>
+    <string name="edit_song">Edit song</string>
     <string name="delete_song_confirm">Remove “%1$s” from the song archive? It will stay in playlists but appear in red.</string>
     <string name="deleted_from_archive">Removed from archive</string>
     <string name="playback_song_indicator">%1$d/%2$d: %3$s</string>

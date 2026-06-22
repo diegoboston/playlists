@@ -22,9 +22,9 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 ### Song archive
 
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
-- **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**.
+- **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**. Underscores in the filename become spaces in the suggested title.
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
-- **Song list** — Shows title, key, and notes preview (first ~20 characters), plus file type badge.
+- **Song list** — Shows title, key, and notes preview (first ~20 characters), plus file type badge. **Pencil** edits title, key, and notes.
 - **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages.
 
 ### Playlists
@@ -35,7 +35,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Drag reorder** — Long-press and drag rows in the Songs tab, Playlists tab, or playlist detail screen. Uses the same center-vs-center swap logic as NoTube (`DraggableItem` + `ReorderLogic`).
 - **Duplicate playlist** — Copies name (with “(copy)”) and full song order.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs).
-- **Remote play** — Wi‑Fi icon on the playlist toolbar starts a local HTTP server; open the URL on another device on the same network (tablet, laptop) for a fullscreen browser view. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. A banner shows the active URL and **Stop**.
+- **Remote play** — Wi‑Fi icon on the playlist toolbar starts a local HTTP server; open the URL on another device on the same network (tablet, laptop) for a fullscreen browser view. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. A banner shows the active URL and **Stop**. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen).
 
 ### Quickstart playlist
 
@@ -54,12 +54,13 @@ Sketch of the main flows (not to scale):
 │                                     │
 │  SONGS TAB                          │
 │  ┌─────────────────────────────┐    │
-│  │ Amazing Grace          PDF │🗑│  │
+│  │ Amazing Grace          PDF │✎🗑│  │
 │  │ Key: G · intro notes · 2 pg│    │
 │  └─────────────────────────────┘    │
 │                                     │
 │  tap row → fullscreen viewer        │
 │  long-press drag → reorder          │
+│  ✎ → edit title / key / notes       │
 │  🗑 → remove from archive (soft)    │
 │                                     │
 └─────────────────────────────────────┘
@@ -188,11 +189,12 @@ Implementation: `AppUpdate.kt`, `PlaylistsViewModel.kt`, `MainActivity.kt`. Chan
 Control playback from a **second screen** on the same Wi‑Fi network (e.g. iPad on a music stand while the phone sits on a stand).
 
 1. **Start** — Open a playlist → tap the **Wi‑Fi** toolbar icon. The phone starts a small HTTP server and opens the URL in the browser (or copy it from the banner).
-2. **Browser UI** — Fullscreen sheet music / image for the current song and page. Title bar shows playlist name and `3/12: Song title · page 2/3`.
+2. **Browser UI** — Fullscreen sheet music / image for the current song and page. Title bar shows playlist name and `3/12: Song title · page 2/3`. **+** uploads a new file; **pencil** opens `/edit` to reorder, remove, or add songs from the archive.
 3. **Navigate** — Swipe left/right (or laptop arrow keys) for next/previous song; multi-page PDFs advance page before moving to the next song.
-4. **Stop** — Tap **Stop** on the banner in the app, or leave the playlist screen (server stops when the screen is disposed).
+4. **Edit playlist** — On `/edit`, drag rows to reorder, tap **Remove**, or search the archive to add. **Done** returns to the stage view. Changes sync to the phone database immediately.
+5. **Stop** — Tap **Stop** on the banner in the app, or leave the playlist screen (server stops when the screen is disposed).
 
-Requires Wi‑Fi with a LAN IP (not cellular-only). HTTP is cleartext on the local network (`usesCleartextTraffic`). Implementation: `PlayRemoteController.kt`, `PlayRemoteServer.kt`, `assets/remote/play.html`.
+Requires Wi‑Fi with a LAN IP (not cellular-only). HTTP is cleartext on the local network (`usesCleartextTraffic`). Implementation: `PlayRemoteController.kt`, `PlayRemoteServer.kt`, `assets/remote/play.html`, `assets/remote/edit.html`.
 
 ## update.sh
 

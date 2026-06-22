@@ -66,6 +66,18 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteSong(id: Long) = viewModelScope.launch { songRepo.delete(id) }
 
+    fun updateSong(id: Long, title: String, keySignature: String, notes: String) =
+        viewModelScope.launch {
+            val song = songRepo.getById(id) ?: return@launch
+            songRepo.update(
+                song.copy(
+                    title = title.trim().ifBlank { song.title },
+                    keySignature = keySignature.trim(),
+                    notes = notes.trim(),
+                ),
+            )
+        }
+
     fun reorderSongs(idsInOrder: List<Long>) = viewModelScope.launch { songRepo.reorder(idsInOrder) }
 
     fun createPlaylist(name: String, onCreated: (Long) -> Unit = {}) = viewModelScope.launch {

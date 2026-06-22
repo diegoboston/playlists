@@ -11,6 +11,9 @@
     #barTop { display: flex; align-items: center; justify-content: center; gap: 10px; }
     #title { font-weight: 700; }
     #remoteBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; }
+    #editBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; }
+    #editBtn:disabled { opacity: .35; cursor: default; }
+    #editBtn svg { width: 22px; height: 22px; fill: currentColor; }
     #remoteBtn.on { color: #7ecbff; }
     #remoteBtn.off { color: rgba(255,255,255,.35); }
     #remoteBtn svg { width: 22px; height: 22px; fill: currentColor; }
@@ -47,6 +50,9 @@
     <div id="barTop">
       <div id="title">Stage Manager</div>
       <button id="uploadBtn" type="button" aria-label="Upload song" title="Upload song">+</button>
+      <button id="editBtn" type="button" aria-label="Edit playlist" title="Edit playlist">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>
+      </button>
       <button id="remoteBtn" type="button" class="on" aria-label="Remote on/off" title="Stop remote play">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
       </button>
@@ -97,6 +103,7 @@
     const emptyEl = document.getElementById('empty');
     const stage = document.getElementById('stage');
     const remoteBtn = document.getElementById('remoteBtn');
+    const editBtn = document.getElementById('editBtn');
     const uploadBtn = document.getElementById('uploadBtn');
     const uploadOverlay = document.getElementById('uploadOverlay');
     const uploadForm = document.getElementById('uploadForm');
@@ -132,7 +139,7 @@
       dropZoneFile.hidden = false;
       dropZoneFile.textContent = file.name;
       if (!uploadTitle.value.trim()) {
-        uploadTitle.value = file.name.replace(/\.[^.]+$/, '');
+        uploadTitle.value = file.name.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
       }
       uploadError.textContent = '';
       return true;
@@ -178,6 +185,7 @@
       remoteBtn.classList.toggle('off', !on);
       remoteBtn.title = on ? 'Stop remote play' : 'Remote off';
       uploadBtn.disabled = !on;
+      editBtn.disabled = !on;
     }
 
     function openUpload() {
@@ -196,6 +204,10 @@
     }
 
     uploadBtn.addEventListener('click', openUpload);
+    editBtn.addEventListener('click', () => {
+      if (!remoteOn || busy) return;
+      window.location.href = '/edit';
+    });
     uploadCancel.addEventListener('click', closeUpload);
 
     uploadDropZone.addEventListener('click', () => uploadFile.click());

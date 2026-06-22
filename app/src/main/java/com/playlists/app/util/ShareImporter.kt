@@ -66,7 +66,8 @@ object ShareImporter {
         val ext = FileStorage.extensionForMime(mime)
         val file = FileStorage.storeBytes(context, bytes, ext)
         val fileType = if (mime.contains("pdf")) FileType.PDF else FileType.IMAGE
-        val title = url.substringAfterLast('/').substringBefore('?').ifBlank { "Shared link" }
+        val title = SongTitles.fromFilename(url.substringAfterLast('/').substringBefore('?'))
+            .ifBlank { "Shared link" }
         return PendingImport.from(file, fileType, mime, title)
     }
 
@@ -74,7 +75,7 @@ object ShareImporter {
         val displayName = resolver.query(uri, arrayOf("_display_name"), null, null, null)?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
-        return displayName?.substringBeforeLast('.') ?: file.nameWithoutExtension
+        return SongTitles.fromFilename(displayName ?: file.name)
     }
 
     suspend fun saveSong(

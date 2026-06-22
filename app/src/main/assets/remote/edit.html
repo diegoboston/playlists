@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Edit playlist — Stage Manager</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; background: #111; color: #fff; font-family: system-ui, sans-serif; }
+    #header { position: sticky; top: 0; z-index: 5; background: rgba(0,0,0,.92); border-bottom: 1px solid #333; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    #title { font-size: 18px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #doneBtn { background: #7ecbff; color: #000; border: none; border-radius: 8px; padding: 10px 16px; font-size: 15px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+    #doneBtn:disabled { opacity: .5; cursor: default; }
+    #content { padding: 12px 16px 32px; max-width: 640px; margin: 0 auto; }
+    #empty { text-align: center; opacity: .75; padding: 32px 16px; }
+    #list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .row { display: flex; align-items: center; gap: 10px; background: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 12px; }
+    .row.deleted { background: #3a2020; border-color: #663333; }
+    .row.dragging { opacity: .55; }
+    .row.drag-over { border-color: #7ecbff; }
+    .handle { color: #888; font-size: 18px; cursor: grab; user-select: none; padding: 0 4px; line-height: 1; flex-shrink: 0; }
+    .info { flex: 1; min-width: 0; }
+    .song-title { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .song-meta { font-size: 13px; opacity: .75; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .removeBtn { background: transparent; border: 1px solid #666; color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; flex-shrink: 0; }
+    .removeBtn:disabled { opacity: .4; cursor: default; }
+    #addSection { margin-top: 24px; border-top: 1px solid #333; padding-top: 20px; }
+    #addSection h2 { font-size: 16px; margin-bottom: 10px; }
+    #searchInput { width: 100%; padding: 12px; border: 1px solid #444; border-radius: 8px; background: #000; color: #fff; font-size: 16px; }
+    #searchResults { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .searchRow { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; }
+    .searchRow:active { background: #252525; }
+    #error { color: #ff8a80; font-size: 14px; margin: 12px 0; min-height: 1.2em; }
+    #content.busy { opacity: .6; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <div id="title">Playlist</div>
+    <button id="doneBtn" type="button">Done</button>
+  </div>
+  <div id="content">
+    <div id="error"></div>
+    <ul id="list"></ul>
+    <div id="empty" hidden>No songs in this playlist.</div>
+    <div id="addSection">
+      <h2>Add song from archive</h2>
+      <input id="searchInput" type="search" placeholder="Search songs…" autocomplete="off" />
+      <div id="searchResults"></div>
+    </div>
+  </div>
+  <script>
+    const titleEl = document.getElementById('title');
+    const doneBtn = document.getElementById('doneBtn');
+    const listEl = document.getElementById('list');
+    const emptyEl = document.getElementById('empty');
+    const errorEl = document.getElementById('error');
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+    const contentEl = document.getElementById('content');
+
+    let entries = [];
+    let busy = false;
+    let dragFrom = -1;
+    let searchTimer = null;
+
+    function setBusy(on) {
+      busy = on;
+      contentEl.classList.toggle('busy', on);
+      doneBtn.disabled = on;
+    }
+
+    function metaLine(entry) {
+      const parts = [];
+      if (entry.key) parts.push(entry.key);
+      if (entry.notes) parts.push(entry.notes);
+      return parts.join(' · ');
+    }
+
+    function renderList() {
+      listEl.innerHTML = '';
+      if (!entries.length) {
+        emptyEl.hidden = false;
+        return;
+      }
+      emptyEl.hidden = true;
+      entries.forEach((entry, index) => {
+        const li = document.createElement('li');
+        li.className = 'row' + (entry.isDeleted ? ' deleted' : '');
+        li.draggable = true;
+        li.dataset.index = String(index);
+        li.innerHTML = `
+          <span class="handle" aria-hidden="true">≡</span>
+          <div class="info">
+            <div class="song-title"></div>
+            <div class="song-meta"></div>
+          </div>
+          <button class="removeBtn" type="button">Remove</button>
+        `;
+        li.querySelector('.song-title').textContent = entry.title;
+        const meta = metaLine(entry);
+        const metaEl = li.querySelector('.song-meta');
+        if (meta) metaEl.textContent = meta;
+        else metaEl.hidden = true;
+
+        li.querySelector('.removeBtn').addEventListener('click', () => removeEntry(entry.entryId));
+        li.addEventListener('dragstart', (e) => {
+          dragFrom = index;
+          li.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        li.addEventListener('dragend', () => {
+          dragFrom = -1;
+          li.classList.remove('dragging');
+          listEl.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
+        });
+        li.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          li.classList.add('drag-over');
+        });
+        li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
+        li.addEventListener('drop', (e) => {
+          e.preventDefault();
+          li.classList.remove('drag-over');
+          const to = index;
+          if (dragFrom < 0 || dragFrom === to) return;
+          const next = entries.slice();
+          const [moved] = next.splice(dragFrom, 1);
+          next.splice(to, 0, moved);
+          reorder(next.map((item) => item.entryId));
+        });
+
+        listEl.appendChild(li);
+      });
+    }
+
+    async function loadPlaylist() {
+      setBusy(true);
+      errorEl.textContent = '';
+      try {
+        const res = await fetch('/api/playlist');
+        if (!res.ok) throw new Error('Could not load playlist');
+        const data = await res.json();
+        titleEl.textContent = data.playlistName || 'Playlist';
+        entries = data.entries || [];
+        renderList();
+      } catch (err) {
+        errorEl.textContent = err.message || 'Load failed';
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function reorder(entryIds) {
+      setBusy(true);
+      errorEl.textContent = '';
+      try {
+        const res = await fetch('/api/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entryIds }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Reorder failed');
+        entries = data.entries || [];
+        renderList();
+      } catch (err) {
+        errorEl.textContent = err.message || 'Reorder failed';
+        await loadPlaylist();
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function removeEntry(entryId) {
+      if (busy) return;
+      setBusy(true);
+      errorEl.textContent = '';
+      try {
+        const res = await fetch('/api/remove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entryId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Remove failed');
+        entries = data.entries || [];
+        renderList();
+      } catch (err) {
+        errorEl.textContent = err.message || 'Remove failed';
+        await loadPlaylist();
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function addSong(songId) {
+      if (busy) return;
+      setBusy(true);
+      errorEl.textContent = '';
+      try {
+        const res = await fetch('/api/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ songId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Add failed');
+        entries = data.entries || [];
+        renderList();
+        searchInput.value = '';
+        searchResults.innerHTML = '';
+      } catch (err) {
+        errorEl.textContent = err.message || 'Add failed';
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function runSearch(query) {
+      try {
+        const res = await fetch('/api/songs/search?q=' + encodeURIComponent(query));
+        if (!res.ok) return;
+        const data = await res.json();
+        searchResults.innerHTML = '';
+        (data.songs || []).forEach((song) => {
+          const row = document.createElement('div');
+          row.className = 'searchRow';
+          const meta = [song.key, song.notes].filter(Boolean).join(' · ');
+          row.innerHTML = `<div class="song-title"></div>${meta ? '<div class="song-meta"></div>' : ''}`;
+          row.querySelector('.song-title').textContent = song.title;
+          if (meta) row.querySelector('.song-meta').textContent = meta;
+          row.addEventListener('click', () => addSong(song.id));
+          searchResults.appendChild(row);
+        });
+      } catch (_) {}
+    }
+
+    doneBtn.addEventListener('click', () => { window.location.href = '/'; });
+
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      const q = searchInput.value.trim();
+      searchTimer = setTimeout(() => runSearch(q), 200);
+    });
+
+    loadPlaylist();
+    runSearch('');
+  </script>
+</body>
+</html>

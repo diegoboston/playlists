@@ -13,17 +13,34 @@ class PlayRemoteServer(
     private val playlistName: String,
     songs: List<RemoteSong>,
     private val html: String,
+    private val editHtml: String,
     private val onStopRequested: () -> Unit = {},
     private val onUpload: ((title: String, key: String, notes: String, tempFile: File, mimeType: String) -> Result<Unit>)? = null,
+    private val onReorder: ((entryIds: List<Long>) -> Result<Unit>)? = null,
+    private val onRemove: ((entryId: Long) -> Result<Unit>)? = null,
+    private val onAdd: ((songId: Long) -> Result<Unit>)? = null,
+    private val onSearchSongs: ((query: String) -> List<SearchSong>)? = null,
 ) : NanoHTTPD(port) {
 
     private val songs: MutableList<RemoteSong> = songs.toMutableList()
 
     data class RemoteSong(
+        val entryId: Long,
+        val songId: Long,
         val title: String,
+        val keySignature: String,
+        val notes: String,
         val fileType: String,
         val filePath: String,
         val pageCount: Int,
+        val isDeleted: Boolean,
+    )
+
+    data class SearchSong(
+        val id: Long,
+        val title: String,
+        val keySignature: String,
+        val notes: String,
     )
 
     @Volatile
@@ -38,25 +55,26 @@ class PlayRemoteServer(
         val uri = session.uri.substringBefore('?')
         return when {
             uri == "/" || uri == "/index.html" -> htmlResponse(html)
+            uri == "/edit" || uri == "/edit.html" -> htmlResponse(editHtml)
             uri == "/api/state" -> jsonResponse(buildStateJson())
+            uri == "/api/playlist" -> jsonResponse(buildPlaylistJson())
+            uri == "/api/songs/search" -> handleSearch(session)
             uri == "/api/navigate" && session.method == Method.POST -> handleNavigate(session)
             uri == "/api/stop" && session.method == Method.POST -> {
                 onStopRequested()
                 jsonResponse("""{"stopped":true}""")
             }
             uri == "/api/upload" && session.method == Method.POST -> handleUpload(session)
+            uri == "/api/reorder" && session.method == Method.POST -> handleReorder(session)
+            uri == "/api/remove" && session.method == Method.POST -> handleRemove(session)
+            uri == "/api/add" && session.method == Method.POST -> handleAdd(session)
             uri == "/api/media" -> serveMedia(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not found")
         }
     }
 
     private fun handleNavigate(session: IHTTPSession): Response {
-        val files = HashMap<String, String>()
-        try {
-            session.parseBody(files)
-        } catch (_: Exception) {
-        }
-        val raw = files["postData"].orEmpty()
+        val raw = readPostBody(session)
         val direction = Regex(""""direction"\s*:\s*"(\w+)"""").find(raw)?.groupValues?.get(1)
         when (direction) {
             "next" -> step(1)
@@ -65,15 +83,71 @@ class PlayRemoteServer(
         return jsonResponse(buildStateJson())
     }
 
+    private fun handleReorder(session: IHTTPSession): Response {
+        val handler = onReorder ?: return jsonError("Reorder not available")
+        val entryIds = parseLongArray(readPostBody(session), "entryIds")
+            ?: return jsonError("Missing entryIds")
+        if (entryIds.isEmpty()) return jsonError("Empty playlist")
+        return if (handler(entryIds).isSuccess) {
+            jsonResponse(buildPlaylistJson())
+        } else {
+            jsonError("Reorder failed")
+        }
+    }
+
+    private fun handleRemove(session: IHTTPSession): Response {
+        val handler = onRemove ?: return jsonError("Remove not available")
+        val entryId = parseLongField(readPostBody(session), "entryId")
+            ?: return jsonError("Missing entryId")
+        return if (handler(entryId).isSuccess) {
+            jsonResponse(buildPlaylistJson())
+        } else {
+            jsonError("Remove failed")
+        }
+    }
+
+    private fun handleAdd(session: IHTTPSession): Response {
+        val handler = onAdd ?: return jsonError("Add not available")
+        val songId = parseLongField(readPostBody(session), "songId")
+            ?: return jsonError("Missing songId")
+        return if (handler(songId).isSuccess) {
+            jsonResponse(buildPlaylistJson())
+        } else {
+            jsonError("Add failed")
+        }
+    }
+
+    private fun handleSearch(session: IHTTPSession): Response {
+        val handler = onSearchSongs ?: return jsonError("Search not available")
+        val query = session.parameters["q"]?.firstOrNull().orEmpty()
+        val results = handler(query)
+        val sb = StringBuilder("""{"songs":[""")
+        results.forEachIndexed { i, song ->
+            if (i > 0) sb.append(',')
+            sb.append(
+                """{"id":${song.id},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)}}""",
+            )
+        }
+        sb.append("]}")
+        return jsonResponse(sb.toString())
+    }
+
     fun replaceSongs(newSongs: List<RemoteSong>) {
         synchronized(songs) {
+            val currentEntryId = songs.getOrNull(songIndex)?.entryId
             songs.clear()
             songs.addAll(newSongs)
             if (songs.isEmpty()) {
                 songIndex = 0
                 pageIndex = 0
             } else {
-                songIndex = songIndex.coerceIn(0, songs.lastIndex)
+                val newIndex = if (currentEntryId != null) {
+                    val idx = songs.indexOfFirst { it.entryId == currentEntryId }
+                    if (idx >= 0) idx else minOf(songIndex, songs.lastIndex)
+                } else {
+                    songIndex.coerceIn(0, songs.lastIndex)
+                }
+                songIndex = newIndex
                 val pages = songs[songIndex].pageCount.coerceAtLeast(1)
                 pageIndex = pageIndex.coerceIn(0, pages - 1)
             }
@@ -222,6 +296,40 @@ class PlayRemoteServer(
         }
         sb.append("]}")
         return sb.toString()
+    }
+
+    private fun buildPlaylistJson(): String {
+        val sb = StringBuilder()
+        sb.append(
+            """{"playlistName":${jsonStr(playlistName)},"songIndex":$songIndex,"entries":[""",
+        )
+        songs.forEachIndexed { i, song ->
+            if (i > 0) sb.append(',')
+            sb.append(
+                """{"entryId":${song.entryId},"songId":${song.songId},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount},"isDeleted":${song.isDeleted}}""",
+            )
+        }
+        sb.append("]}")
+        return sb.toString()
+    }
+
+    private fun readPostBody(session: IHTTPSession): String {
+        val files = HashMap<String, String>()
+        try {
+            session.parseBody(files)
+        } catch (_: Exception) {
+        }
+        return files["postData"].orEmpty()
+    }
+
+    private fun parseLongField(raw: String, field: String): Long? =
+        Regex(""""$field"\s*:\s*(\d+)""").find(raw)?.groupValues?.get(1)?.toLongOrNull()
+
+    private fun parseLongArray(raw: String, field: String): List<Long>? {
+        val match = Regex(""""$field"\s*:\s*\[([^\]]*)]""").find(raw) ?: return null
+        val inner = match.groupValues[1].trim()
+        if (inner.isEmpty()) return emptyList()
+        return inner.split(',').mapNotNull { it.trim().toLongOrNull() }
     }
 
     private fun jsonStr(value: String): String =

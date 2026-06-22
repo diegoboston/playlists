@@ -11,6 +11,8 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun insert(song: Song): Long = songDao.insertAtTop(song)
 
+    suspend fun update(song: Song) = songDao.update(song)
+
     suspend fun delete(id: Long) = songDao.markDeleted(id, System.currentTimeMillis())
 
     suspend fun reorder(idsInOrder: List<Long>) = songDao.replaceOrder(idsInOrder)
