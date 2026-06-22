@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.playlists.app.util.SongTitleMigration
+import com.playlists.app.util.StageManagerStorage
 
 @Database(
     entities = [Song::class, Playlist::class, PlaylistSong::class],
@@ -100,12 +101,27 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        fun databasePath(context: Context): String {
+            return if (StageManagerStorage.hasAccess(context)) {
+                StageManagerStorage.dbFile().absolutePath
+            } else {
+                "playlists.db"
+            }
+        }
+
+        fun closeAndReset() {
+            synchronized(this) {
+                instance?.close()
+                instance = null
+            }
+        }
+
         fun get(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "playlists.db",
+                    databasePath(context),
                 )
                     .addMigrations(
                         MIGRATION_1_2,

@@ -6,6 +6,7 @@ import com.playlists.app.data.AppDatabase
 import com.playlists.app.data.PlaylistRepository
 import com.playlists.app.data.SongRepository
 import com.playlists.app.util.AppUpdate
+import com.playlists.app.util.StorageMigration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,11 +20,11 @@ class PlaylistsApp : Application() {
     lateinit var playlistRepository: PlaylistRepository
         private set
 
+    private var dataInitialized = false
+
     override fun onCreate() {
         super.onCreate()
-        val db = AppDatabase.get(this)
-        songRepository = SongRepository(db.songDao())
-        playlistRepository = PlaylistRepository(db.playlistDao(), db.playlistSongDao())
+        ensureDataInitialized()
 
         applicationScope.launch {
             runCatching {
@@ -36,6 +37,26 @@ class PlaylistsApp : Application() {
                 prefs.edit().putLong(KEY_LAST_VERSION, installed).apply()
             }.onFailure { Log.w(TAG, "Update cache cleanup failed", it) }
         }
+    }
+
+    fun ensureDataInitialized() {
+        if (dataInitialized) return
+        synchronized(this) {
+            if (dataInitialized) return
+            StorageMigration.runIfNeeded(this)
+            val db = AppDatabase.get(this)
+            songRepository = SongRepository(db.songDao())
+            playlistRepository = PlaylistRepository(db.playlistDao(), db.playlistSongDao())
+            dataInitialized = true
+        }
+    }
+
+    fun reinitializeAfterStorageMigration() {
+        synchronized(this) {
+            AppDatabase.closeAndReset()
+            dataInitialized = false
+        }
+        ensureDataInitialized()
     }
 
     companion object {

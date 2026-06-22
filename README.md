@@ -172,7 +172,7 @@ playlists/
 │           │   ├── components/     # Media viewer, dialogs, update banner
 │           │   ├── reorder/        # DraggableItem + list drag handler
 │           │   └── theme/          # Material 3 theme
-│           └── util/               # Share import, quickstart matcher, AppUpdate, AppPrefs
+│           └── util/               # Share import, storage migration, AppUpdate, AppPrefs
 └── gradle/wrapper/
 ```
 
@@ -184,6 +184,8 @@ playlists/
 | `POST_NOTIFICATIONS` | Remote-play foreground notification (Android 13+) |
 | `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_DATA_SYNC` | Keep remote play alive while tunneled |
 | `REQUEST_INSTALL_PACKAGES` | In-app update installs the downloaded APK |
+| `MANAGE_EXTERNAL_STORAGE` (Android 11+) | Read/write songs, database, and settings under `Music/StageManager` |
+| `WRITE_EXTERNAL_STORAGE` (Android 9 and below) | Same storage path on older devices |
 
 ## Build
 
@@ -285,7 +287,15 @@ See each skill's `SKILL.md` for the exact command or checklist.
 - **Playlist** — name, optional accent color, creation time.
 - **PlaylistSong** — playlist + song + position (ordered).
 
-Files are stored in app-internal storage (`files/songs/`). Metadata lives in Room (`playlists.db`).
+Files and app state live on shared storage under **`Music/StageManager/`** (typically `/storage/emulated/0/Music/StageManager/`):
+
+| Path | Contents |
+|------|----------|
+| `songs/` | PDF and image sheet music |
+| `playlists.db` | Room database (songs, playlists, order) |
+| `state.json` | Remote-play code and last-opened playlist |
+
+On first launch after install or upgrade, the app requests **All files access** so it can use this folder. Existing data in app-internal storage is migrated automatically. After migration, uninstalling and reinstalling the app restores your library from `Music/StageManager`.
 
 ## Tech stack
 

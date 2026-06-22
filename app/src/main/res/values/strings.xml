@@ -86,4 +86,7 @@
     <string name="update_app_needs_permission">Allow installs from this app, then try updating again.</string>
     <string name="update_app_snackbar_prompt">Version %1$s is available. Update now?</string>
     <string name="update_app_snackbar_action">Update now</string>
+    <string name="storage_access_title">Storage access required</string>
+    <string name="storage_access_message">Stage Manager keeps your songs, playlists, and settings in Music/StageManager so they survive app reinstall. Grant “All files access” to continue.</string>
+    <string name="storage_access_open_settings">Open settings</string>
 </resources>

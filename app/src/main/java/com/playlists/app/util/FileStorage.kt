@@ -8,11 +8,12 @@ import java.net.URL
 import java.util.UUID
 
 object FileStorage {
-    private const val SONGS_DIR = "songs"
-
     fun songsDir(context: Context): File {
-        val dir = File(context.filesDir, SONGS_DIR)
-        if (!dir.exists()) dir.mkdirs()
+        val dir = if (StageManagerStorage.hasAccess(context)) {
+            StageManagerStorage.songsDir().also { it.mkdirs() }
+        } else {
+            StageManagerStorage.legacyInternalSongsDir(context).also { it.mkdirs() }
+        }
         return dir
     }
 

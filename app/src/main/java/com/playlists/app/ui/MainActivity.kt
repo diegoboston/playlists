@@ -14,21 +14,29 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.playlists.app.PlaylistsApp
 import com.playlists.app.R
 import com.playlists.app.ui.navigation.AppNavigation
+import com.playlists.app.ui.screens.StorageAccessScreen
 import com.playlists.app.ui.theme.PlaylistsTheme
 import com.playlists.app.util.AppUpdate
 import com.playlists.app.util.ShareImporter
+import com.playlists.app.util.StageManagerStorage
 import java.io.File
 
 class MainActivity : ComponentActivity() {
     private val viewModel: PlaylistsViewModel by viewModels()
     private var pendingApkInstall: File? = null
     private var installPermissionRequestPending = false
+    private var storageReady by mutableStateOf(false)
+    private var storageSettingsPending = false
 
     private val installPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -46,8 +54,28 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission(),
     ) { }
 
+    private val legacyStoragePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            onStorageAccessGranted()
+        }
+    }
+
+    private val storageSettingsLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        storageSettingsPending = false
+        onStorageAccessGranted()
+    }
+
     private val lifecycleObserver = LifecycleEventObserver { _, event ->
         if (event == Lifecycle.Event.ON_RESUME) {
+            if (storageSettingsPending) {
+                onStorageAccessGranted()
+            } else if (!storageReady && StageManagerStorage.hasAccess(this@MainActivity)) {
+                onStorageAccessGranted()
+            }
             tryLaunchPendingInstall()
         }
     }
@@ -62,16 +90,24 @@ class MainActivity : ComponentActivity() {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+        storageReady = StageManagerStorage.hasAccess(this)
+        if (storageReady) {
+            (application as PlaylistsApp).ensureDataInitialized()
+        }
         handleShareIntent(intent)
 
         setContent {
             PlaylistsTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AppNavigation(
-                        viewModel = viewModel,
-                        pendingInstallApk = { apk -> queueInstall(apk) },
-                        retryInstallApk = { apk -> queueInstall(apk) },
-                    )
+                    if (storageReady) {
+                        AppNavigation(
+                            viewModel = viewModel,
+                            pendingInstallApk = { apk -> queueInstall(apk) },
+                            retryInstallApk = { apk -> queueInstall(apk) },
+                        )
+                    } else {
+                        StorageAccessScreen(onOpenSettings = { requestStorageAccess() })
+                    }
                 }
             }
         }
@@ -88,8 +124,33 @@ class MainActivity : ComponentActivity() {
         handleShareIntent(intent)
     }
 
+    private fun onStorageAccessGranted() {
+        if (!StageManagerStorage.hasAccess(this)) return
+        val wasReady = storageReady
+        (application as PlaylistsApp).reinitializeAfterStorageMigration()
+        storageReady = true
+        if (!wasReady) {
+            recreate()
+        }
+    }
+
+    private fun requestStorageAccess() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            storageSettingsPending = true
+            storageSettingsLauncher.launch(StageManagerStorage.manageStorageIntent(this))
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            onStorageAccessGranted()
+            return
+        }
+        legacyStoragePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    }
+
     private fun handleShareIntent(intent: Intent?) {
-        if (intent == null) return
+        if (intent == null || !storageReady) return
         val pending = ShareImporter.parseIntent(this, intent) ?: return
         viewModel.setPendingImport(pending)
     }
