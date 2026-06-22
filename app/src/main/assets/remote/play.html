@@ -10,13 +10,9 @@
     #bar { background: rgba(0,0,0,.8); padding: 10px 12px; text-align: center; font-size: 14px; line-height: 1.4; }
     #barTop { display: flex; align-items: center; justify-content: center; gap: 10px; }
     #title { font-weight: 700; }
-    #remoteBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; }
     #editBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; }
     #editBtn:disabled { opacity: .35; cursor: default; }
     #editBtn svg { width: 22px; height: 22px; fill: currentColor; }
-    #remoteBtn.on { color: #7ecbff; }
-    #remoteBtn.off { color: rgba(255,255,255,.35); }
-    #remoteBtn svg { width: 22px; height: 22px; fill: currentColor; }
     #uploadBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; font-size: 22px; font-weight: 700; width: 30px; height: 30px; }
     #uploadBtn:disabled { opacity: .35; cursor: default; }
     #meta { opacity: .85; font-size: 13px; margin-top: 2px; }
@@ -52,9 +48,6 @@
       <button id="uploadBtn" type="button" aria-label="Upload song" title="Upload song">+</button>
       <button id="editBtn" type="button" aria-label="Edit playlist" title="Edit playlist">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>
-      </button>
-      <button id="remoteBtn" type="button" class="on" aria-label="Remote on/off" title="Stop remote play">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
       </button>
     </div>
     <div id="meta"></div>
@@ -102,7 +95,6 @@
     const metaEl = document.getElementById('meta');
     const emptyEl = document.getElementById('empty');
     const stage = document.getElementById('stage');
-    const remoteBtn = document.getElementById('remoteBtn');
     const editBtn = document.getElementById('editBtn');
     const uploadBtn = document.getElementById('uploadBtn');
     const uploadOverlay = document.getElementById('uploadOverlay');
@@ -138,11 +130,24 @@
       dropZoneText.hidden = true;
       dropZoneFile.hidden = false;
       dropZoneFile.textContent = file.name;
-      if (!uploadTitle.value.trim()) {
-        uploadTitle.value = file.name.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
-      }
+      applyFilenameSuggestions(file.name);
       uploadError.textContent = '';
       return true;
+    }
+
+    async function applyFilenameSuggestions(filename) {
+      try {
+        const res = await fetch('/api/parse-filename?raw=' + encodeURIComponent(filename));
+        if (!res.ok) throw new Error('parse failed');
+        const parsed = await res.json();
+        uploadTitle.value = parsed.title || '';
+        uploadKey.value = parsed.key || '';
+        uploadNotes.value = parsed.notes || '';
+      } catch (_) {
+        uploadTitle.value = filename.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+        uploadKey.value = '';
+        uploadNotes.value = '';
+      }
     }
 
     function clearUploadFile() {
@@ -156,7 +161,7 @@
     let touchStartX = 0;
     let touchStartY = 0;
     let busy = false;
-    let remoteOn = true;
+    let connectionLost = false;
     let lastSongIndex = -1;
     let lastPageIndex = -1;
     let scale = 1;
@@ -172,24 +177,15 @@
     let lastTouchEnd = 0;
 
     function handleSideTap(clientX) {
-      if (!remoteOn || busy || scale > NAV.ZOOM_NAV_MAX) return;
+      if (busy || scale > NAV.ZOOM_NAV_MAX) return;
       const rect = stage.getBoundingClientRect();
       const x = clientX - rect.left;
       if (x >= rect.width / 2) navigate('next');
       else navigate('prev');
     }
 
-    function setRemoteState(on) {
-      remoteOn = on;
-      remoteBtn.classList.toggle('on', on);
-      remoteBtn.classList.toggle('off', !on);
-      remoteBtn.title = on ? 'Stop remote play' : 'Remote off';
-      uploadBtn.disabled = !on;
-      editBtn.disabled = !on;
-    }
-
     function openUpload() {
-      if (!remoteOn || busy) return;
+      if (busy) return;
       uploadError.textContent = '';
       uploadTitle.value = '';
       uploadKey.value = '';
@@ -205,7 +201,7 @@
 
     uploadBtn.addEventListener('click', openUpload);
     editBtn.addEventListener('click', () => {
-      if (!remoteOn || busy) return;
+      if (busy) return;
       window.location.href = '/edit';
     });
     uploadCancel.addEventListener('click', closeUpload);
@@ -244,7 +240,7 @@
 
     uploadForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (!remoteOn || busy) return;
+      if (busy) return;
       const file = uploadFile.files?.[0];
       if (!file) {
         uploadError.textContent = 'Choose a PDF or image.';
@@ -258,6 +254,7 @@
         formData.append('title', uploadTitle.value.trim());
         formData.append('key', uploadKey.value.trim());
         formData.append('notes', uploadNotes.value.trim());
+        formData.append('filename', file.name);
         formData.append('mime', file.type || 'application/octet-stream');
         formData.append('file', file);
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -277,28 +274,13 @@
       }
     });
 
-    function showStopped() {
-      setRemoteState(false);
+    function showConnectionLost() {
+      connectionLost = true;
       zoomWrap.hidden = true;
       emptyEl.hidden = false;
-      emptyEl.textContent = 'Remote play stopped.';
+      emptyEl.textContent = 'Connection lost. Retrying…';
       metaEl.textContent = '';
     }
-
-    async function toggleRemote() {
-      if (!remoteOn || busy) return;
-      busy = true;
-      try {
-        await fetch('/api/stop', { method: 'POST' });
-        showStopped();
-      } catch (_) {
-        showStopped();
-      } finally {
-        busy = false;
-      }
-    }
-
-    remoteBtn.addEventListener('click', toggleRemote);
 
     function resetZoom() {
       scale = 1;
@@ -318,10 +300,11 @@
     }
 
     async function refresh() {
-      if (!remoteOn) return;
       try {
         const res = await fetch('/api/state');
+        if (!res.ok) throw new Error('state unavailable');
         const s = await res.json();
+        connectionLost = false;
         if (!s.songs || s.songs.length === 0) {
           zoomWrap.hidden = true;
           emptyEl.hidden = false;
@@ -346,12 +329,12 @@
           media.src = `/api/media?song=${s.songIndex}&page=${s.pageIndex}`;
         }
       } catch (_) {
-        showStopped();
+        showConnectionLost();
       }
     }
 
     async function navigate(direction) {
-      if (busy || !remoteOn || scale > NAV.ZOOM_NAV_MAX) return;
+      if (busy || scale > NAV.ZOOM_NAV_MAX) return;
       busy = true;
       try {
         await fetch('/api/navigate', {
@@ -366,7 +349,6 @@
     }
 
     stage.addEventListener('touchstart', (e) => {
-      if (!remoteOn) return;
       if (e.touches.length === 1) {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
@@ -384,7 +366,6 @@
     }, { passive: true });
 
     stage.addEventListener('touchmove', (e) => {
-      if (!remoteOn) return;
       if (e.touches.length === 1) {
         const dx = e.touches[0].clientX - touchStartX;
         const dy = e.touches[0].clientY - touchStartY;
@@ -409,7 +390,6 @@
     }, { passive: true });
 
     stage.addEventListener('touchend', (e) => {
-      if (!remoteOn) return;
       if (e.touches.length === 0 && scale <= NAV.ZOOM_NAV_MAX) {
         const endX = e.changedTouches[0].clientX;
         const endY = e.changedTouches[0].clientY;
@@ -436,7 +416,6 @@
     });
 
     document.addEventListener('keydown', (e) => {
-      if (!remoteOn) return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate('next');
       if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') navigate('prev');
     });

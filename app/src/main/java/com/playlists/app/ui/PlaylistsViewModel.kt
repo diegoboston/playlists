@@ -173,6 +173,10 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
         _appUpdateState.value = null
     }
 
+    fun failAppUpdateInstall(message: String) {
+        _appUpdateState.value = AppUpdateUiState.Failed(message)
+    }
+
     fun startAppUpdateDownload(context: android.content.Context) {
         val current = _appUpdateState.value
         if (current is AppUpdateUiState.Checking || current is AppUpdateUiState.Downloading) return

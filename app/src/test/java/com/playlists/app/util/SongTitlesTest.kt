@@ -10,4 +10,12 @@ class SongTitlesTest {
         assertEquals("my song", SongTitles.fromFilename("my_song.png"))
         assertEquals("no ext", SongTitles.fromFilename("no_ext"))
     }
+
+    @Test
+    fun parseFilename_extractsTitleKeyAndNotes() {
+        val parsed = SongTitles.parseFilename("Amazing_Grace_C_voice.pdf")
+        assertEquals("Amazing Grace", parsed.title)
+        assertEquals("C", parsed.keySignature)
+        assertEquals("voice", parsed.notes)
+    }
 }

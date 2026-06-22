@@ -63,9 +63,9 @@ sync_delete_extra_local_files() {
     to_delete=$("${RSYNC_FROM_REMOTE[@]}" --delete -n 2>/dev/null | grep '^deleting ' | sed 's/^deleting //' || true)
     if [ -z "$to_delete" ]; then
         echo "  (none)"
-    else
-        echo "$to_delete" | sed 's/^/  /'
+        return 0
     fi
+    echo "$to_delete" | sed 's/^/  /'
     confirm "Delete these files and re-sync from shared6?"
 
     echo "==> Deleting extras and syncing from shared6"

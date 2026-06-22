@@ -57,8 +57,8 @@ object ShareImporter {
             FileStorage.storeStream(context, stream, ext)
         } ?: return null
         val fileType = if (mimeType.contains("pdf")) FileType.PDF else FileType.IMAGE
-        val title = suggestTitle(resolver, uri, file)
-        return PendingImport.from(file, fileType, mimeType, title)
+        val rawTitle = rawTitleFromUri(resolver, uri, file)
+        return PendingImport.fromRawTitle(file, fileType, mimeType, rawTitle)
     }
 
     private fun importFromUrl(context: Context, url: String): PendingImport? {
@@ -66,16 +66,15 @@ object ShareImporter {
         val ext = FileStorage.extensionForMime(mime)
         val file = FileStorage.storeBytes(context, bytes, ext)
         val fileType = if (mime.contains("pdf")) FileType.PDF else FileType.IMAGE
-        val title = SongTitles.fromFilename(url.substringAfterLast('/').substringBefore('?'))
-            .ifBlank { "Shared link" }
-        return PendingImport.from(file, fileType, mime, title)
+        val rawTitle = url.substringAfterLast('/').substringBefore('?').ifBlank { "Shared link" }
+        return PendingImport.fromRawTitle(file, fileType, mime, rawTitle)
     }
 
-    private fun suggestTitle(resolver: ContentResolver, uri: Uri, file: File): String {
+    private fun rawTitleFromUri(resolver: ContentResolver, uri: Uri, file: File): String {
         val displayName = resolver.query(uri, arrayOf("_display_name"), null, null, null)?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
-        return SongTitles.fromFilename(displayName ?: file.name)
+        return displayName ?: file.name
     }
 
     suspend fun saveSong(
@@ -88,8 +87,8 @@ object ShareImporter {
         return repository.insert(
             Song(
                 title = title.trim().ifBlank { pending.suggestedTitle },
-                keySignature = keySignature.trim(),
-                notes = notes.trim(),
+                keySignature = keySignature.trim().ifBlank { pending.suggestedKey },
+                notes = notes.trim().ifBlank { pending.suggestedNotes },
                 filePath = pending.file.absolutePath,
                 fileType = pending.fileType.name,
                 mimeType = pending.mimeType,

@@ -42,8 +42,8 @@ fun ImportSongScreen(
     }
 
     var title by remember(currentPending) { mutableStateOf(currentPending.suggestedTitle) }
-    var key by remember(currentPending) { mutableStateOf("") }
-    var notes by remember(currentPending) { mutableStateOf("") }
+    var key by remember(currentPending) { mutableStateOf(currentPending.suggestedKey) }
+    var notes by remember(currentPending) { mutableStateOf(currentPending.suggestedNotes) }
 
     Scaffold(
         topBar = {

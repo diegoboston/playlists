@@ -11,16 +11,22 @@ data class PendingImport(
     val fileType: FileType,
     val mimeType: String,
     val suggestedTitle: String,
+    val suggestedKey: String = "",
+    val suggestedNotes: String = "",
 ) : Parcelable {
     val file: File get() = File(filePath)
 
     companion object {
-        fun from(file: File, fileType: FileType, mimeType: String, suggestedTitle: String) =
-            PendingImport(
+        fun fromRawTitle(file: File, fileType: FileType, mimeType: String, rawTitle: String): PendingImport {
+            val parsed = SongTitles.parseFilename(rawTitle)
+            return PendingImport(
                 filePath = file.absolutePath,
                 fileType = fileType,
                 mimeType = mimeType,
-                suggestedTitle = suggestedTitle,
+                suggestedTitle = parsed.title,
+                suggestedKey = parsed.keySignature,
+                suggestedNotes = parsed.notes,
             )
+        }
     }
 }

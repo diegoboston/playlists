@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.playlists.app.R
-import com.playlists.app.ui.AppUpdateUiState
 import com.playlists.app.ui.PlaylistAccentColors
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -123,12 +122,13 @@ fun TextInputDialog(
 
 @Composable
 fun AppUpdateBanner(
-    state: AppUpdateUiState,
+    state: com.playlists.app.ui.AppUpdateUiState,
     onDismiss: () -> Unit,
+    onInstall: (java.io.File) -> Unit = {},
 ) {
     val message = when (state) {
-        AppUpdateUiState.Checking -> stringResource(R.string.update_app_checking)
-        is AppUpdateUiState.Downloading -> {
+        com.playlists.app.ui.AppUpdateUiState.Checking -> stringResource(R.string.update_app_checking)
+        is com.playlists.app.ui.AppUpdateUiState.Downloading -> {
             val progress = state.progress
             if (progress != null) {
                 stringResource(R.string.update_app_downloading_percent, (progress * 100).toInt())
@@ -136,9 +136,9 @@ fun AppUpdateBanner(
                 stringResource(R.string.update_app_downloading)
             }
         }
-        is AppUpdateUiState.UpToDate -> stringResource(R.string.update_app_up_to_date, state.versionName)
-        is AppUpdateUiState.ReadyToInstall -> stringResource(R.string.update_app_ready, state.versionName)
-        is AppUpdateUiState.Failed -> stringResource(R.string.update_app_failed, state.message)
+        is com.playlists.app.ui.AppUpdateUiState.UpToDate -> stringResource(R.string.update_app_up_to_date, state.versionName)
+        is com.playlists.app.ui.AppUpdateUiState.ReadyToInstall -> stringResource(R.string.update_app_ready, state.versionName)
+        is com.playlists.app.ui.AppUpdateUiState.Failed -> stringResource(R.string.update_app_failed, state.message)
     }
     Column(
         modifier = Modifier
@@ -147,10 +147,19 @@ fun AppUpdateBanner(
             .padding(12.dp),
     ) {
         Text(message, style = MaterialTheme.typography.bodyMedium)
-        if (state is AppUpdateUiState.UpToDate || state is AppUpdateUiState.Failed) {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(android.R.string.ok))
+        when (state) {
+            is com.playlists.app.ui.AppUpdateUiState.ReadyToInstall -> {
+                TextButton(onClick = { onInstall(state.apk) }) {
+                    Text(stringResource(R.string.update_app_install))
+                }
             }
+            is com.playlists.app.ui.AppUpdateUiState.UpToDate,
+            is com.playlists.app.ui.AppUpdateUiState.Failed -> {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            }
+            else -> Unit
         }
     }
 }

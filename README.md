@@ -22,7 +22,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 ### Song archive
 
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
-- **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**. Underscores in the filename become spaces in the suggested title.
+- **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores → spaces, extension dropped, trailing key → Key, trailing instrument → Notes).
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
 - **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. **A–Z**, **Recently added** (import date), and **Recently viewed** buttons sort the archive (persists order). Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation.
 - **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages.
@@ -245,7 +245,7 @@ Control playback from a **second screen** over the internet (e.g. iPad on a musi
 1. **Settings** — In **Settings** (gear on main tabs), under **Remote play**, set a **5-digit code** (default `44444`, range 10000–65535). The same number is the Cloudflare PIN and the LAN port.
 2. **Start** — Open a playlist → tap **Wi‑Fi** (or the main-tab shortcut). Pick **Cloudflare tunnel** for internet (`https://….trycloudflare.com/` — no port) or **LAN only** for same-Wi‑Fi (`http://phone-ip:code/`). The phone starts the HTTP server and shows a dialog with the URL (clickable link + **Open in browser**). A **foreground notification** with **Stop** also appears; it does not include the URL or code.
 3. **Connect** — Cloudflare: open the URL and enter the code. LAN: open the URL on the same Wi‑Fi — no code prompt.
-4. **Browser UI** — Fullscreen sheet music / image for the current song and page. Title bar shows playlist name and `3/12: Song title · page 2/3`. **+** uploads a new file; **pencil** opens `/edit` to reorder, remove, or add songs from the archive.
+4. **Browser UI** — Fullscreen sheet music / image for the current song and page. Title bar shows playlist name and `3/12: Song title · page 2/3`. **+** uploads a new file with **Title**, **Key**, and **Notes** pre-filled from the filename (same rules as share/import). **Pencil** opens `/edit` to reorder, remove, or add songs from the archive.
 5. **Navigate** — Swipe left/right (or laptop arrow keys) for next/previous song; multi-page PDFs advance page before moving to the next song.
 6. **Edit playlist** — On `/edit`, drag rows to reorder, tap **Remove**, or search the archive to add. **Done** returns to the stage view. Changes sync to the phone database immediately.
 7. **Stop** — Tap the highlighted **Wi‑Fi** icon again, **Stop** on the system notification, or delete the active playlist.

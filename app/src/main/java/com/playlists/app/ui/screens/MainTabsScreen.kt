@@ -64,12 +64,13 @@ fun MainTabsScreen(
     var remoteStartedUrl by remember { mutableStateOf<String?>(null) }
     var remoteStartedMode by remember { mutableStateOf<RemotePlayMode?>(null) }
 
-    val activePlaylistId = PlayRemoteController.activePlaylistId
-    val entries by viewModel.observePlaylistSongs(activePlaylistId ?: -1L)
+    val activePlaylistId = if (remoteRunning) PlayRemoteController.activePlaylistId else null
+    val entries by viewModel.observePlaylistSongs(activePlaylistId ?: 0L)
         .collectAsStateWithLifecycle()
 
     LaunchedEffect(entries, remoteRunning, activePlaylistId) {
-        if (remoteRunning && activePlaylistId != null && PlayRemoteController.isRunningFor(activePlaylistId)) {
+        if (!remoteRunning || activePlaylistId == null) return@LaunchedEffect
+        if (PlayRemoteController.isRunningFor(activePlaylistId)) {
             PlayRemoteController.refreshSongs(entries)
         }
     }

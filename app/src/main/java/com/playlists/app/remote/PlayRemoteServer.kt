@@ -2,6 +2,7 @@ package com.playlists.app.remote
 
 import android.graphics.Bitmap
 import com.playlists.app.ui.PdfHelper
+import com.playlists.app.util.SongTitleMigration
 import fi.iki.elonen.NanoHTTPD
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -19,7 +20,6 @@ class PlayRemoteServer(
     private val html: String,
     private val editHtml: String,
     private val pinHtml: String,
-    private val onStopRequested: () -> Unit = {},
     private val onUpload: ((title: String, key: String, notes: String, tempFile: File, mimeType: String) -> Result<Unit>)? = null,
     private val onReorder: ((entryIds: List<Long>) -> Result<Unit>)? = null,
     private val onRemove: ((entryId: Long) -> Result<Unit>)? = null,
@@ -75,12 +75,9 @@ class PlayRemoteServer(
             uri == "/edit" || uri == "/edit.html" -> htmlResponse(editHtml)
             uri == "/api/state" -> jsonResponse(buildStateJson())
             uri == "/api/playlist" -> jsonResponse(buildPlaylistJson())
+            uri == "/api/parse-filename" -> handleParseFilename(session)
             uri == "/api/songs/search" -> handleSearch(session)
             uri == "/api/navigate" && session.method == Method.POST -> handleNavigate(session)
-            uri == "/api/stop" && session.method == Method.POST -> {
-                onStopRequested()
-                jsonResponse("""{"stopped":true}""")
-            }
             uri == "/api/upload" && session.method == Method.POST -> handleUpload(session)
             uri == "/api/reorder" && session.method == Method.POST -> handleReorder(session)
             uri == "/api/remove" && session.method == Method.POST -> handleRemove(session)
@@ -191,18 +188,31 @@ class PlayRemoteServer(
         val title = session.parameters["title"]?.firstOrNull().orEmpty()
         val key = session.parameters["key"]?.firstOrNull().orEmpty()
         val notes = session.parameters["notes"]?.firstOrNull().orEmpty()
+        val rawFilename = session.parameters["filename"]?.firstOrNull().orEmpty()
         val tempPath = files["file"] ?: return jsonError("Missing file")
         val tempFile = File(tempPath)
         if (!tempFile.exists()) return jsonError("Missing file")
         val mimeType = session.parameters["mime"]?.firstOrNull()
             ?: guessMimeType(tempFile)
         if (!isAllowedMime(mimeType)) return jsonError("Unsupported file type")
-        val result = handler(title, key, notes, tempFile, mimeType)
+        val parsed = SongTitleMigration.parse(rawFilename.ifBlank { tempFile.name })
+        val resolvedTitle = title.trim().ifBlank { parsed.title }
+        val resolvedKey = key.trim().ifBlank { parsed.keySignature }
+        val resolvedNotes = notes.trim().ifBlank { parsed.notes }
+        val result = handler(resolvedTitle, resolvedKey, resolvedNotes, tempFile, mimeType)
         return if (result.isSuccess) {
             jsonResponse(buildStateJson())
         } else {
             jsonError(result.exceptionOrNull()?.message ?: "Upload failed")
         }
+    }
+
+    private fun handleParseFilename(session: IHTTPSession): Response {
+        val raw = session.parameters["raw"]?.firstOrNull().orEmpty()
+        val parsed = SongTitleMigration.parse(raw)
+        return jsonResponse(
+            """{"title":${jsonStr(parsed.title)},"key":${jsonStr(parsed.keySignature)},"notes":${jsonStr(parsed.notes)}}""",
+        )
     }
 
     private fun isAllowedMime(mimeType: String): Boolean =

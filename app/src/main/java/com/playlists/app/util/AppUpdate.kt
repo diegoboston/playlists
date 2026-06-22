@@ -1,5 +1,6 @@
 package com.playlists.app.util
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -32,6 +33,7 @@ object AppUpdate {
     sealed class InstallResult {
         data object Launched : InstallResult()
         data object NeedsPermission : InstallResult()
+        data class Failed(val message: String) : InstallResult()
     }
 
     fun installedVersionCode(context: Context): Long {
@@ -155,18 +157,31 @@ object AppUpdate {
         if (!context.packageManager.canRequestPackageInstalls()) {
             return InstallResult.NeedsPermission
         }
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            apk,
-        )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (!apk.isFile || apk.length() <= 0L) {
+            return InstallResult.Failed("Downloaded APK is missing or empty")
         }
-        context.startActivity(intent)
-        return InstallResult.Launched
+        return try {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apk,
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (context !is Activity) {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            }
+            if (intent.resolveActivity(context.packageManager) == null) {
+                InstallResult.Failed("No package installer found")
+            } else {
+                context.startActivity(intent)
+                InstallResult.Launched
+            }
+        } catch (e: Exception) {
+            InstallResult.Failed(e.message ?: e.toString())
+        }
     }
 
     private fun openGet(url: String): HttpURLConnection {

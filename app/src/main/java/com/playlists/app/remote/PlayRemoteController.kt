@@ -8,7 +8,6 @@ import com.playlists.app.data.Song
 import com.playlists.app.ui.PdfHelper
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.FileStorage
-import com.playlists.app.util.SongTitles
 import fi.iki.elonen.NanoHTTPD
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,7 +60,6 @@ object PlayRemoteController {
             html = html,
             editHtml = editHtml,
             pinHtml = pinHtml,
-            onStopRequested = { stop() },
             onUpload = { title, key, notes, tempFile, mimeType ->
                 runBlocking {
                     handleUpload(playlistId, title, key, notes, tempFile, mimeType)
@@ -132,14 +130,19 @@ object PlayRemoteController {
     }
 
     fun stop() {
-        appContext?.let { RemotePlayService.stop(it) }
-        CloudflareTunnel.stop()
-        server?.stop()
-        server = null
-        publicUrl = null
-        activePlaylistId = null
-        appContext = null
-        _running.value = false
+        if (!_running.value && server == null) return
+        try {
+            appContext?.let { RemotePlayService.stop(it) }
+            CloudflareTunnel.stop()
+            server?.stop()
+        } catch (_: Exception) {
+        } finally {
+            server = null
+            publicUrl = null
+            activePlaylistId = null
+            appContext = null
+            _running.value = false
+        }
     }
 
     private fun entriesToRemoteSongs(entries: List<PlaylistSongWithDetails>): List<PlayRemoteServer.RemoteSong> =
@@ -212,8 +215,7 @@ object PlayRemoteController {
             val fileType = if (mimeType.contains("pdf")) FileType.PDF else FileType.IMAGE
             val songId = app.songRepository.insert(
                 Song(
-                    title = title.trim().ifBlank { SongTitles.fromFilename(tempFile.name) }
-                        .ifBlank { "Uploaded song" },
+                    title = title.trim().ifBlank { "Uploaded song" },
                     keySignature = key.trim(),
                     notes = notes.trim(),
                     filePath = stored.absolutePath,

@@ -2,7 +2,7 @@ package com.playlists.app.util
 
 /**
  * Parses song titles imported from filenames (underscores, extensions, trailing key/instrument).
- * Used by the v5→v6 DB migration and [SongTitles.fromFilename].
+ * Used by the v5→v6 DB migration, share/import, and [SongTitles.fromFilename].
  */
 object SongTitleMigration {
     data class Result(
