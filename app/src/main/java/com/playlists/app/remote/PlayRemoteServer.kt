@@ -106,9 +106,11 @@ class PlayRemoteServer(
         val mimeType = session.parameters["mime"]?.firstOrNull()
             ?: guessMimeType(tempFile)
         if (!isAllowedMime(mimeType)) return jsonError("Unsupported file type")
-        return when (val result = handler(title, key, notes, tempFile, mimeType)) {
-            is Result.Success -> jsonResponse(buildStateJson())
-            is Result.Failure -> jsonError(result.exceptionOrNull()?.message ?: "Upload failed")
+        val result = handler(title, key, notes, tempFile, mimeType)
+        return if (result.isSuccess) {
+            jsonResponse(buildStateJson())
+        } else {
+            jsonError(result.exceptionOrNull()?.message ?: "Upload failed")
         }
     }
 

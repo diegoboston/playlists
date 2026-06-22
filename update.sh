@@ -73,7 +73,8 @@ echo "==> Files that would be deleted if rsync used --delete (dry run):"
 would_delete=$(
     rsync -avn --delete --delete-excluded "${RSYNC_EXCLUDES[@]}" \
         shared6:code/d-a/playlists .. 2>/dev/null \
-        | grep '^deleting ' | sed 's/^deleting //' || true
+        | grep '^deleting ' | sed 's/^deleting //' \
+        | grep -vE '(^|/)\.git(/|$)' || true
 )
 if [ -z "$would_delete" ]; then
     echo "  (none)"

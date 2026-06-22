@@ -73,7 +73,9 @@ fun DraggableItem(
                                         return@withTimeoutOrNull false
                                     }
                                 }
-                            } ?: true
+                                @Suppress("UNREACHABLE_CODE")
+                                true
+                            } != false
 
                             if (!longPress) {
                                 onClick?.invoke()
