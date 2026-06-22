@@ -1,7 +1,5 @@
 package com.playlists.app.ui.screens
 
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -42,6 +40,7 @@ import com.playlists.app.remote.RemotePlayErrorDialog
 import com.playlists.app.remote.RemotePlayErrors
 import com.playlists.app.remote.RemotePlayMode
 import com.playlists.app.remote.RemotePlayModeDialog
+import com.playlists.app.remote.RemotePlayStartedDialog
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.util.AppPrefs
 import kotlinx.coroutines.launch
@@ -62,6 +61,7 @@ fun MainTabsScreen(
     var remoteError by remember { mutableStateOf<String?>(null) }
     var showRemoteModeDialog by remember { mutableStateOf(false) }
     var pendingRemotePlaylistId by remember { mutableStateOf<Long?>(null) }
+    var remoteStartedUrl by remember { mutableStateOf<String?>(null) }
 
     val activePlaylistId = PlayRemoteController.activePlaylistId
     val entries by viewModel.observePlaylistSongs(activePlaylistId ?: -1L)
@@ -86,10 +86,7 @@ fun MainTabsScreen(
                 return@launch
             }
             PlayRemoteController.start(context, playlistId, playlist.name, list, mode)
-                .onSuccess { url ->
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                    Toast.makeText(context, R.string.remote_started, Toast.LENGTH_SHORT).show()
-                }
+                .onSuccess { url -> remoteStartedUrl = url }
                 .onFailure { error ->
                     remoteError = RemotePlayErrors.format(error)
                 }
@@ -110,9 +107,12 @@ fun MainTabsScreen(
                             IconButton(
                                 onClick = {
                                     if (remoteRunning) {
-                                        PlayRemoteController.currentUrl()?.let { url ->
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                        }
+                                        PlayRemoteController.stop()
+                                        Toast.makeText(
+                                            context,
+                                            R.string.remote_stopped,
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
                                         return@IconButton
                                     }
                                     val playlistId = AppPrefs.getLastPlaylistId(context)
@@ -190,5 +190,9 @@ fun MainTabsScreen(
                 pendingRemotePlaylistId = null
             },
         )
+    }
+
+    remoteStartedUrl?.let { url ->
+        RemotePlayStartedDialog(url = url, onDismiss = { remoteStartedUrl = null })
     }
 }

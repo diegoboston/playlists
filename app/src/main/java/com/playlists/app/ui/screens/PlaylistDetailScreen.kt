@@ -1,7 +1,5 @@
 package com.playlists.app.ui.screens
 
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,6 +59,7 @@ import com.playlists.app.remote.RemotePlayErrorDialog
 import com.playlists.app.remote.RemotePlayErrors
 import com.playlists.app.remote.RemotePlayMode
 import com.playlists.app.remote.RemotePlayModeDialog
+import com.playlists.app.remote.RemotePlayStartedDialog
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.components.PlaylistColorDialog
@@ -95,6 +94,7 @@ fun PlaylistDetailScreen(
     var showAddSong by remember { mutableStateOf(false) }
     var remoteError by remember { mutableStateOf<String?>(null) }
     var showRemoteModeDialog by remember { mutableStateOf(false) }
+    var remoteStartedUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(playlistId) {
         playlist = viewModel.getPlaylist(playlistId)
@@ -123,10 +123,7 @@ fun PlaylistDetailScreen(
             }
             val name = playlist?.name.orEmpty()
             PlayRemoteController.start(context, playlistId, name, list, mode)
-                .onSuccess { url ->
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                    Toast.makeText(context, R.string.remote_started, Toast.LENGTH_SHORT).show()
-                }
+                .onSuccess { url -> remoteStartedUrl = url }
                 .onFailure { error ->
                     remoteError = RemotePlayErrors.format(error)
                 }
@@ -167,9 +164,8 @@ fun PlaylistDetailScreen(
                         }
                         IconButton(onClick = {
                             if (remoteActiveHere) {
-                                PlayRemoteController.currentUrl()?.let { url ->
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                }
+                                PlayRemoteController.stop()
+                                Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
                             } else {
                                 showRemoteModeDialog = true
                             }
@@ -349,6 +345,10 @@ fun PlaylistDetailScreen(
                 startRemote(mode)
             },
         )
+    }
+
+    remoteStartedUrl?.let { url ->
+        RemotePlayStartedDialog(url = url, onDismiss = { remoteStartedUrl = null })
     }
 }
 

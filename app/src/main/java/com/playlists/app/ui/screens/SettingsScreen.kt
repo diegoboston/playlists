@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
@@ -52,6 +55,7 @@ fun SettingsScreen(
     var pinText by remember {
         mutableStateOf(AppPrefs.getRemotePin(context))
     }
+    var pinVisible by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -80,9 +84,31 @@ fun SettingsScreen(
                 onValueChange = { pinText = it.filter { ch -> ch.isDigit() }.take(4) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (pinVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 placeholder = { Text(AppPrefs.DEFAULT_REMOTE_PIN) },
+                trailingIcon = {
+                    IconButton(onClick = { pinVisible = !pinVisible }) {
+                        Icon(
+                            imageVector = if (pinVisible) {
+                                Icons.Filled.VisibilityOff
+                            } else {
+                                Icons.Filled.Visibility
+                            },
+                            contentDescription = stringResource(
+                                if (pinVisible) {
+                                    R.string.settings_remote_pin_hide
+                                } else {
+                                    R.string.settings_remote_pin_show
+                                },
+                            ),
+                        )
+                    }
+                },
             )
             Text(
                 text = stringResource(R.string.settings_remote_pin_hint),

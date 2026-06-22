@@ -30,6 +30,8 @@
     <string name="remote_stop">Stop</string>
     <string name="remote_url_label">Remote: %1$s</string>
     <string name="remote_started">Remote play started</string>
+    <string name="remote_started_message">Share this URL with other devices. Visitors enter the PIN from Settings.</string>
+    <string name="remote_open_in_browser">Open in browser</string>
     <string name="remote_empty">Add songs before starting remote play.</string>
     <string name="remote_tunnel_failed">Remote play failed: %1$s</string>
     <string name="remote_error_copy">Copy</string>
@@ -45,6 +47,8 @@
     <string name="settings_remote_port_hint">Default 44444. Local HTTP port for remote play (LAN and Cloudflare tunnel).</string>
     <string name="settings_remote_pin">Remote play PIN</string>
     <string name="settings_remote_pin_hint">4 digits. Anyone with the remote URL must enter this PIN in the browser.</string>
+    <string name="settings_remote_pin_show">Show PIN</string>
+    <string name="settings_remote_pin_hide">Hide PIN</string>
     <string name="settings_port_invalid">Enter a port between 1024 and 65535.</string>
     <string name="settings_pin_invalid">Enter exactly 4 digits for the PIN.</string>
     <string name="settings_saved">Settings saved</string>
@@ -55,7 +59,7 @@
     <string name="remote_notification_channel">Remote play</string>
     <string name="remote_notification_channel_desc">Shows while remote play is active</string>
     <string name="remote_notification_title">Remote: %1$s</string>
-    <string name="remote_notification_body">Active — open the app and tap the Wi‑Fi icon for the link</string>
+    <string name="remote_notification_body">Active — tap Stop here or the Wi‑Fi icon in the app to end</string>
     <string name="remove">Remove</string>
     <string name="empty_playlist">Tap + above to add songs.</string>
     <string name="quickstart">Quickstart playlist</string>

@@ -14,6 +14,20 @@ object CloudflareTunnel {
 
     private val URL_PATTERN = Pattern.compile("""https://[a-z0-9-]+\.trycloudflare\.com""")
 
+    /** Quick-tunnel API host — not the public URL visitors should open. */
+    private const val QUICK_TUNNEL_API_HOST = "api.trycloudflare.com"
+
+    internal fun extractPublicTunnelUrl(line: String): String? {
+        val matcher = URL_PATTERN.matcher(line)
+        while (matcher.find()) {
+            val url = matcher.group()
+            if (!url.contains("://$QUICK_TUNNEL_API_HOST")) {
+                return url
+            }
+        }
+        return null
+    }
+
     private var process: Process? = null
     private var outputThread: Thread? = null
     private var waitThread: Thread? = null
@@ -50,9 +64,9 @@ object CloudflareTunnel {
                 proc.inputStream.bufferedReader().useLines { lines ->
                     for (line in lines) {
                         outputLines.add(line)
-                        val matcher = URL_PATTERN.matcher(line)
-                        if (matcher.find()) {
-                            urlRef.set(matcher.group())
+                        val url = extractPublicTunnelUrl(line)
+                        if (url != null) {
+                            urlRef.set(url)
                             latch.countDown()
                             break
                         }
