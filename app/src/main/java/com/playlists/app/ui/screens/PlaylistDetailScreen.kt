@@ -95,15 +95,23 @@ fun PlaylistDetailScreen(
         playlist = viewModel.getPlaylist(playlistId)
     }
 
+    val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
+
     LaunchedEffect(entries, draggingKey) {
         syncDisplayedKeys(displayedKeys, draggingKey, entries.map { "e:${it.id}" })
     }
 
-    LaunchedEffect(Unit) {
-        remoteUrl = if (PlayRemoteController.isRunningFor(playlistId)) {
+    LaunchedEffect(remoteRunning, playlistId) {
+        remoteUrl = if (remoteRunning && PlayRemoteController.isRunningFor(playlistId)) {
             PlayRemoteController.currentUrl()
         } else {
             null
+        }
+    }
+
+    LaunchedEffect(entries, remoteRunning, playlistId) {
+        if (remoteRunning && PlayRemoteController.isRunningFor(playlistId)) {
+            PlayRemoteController.refreshSongs(entries)
         }
     }
 
@@ -233,6 +241,7 @@ fun PlaylistDetailScreen(
             } else {
                 LazyColumn(
                     state = listState,
+                    userScrollEnabled = draggingKey == null,
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize(),

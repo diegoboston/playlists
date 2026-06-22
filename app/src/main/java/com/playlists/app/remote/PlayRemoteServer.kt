@@ -11,9 +11,13 @@ import java.io.FileInputStream
 class PlayRemoteServer(
     port: Int,
     private val playlistName: String,
-    private val songs: List<RemoteSong>,
+    songs: List<RemoteSong>,
     private val html: String,
+    private val onStopRequested: () -> Unit = {},
+    private val onUpload: ((title: String, key: String, notes: String, tempFile: File, mimeType: String) -> Result<Unit>)? = null,
 ) : NanoHTTPD(port) {
+
+    private val songs: MutableList<RemoteSong> = songs.toMutableList()
 
     data class RemoteSong(
         val title: String,
@@ -36,6 +40,11 @@ class PlayRemoteServer(
             uri == "/" || uri == "/index.html" -> htmlResponse(html)
             uri == "/api/state" -> jsonResponse(buildStateJson())
             uri == "/api/navigate" && session.method == Method.POST -> handleNavigate(session)
+            uri == "/api/stop" && session.method == Method.POST -> {
+                onStopRequested()
+                jsonResponse("""{"stopped":true}""")
+            }
+            uri == "/api/upload" && session.method == Method.POST -> handleUpload(session)
             uri == "/api/media" -> serveMedia(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not found")
         }
@@ -55,6 +64,84 @@ class PlayRemoteServer(
         }
         return jsonResponse(buildStateJson())
     }
+
+    fun replaceSongs(newSongs: List<RemoteSong>) {
+        synchronized(songs) {
+            songs.clear()
+            songs.addAll(newSongs)
+            if (songs.isEmpty()) {
+                songIndex = 0
+                pageIndex = 0
+            } else {
+                songIndex = songIndex.coerceIn(0, songs.lastIndex)
+                val pages = songs[songIndex].pageCount.coerceAtLeast(1)
+                pageIndex = pageIndex.coerceIn(0, pages - 1)
+            }
+        }
+    }
+
+    fun goToSong(index: Int) {
+        synchronized(songs) {
+            if (songs.isEmpty()) return
+            songIndex = index.coerceIn(0, songs.lastIndex)
+            pageIndex = 0
+        }
+    }
+
+    private fun handleUpload(session: IHTTPSession): Response {
+        val handler = onUpload
+            ?: return jsonError("Upload not available")
+        val files = HashMap<String, String>()
+        try {
+            session.parseBody(files)
+        } catch (_: Exception) {
+            return jsonError("Invalid upload")
+        }
+        val title = session.parameters["title"]?.firstOrNull().orEmpty()
+        val key = session.parameters["key"]?.firstOrNull().orEmpty()
+        val notes = session.parameters["notes"]?.firstOrNull().orEmpty()
+        val tempPath = files["file"] ?: return jsonError("Missing file")
+        val tempFile = File(tempPath)
+        if (!tempFile.exists()) return jsonError("Missing file")
+        val mimeType = session.parameters["mime"]?.firstOrNull()
+            ?: guessMimeType(tempFile)
+        if (!isAllowedMime(mimeType)) return jsonError("Unsupported file type")
+        return when (val result = handler(title, key, notes, tempFile, mimeType)) {
+            is Result.Success -> jsonResponse(buildStateJson())
+            is Result.Failure -> jsonError(result.exceptionOrNull()?.message ?: "Upload failed")
+        }
+    }
+
+    private fun isAllowedMime(mimeType: String): Boolean =
+        mimeType.startsWith("image/") || mimeType == "application/pdf"
+
+    private fun guessMimeType(file: File): String {
+        file.inputStream().use { input ->
+            val header = ByteArray(4)
+            if (input.read(header) == 4 &&
+                header[0] == '%'.code.toByte() &&
+                header[1] == 'P'.code.toByte() &&
+                header[2] == 'D'.code.toByte() &&
+                header[3] == 'F'.code.toByte()
+            ) {
+                return "application/pdf"
+            }
+        }
+        return when (file.extension.lowercase()) {
+            "pdf" -> "application/pdf"
+            "png" -> "image/png"
+            "gif" -> "image/gif"
+            "webp" -> "image/webp"
+            else -> "image/jpeg"
+        }
+    }
+
+    private fun jsonError(message: String): Response =
+        newFixedLengthResponse(
+            Response.Status.BAD_REQUEST,
+            "application/json",
+            """{"error":${jsonStr(message)}}""",
+        )
 
     private fun step(delta: Int) {
         if (songs.isEmpty()) return

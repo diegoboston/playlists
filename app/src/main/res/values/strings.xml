@@ -30,6 +30,8 @@
     <string name="remote_empty">Add songs before starting remote play.</string>
     <string name="remote_no_network">Connect to Wi‑Fi to use remote play.</string>
     <string name="remote_failed">Remote play failed: %1$s</string>
+    <string name="remote_open_playlist">Open a playlist to start remote play.</string>
+    <string name="remote_stopped">Remote play stopped</string>
     <string name="remove">Remove</string>
     <string name="empty_playlist">Tap + above to add songs.</string>
     <string name="quickstart">Quickstart playlist</string>

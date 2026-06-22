@@ -8,18 +8,44 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; background: #000; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
     #bar { background: rgba(0,0,0,.8); padding: 10px 12px; text-align: center; font-size: 14px; line-height: 1.4; }
+    #barTop { display: flex; align-items: center; justify-content: center; gap: 10px; }
     #title { font-weight: 700; }
+    #remoteBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; }
+    #remoteBtn.on { color: #7ecbff; }
+    #remoteBtn.off { color: rgba(255,255,255,.35); }
+    #remoteBtn svg { width: 22px; height: 22px; fill: currentColor; }
+    #uploadBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; font-size: 22px; font-weight: 700; width: 30px; height: 30px; }
+    #uploadBtn:disabled { opacity: .35; cursor: default; }
     #meta { opacity: .85; font-size: 13px; margin-top: 2px; }
     #stage { height: calc(100% - 56px); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
     #zoomWrap { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; transform-origin: center center; will-change: transform; }
     #media { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; pointer-events: none; }
     #hint { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; opacity: .55; font-size: 12px; pointer-events: none; }
     #empty { padding: 24px; text-align: center; opacity: .8; }
+    #uploadOverlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+    #uploadOverlay[hidden] { display: none; }
+    #uploadForm { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 20px; width: min(400px, 100%); }
+    #uploadForm h2 { font-size: 18px; margin-bottom: 16px; }
+    #uploadForm label { display: block; font-size: 13px; opacity: .8; margin-bottom: 4px; }
+    #uploadForm input[type="text"] { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #444; border-radius: 8px; background: #000; color: #fff; font-size: 16px; }
+    #uploadForm input[type="file"] { width: 100%; margin-bottom: 12px; color: #ccc; font-size: 14px; }
+    #uploadError { color: #ff8a80; font-size: 13px; margin-bottom: 12px; min-height: 1.2em; }
+    #uploadActions { display: flex; gap: 10px; justify-content: flex-end; }
+    #uploadActions button { padding: 10px 16px; border-radius: 8px; border: none; font-size: 15px; cursor: pointer; }
+    #uploadCancel { background: #333; color: #fff; }
+    #uploadSubmit { background: #7ecbff; color: #000; font-weight: 600; }
+    #uploadSubmit:disabled { opacity: .5; cursor: default; }
   </style>
 </head>
 <body>
   <div id="bar">
-    <div id="title">Stage Manager</div>
+    <div id="barTop">
+      <div id="title">Stage Manager</div>
+      <button id="uploadBtn" type="button" aria-label="Upload song" title="Upload song">+</button>
+      <button id="remoteBtn" type="button" class="on" aria-label="Remote on/off" title="Stop remote play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      </button>
+    </div>
     <div id="meta"></div>
   </div>
   <div id="stage">
@@ -29,17 +55,46 @@
     <div id="empty" hidden>No songs in this playlist.</div>
     <div id="hint">Pinch to zoom · swipe ← → · arrow keys</div>
   </div>
+  <div id="uploadOverlay" hidden>
+    <form id="uploadForm">
+      <h2>Upload song</h2>
+      <label for="uploadTitle">Title</label>
+      <input id="uploadTitle" type="text" autocomplete="off" />
+      <label for="uploadKey">Key</label>
+      <input id="uploadKey" type="text" autocomplete="off" />
+      <label for="uploadNotes">Notes</label>
+      <input id="uploadNotes" type="text" autocomplete="off" />
+      <label for="uploadFile">File (PDF or image)</label>
+      <input id="uploadFile" type="file" accept="image/*,application/pdf,.pdf" required />
+      <div id="uploadError"></div>
+      <div id="uploadActions">
+        <button id="uploadCancel" type="button">Cancel</button>
+        <button id="uploadSubmit" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
   <script>
     const zoomWrap = document.getElementById('zoomWrap');
     const media = document.getElementById('media');
-    const titleEl = document.getElementById('title');
     const metaEl = document.getElementById('meta');
     const emptyEl = document.getElementById('empty');
     const stage = document.getElementById('stage');
+    const remoteBtn = document.getElementById('remoteBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadOverlay = document.getElementById('uploadOverlay');
+    const uploadForm = document.getElementById('uploadForm');
+    const uploadTitle = document.getElementById('uploadTitle');
+    const uploadKey = document.getElementById('uploadKey');
+    const uploadNotes = document.getElementById('uploadNotes');
+    const uploadFile = document.getElementById('uploadFile');
+    const uploadError = document.getElementById('uploadError');
+    const uploadSubmit = document.getElementById('uploadSubmit');
+    const uploadCancel = document.getElementById('uploadCancel');
 
     let touchStartX = 0;
     let touchStartY = 0;
     let busy = false;
+    let remoteOn = true;
     let lastSongIndex = -1;
     let lastPageIndex = -1;
     let scale = 1;
@@ -47,13 +102,101 @@
     let offsetY = 0;
     let pinchStartDist = 0;
     let pinchStartScale = 1;
-    let pinchMidX = 0;
-    let pinchMidY = 0;
     let panStartX = 0;
     let panStartY = 0;
     let panOffsetStartX = 0;
     let panOffsetStartY = 0;
-    let activeTouches = 0;
+
+    function setRemoteState(on) {
+      remoteOn = on;
+      remoteBtn.classList.toggle('on', on);
+      remoteBtn.classList.toggle('off', !on);
+      remoteBtn.title = on ? 'Stop remote play' : 'Remote off';
+      uploadBtn.disabled = !on;
+    }
+
+    function openUpload() {
+      if (!remoteOn || busy) return;
+      uploadError.textContent = '';
+      uploadTitle.value = '';
+      uploadKey.value = '';
+      uploadNotes.value = '';
+      uploadFile.value = '';
+      uploadOverlay.hidden = false;
+    }
+
+    function closeUpload() {
+      uploadOverlay.hidden = true;
+      uploadError.textContent = '';
+    }
+
+    uploadBtn.addEventListener('click', openUpload);
+    uploadCancel.addEventListener('click', closeUpload);
+
+    uploadFile.addEventListener('change', () => {
+      const file = uploadFile.files?.[0];
+      if (file && !uploadTitle.value.trim()) {
+        uploadTitle.value = file.name.replace(/\.[^.]+$/, '');
+      }
+    });
+
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!remoteOn || busy) return;
+      const file = uploadFile.files?.[0];
+      if (!file) {
+        uploadError.textContent = 'Choose a PDF or image.';
+        return;
+      }
+      busy = true;
+      uploadSubmit.disabled = true;
+      uploadError.textContent = '';
+      try {
+        const formData = new FormData();
+        formData.append('title', uploadTitle.value.trim());
+        formData.append('key', uploadKey.value.trim());
+        formData.append('notes', uploadNotes.value.trim());
+        formData.append('mime', file.type || 'application/octet-stream');
+        formData.append('file', file);
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Upload failed');
+        }
+        closeUpload();
+        lastSongIndex = -1;
+        lastPageIndex = -1;
+        await refresh();
+      } catch (err) {
+        uploadError.textContent = err.message || 'Upload failed';
+      } finally {
+        busy = false;
+        uploadSubmit.disabled = false;
+      }
+    });
+
+    function showStopped() {
+      setRemoteState(false);
+      zoomWrap.hidden = true;
+      emptyEl.hidden = false;
+      emptyEl.textContent = 'Remote play stopped.';
+      metaEl.textContent = '';
+    }
+
+    async function toggleRemote() {
+      if (!remoteOn || busy) return;
+      busy = true;
+      try {
+        await fetch('/api/stop', { method: 'POST' });
+        showStopped();
+      } catch (_) {
+        showStopped();
+      } finally {
+        busy = false;
+      }
+    }
+
+    remoteBtn.addEventListener('click', toggleRemote);
 
     function resetZoom() {
       scale = 1;
@@ -73,35 +216,40 @@
     }
 
     async function refresh() {
-      const res = await fetch('/api/state');
-      const s = await res.json();
-      titleEl.textContent = s.playlistName || 'Playlist';
-      if (!s.songs || s.songs.length === 0) {
-        zoomWrap.hidden = true;
-        emptyEl.hidden = false;
-        metaEl.textContent = '';
-        lastSongIndex = -1;
-        lastPageIndex = -1;
-        return;
-      }
-      emptyEl.hidden = true;
-      zoomWrap.hidden = false;
-      const song = s.songs[s.songIndex];
-      const pageCount = song.pageCount || 1;
-      const pageLabel = pageCount > 1 ? ` · page ${s.pageIndex + 1}/${pageCount}` : '';
-      metaEl.textContent = `${s.songIndex + 1}/${s.songs.length}: ${song.title}${pageLabel}`;
+      if (!remoteOn) return;
+      try {
+        const res = await fetch('/api/state');
+        const s = await res.json();
+        if (!s.songs || s.songs.length === 0) {
+          zoomWrap.hidden = true;
+          emptyEl.hidden = false;
+          emptyEl.textContent = 'No songs in this playlist.';
+          metaEl.textContent = s.playlistName || '';
+          lastSongIndex = -1;
+          lastPageIndex = -1;
+          return;
+        }
+        emptyEl.hidden = true;
+        zoomWrap.hidden = false;
+        const song = s.songs[s.songIndex];
+        const pageCount = song.pageCount || 1;
+        const pageLabel = pageCount > 1 ? ` · page ${s.pageIndex + 1}/${pageCount}` : '';
+        metaEl.textContent = `${s.playlistName || 'Playlist'} · ${s.songIndex + 1}/${s.songs.length}: ${song.title}${pageLabel}`;
 
-      const contentChanged = s.songIndex !== lastSongIndex || s.pageIndex !== lastPageIndex;
-      if (contentChanged) {
-        resetZoom();
-        lastSongIndex = s.songIndex;
-        lastPageIndex = s.pageIndex;
-        media.src = `/api/media?song=${s.songIndex}&page=${s.pageIndex}`;
+        const contentChanged = s.songIndex !== lastSongIndex || s.pageIndex !== lastPageIndex;
+        if (contentChanged) {
+          resetZoom();
+          lastSongIndex = s.songIndex;
+          lastPageIndex = s.pageIndex;
+          media.src = `/api/media?song=${s.songIndex}&page=${s.pageIndex}`;
+        }
+      } catch (_) {
+        showStopped();
       }
     }
 
     async function navigate(direction) {
-      if (busy || scale > 1.05) return;
+      if (busy || !remoteOn || scale > 1.05) return;
       busy = true;
       try {
         await fetch('/api/navigate', {
@@ -116,7 +264,7 @@
     }
 
     stage.addEventListener('touchstart', (e) => {
-      activeTouches = e.touches.length;
+      if (!remoteOn) return;
       if (e.touches.length === 1) {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
@@ -129,12 +277,11 @@
       } else if (e.touches.length === 2) {
         pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
         pinchStartScale = scale;
-        pinchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        pinchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       }
     }, { passive: true });
 
     stage.addEventListener('touchmove', (e) => {
+      if (!remoteOn) return;
       if (e.touches.length === 2) {
         const dist = touchDistance(e.touches[0], e.touches[1]);
         if (pinchStartDist > 0) {
@@ -154,7 +301,7 @@
     }, { passive: true });
 
     stage.addEventListener('touchend', (e) => {
-      activeTouches = e.touches.length;
+      if (!remoteOn) return;
       if (e.touches.length === 0 && scale <= 1.05) {
         const dx = e.changedTouches[0].clientX - touchStartX;
         const dy = e.changedTouches[0].clientY - touchStartY;
@@ -171,6 +318,7 @@
     }, { passive: true });
 
     document.addEventListener('keydown', (e) => {
+      if (!remoteOn) return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate('next');
       if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') navigate('prev');
     });

@@ -69,6 +69,7 @@ fun SongsScreen(
 
     LazyColumn(
         state = listState,
+        userScrollEnabled = draggingKey == null,
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize(),
