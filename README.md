@@ -24,18 +24,18 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**. Underscores in the filename become spaces in the suggested title.
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
-- **Song list** — Shows title, key, and notes preview (first ~20 characters), plus file type badge. **Pencil** edits title, key, and notes.
+- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation.
 - **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages.
 
 ### Playlists
 
-- **Create / rename** — New playlists get an editable name.
+- **Create / rename** — New playlists get an editable name. The **Playlists** tab shows each playlist as a **colorful block** (NoTube-style folder colors) with inline **pencil** (rename), **color**, and **delete**.
 - **Ordered sequences** — A playlist is an ordered list of songs from the archive.
 - **Add songs** — Search dialog with full-text match across title, key, and notes.
 - **Drag reorder** — Long-press and drag rows in the Songs tab, Playlists tab, or playlist detail screen. Uses the same center-vs-center swap logic as NoTube (`DraggableItem` + `ReorderLogic`).
 - **Duplicate playlist** — Copies name (with “(copy)”) and full song order.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs).
-- **Remote play** — Wi‑Fi icon on the playlist toolbar starts a local HTTP server; open the URL on another device on the same network (tablet, laptop) for a fullscreen browser view. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. A banner shows the active URL and **Stop**. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen).
+- **Remote play** — Wi‑Fi icon starts a local HTTP server; open the URL on another device on the same network (tablet, laptop) for a fullscreen browser view. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. A **system notification** (high priority) shows the active URL with a **Stop** action while remote is on; the Wi‑Fi icon and “Remote play” label are highlighted when active, gray when off. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen).
 
 ### Quickstart playlist
 
@@ -54,14 +54,14 @@ Sketch of the main flows (not to scale):
 │                                     │
 │  SONGS TAB                          │
 │  ┌─────────────────────────────┐    │
-│  │ Amazing Grace          PDF │✎🗑│  │
-│  │ Key: G · intro notes · 2 pg│    │
+│  │ Amazing Grace (G)          ✎ │    │
+│  │ intro notes                  │    │
 │  └─────────────────────────────┘    │
 │                                     │
 │  tap row → fullscreen viewer        │
 │  long-press drag → reorder          │
 │  ✎ → edit title / key / notes       │
-│  🗑 → remove from archive (soft)    │
+│     (delete with confirmation)      │
 │                                     │
 └─────────────────────────────────────┘
 
@@ -81,18 +81,21 @@ Sketch of the main flows (not to scale):
                  │
                  ▼
 ┌─────────────────────────────────────┐
-│ ← Sunday set                        │
+│ ← Sunday set                        │  ← line 1: back + title
 ├─────────────────────────────────────┤
-│  +   ▶   📶  ✎   ⧉   ○   🗑            │
-│ add play remote rename dup color delete  │
+│  +   ▶   📶 Remote  ✎   ⧉   ○   🗑   │  ← line 2: tools (remote gray when off)
 ├─────────────────────────────────────┤
-│ http://192.168.1.5:8080/    [ Stop ]  │  ← remote play banner (when active)
-├─────────────────────────────────────┤
-│  Amazing Grace                      │
-│  (G) intro                          │
-│  How Great Thou Art          Remove │  ← red if deleted from archive
+│  Amazing Grace (G)              🗑  │
+│  intro notes                        │
+│  How Great Thou Art (Bb)        🗑  │  ← red if deleted from archive
 │                                     │
 │  empty: “Tap + above to add songs.” │
+└─────────────────────────────────────┘
+
+PLAYLISTS TAB — colorful folder blocks
+┌─────────────────────────────────────┐
+│ [ Sunday set          ✎  ○  🗑 ]    │  ← tap block to open; icons inline
+│ [ Rehearsal           ✎  ○  🗑 ]    │
 └─────────────────────────────────────┘
 ```
 
@@ -104,7 +107,7 @@ Sketch of the main flows (not to scale):
 4. **Add songs** — Open a playlist → **+** → search → tap a result.
 5. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 6. **Play** — Open a playlist → **Play** → swipe between songs.
-7. **Remote play** — Open a playlist → **Wi‑Fi** → open the URL on another device on the same LAN; swipe there to change songs/pages. **Stop** ends the server.
+7. **Remote play** — Open a playlist → **Wi‑Fi** → open the URL on another device on the same LAN; swipe there to change songs/pages. **Stop** via the system notification (or when deleting the playlist).
 8. **Quickstart** — **Playlists** tab → **Quickstart playlist** → paste text → **Match songs** → **Create**.
 
 ## Project layout
@@ -120,7 +123,7 @@ playlists/
 │   ├── keystore/playlists.keystore # Shared sideload signing key (committed)
 │   └── src/main/java/com/playlists/app/
 │       ├── data/                   # Room: Song, Playlist, PlaylistSong
-│       ├── remote/                 # Local HTTP server + browser remote UI
+│       ├── remote/                 # Local HTTP server, foreground notification
 │       ├── ui/
 │       │   ├── MainActivity.kt     # Single Compose entry + share intents
 │       │   ├── PlaylistsViewModel.kt
@@ -188,13 +191,13 @@ Implementation: `AppUpdate.kt`, `PlaylistsViewModel.kt`, `MainActivity.kt`. Chan
 
 Control playback from a **second screen** on the same Wi‑Fi network (e.g. iPad on a music stand while the phone sits on a stand).
 
-1. **Start** — Open a playlist → tap the **Wi‑Fi** toolbar icon. The phone starts a small HTTP server and opens the URL in the browser (or copy it from the banner).
+1. **Start** — Open a playlist → tap the **Wi‑Fi** toolbar icon (or the main-tab Wi‑Fi shortcut for the last-opened playlist). The phone starts a foreground HTTP server, shows a **system notification** with the URL, and opens the URL in the browser.
 2. **Browser UI** — Fullscreen sheet music / image for the current song and page. Title bar shows playlist name and `3/12: Song title · page 2/3`. **+** uploads a new file; **pencil** opens `/edit` to reorder, remove, or add songs from the archive.
 3. **Navigate** — Swipe left/right (or laptop arrow keys) for next/previous song; multi-page PDFs advance page before moving to the next song.
 4. **Edit playlist** — On `/edit`, drag rows to reorder, tap **Remove**, or search the archive to add. **Done** returns to the stage view. Changes sync to the phone database immediately.
-5. **Stop** — Tap **Stop** on the banner in the app, or leave the playlist screen (server stops when the screen is disposed).
+5. **Stop** — Tap **Stop** on the system notification, or delete the active playlist.
 
-Requires Wi‑Fi with a LAN IP (not cellular-only). HTTP is cleartext on the local network (`usesCleartextTraffic`). Implementation: `PlayRemoteController.kt`, `PlayRemoteServer.kt`, `assets/remote/play.html`, `assets/remote/edit.html`.
+Requires Wi‑Fi with a LAN IP (not cellular-only). HTTP is cleartext on the local network (`usesCleartextTraffic`). On Android 13+, the app requests notification permission so the remote-play notification can appear. Implementation: `PlayRemoteController.kt`, `RemotePlayService.kt`, `PlayRemoteServer.kt`, `assets/remote/play.html`, `assets/remote/edit.html`.
 
 ## update.sh
 

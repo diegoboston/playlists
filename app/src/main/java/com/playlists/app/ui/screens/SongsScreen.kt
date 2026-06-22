@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -52,8 +53,8 @@ fun SongsScreen(
     val listState = rememberLazyListState()
     val displayedKeys = remember { mutableStateListOf<String>() }
     val dragState = remember { ReorderDragState() }
-    var deleteTarget by remember { mutableStateOf<Song?>(null) }
     var editTarget by remember { mutableStateOf<Song?>(null) }
+    var deleteTarget by remember { mutableStateOf<Song?>(null) }
 
     LaunchedEffect(songs, dragState.draggingKey) {
         syncDisplayedKeys(displayedKeys, dragState.draggingKey, songs.map { "s:${it.id}" })
@@ -73,8 +74,8 @@ fun SongsScreen(
     LazyColumn(
         state = listState,
         userScrollEnabled = !dragState.isDragging,
-        contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
         items(
@@ -99,9 +100,7 @@ fun SongsScreen(
             ) {
                 SongRow(
                     song = song,
-                    pageCount = viewModel.pageCount(song),
                     onEdit = { editTarget = song },
-                    onDelete = { deleteTarget = song },
                 )
             }
         }
@@ -114,6 +113,10 @@ fun SongsScreen(
             onSave = { title, key, notes ->
                 viewModel.updateSong(song.id, title, key, notes)
                 editTarget = null
+            },
+            onDelete = {
+                editTarget = null
+                deleteTarget = song
             },
         )
     }
@@ -145,6 +148,7 @@ private fun EditSongDialog(
     song: Song,
     onDismiss: () -> Unit,
     onSave: (title: String, key: String, notes: String) -> Unit,
+    onDelete: () -> Unit,
 ) {
     var title by remember(song.id) { mutableStateOf(song.title) }
     var key by remember(song.id) { mutableStateOf(song.keySignature) }
@@ -175,6 +179,22 @@ private fun EditSongDialog(
                     label = { Text(stringResource(R.string.notes_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .size(18.dp),
+                        )
+                        Text(stringResource(R.string.delete_song))
+                    }
+                }
             }
         },
         confirmButton = {
@@ -196,9 +216,7 @@ private fun EditSongDialog(
 @Composable
 private fun SongRow(
     song: Song,
-    pageCount: Int,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -213,32 +231,36 @@ private fun SongRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = SongDisplay.titleWithKey(song.title, song.keySignature),
+                    style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text = SongDisplay.subtitle(song, pageCount),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                val noteLine = SongDisplay.notesLine(song.notes)
+                if (noteLine.isNotEmpty()) {
+                    Text(
+                        text = noteLine,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.edit_song),
+                    modifier = Modifier.size(18.dp),
                 )
-            }
-            Text(
-                text = SongDisplay.typeBadge(song, pageCount),
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(end = 4.dp),
-            )
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit_song))
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_song))
             }
         }
     }

@@ -10,20 +10,24 @@ object SongDisplay {
         return if (trimmed.length <= PREVIEW_LEN) trimmed else trimmed.take(PREVIEW_LEN) + "…"
     }
 
-    fun playlistLine(keySignature: String, notes: String): String {
+    fun keySuffix(keySignature: String): String {
         val key = keySignature.trim()
+        return if (key.isNotEmpty()) " ($key)" else ""
+    }
+
+    fun titleWithKey(title: String, keySignature: String): String =
+        title + keySuffix(keySignature)
+
+    fun notesLine(notes: String): String = preview(notes)
+
+    fun playlistLine(keySignature: String, notes: String): String {
         val note = preview(notes)
-        return when {
-            key.isNotEmpty() && note.isNotEmpty() -> "($key) $note"
-            key.isNotEmpty() -> "($key)"
-            note.isNotEmpty() -> note
-            else -> ""
-        }
+        return note
     }
 
     fun subtitle(song: Song, pageCount: Int? = null): String {
-        val base = "Key: ${preview(song.keySignature)} · ${preview(song.notes)}"
-        return if (pageCount != null) "$base · $pageCount pg" else base
+        val note = preview(song.notes)
+        return note
     }
 
     fun typeBadge(song: Song, pageCount: Int? = null): String =

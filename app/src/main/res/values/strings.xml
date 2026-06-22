@@ -39,6 +39,9 @@
     <string name="settings_port_invalid">Enter a port between 1024 and 65535.</string>
     <string name="settings_saved">Settings saved</string>
     <string name="remote_stopped">Remote play stopped</string>
+    <string name="remote_notification_channel">Remote play</string>
+    <string name="remote_notification_channel_desc">Shows while remote play is active on your network</string>
+    <string name="remote_notification_title">Remote: %1$s</string>
     <string name="remove">Remove</string>
     <string name="empty_playlist">Tap + above to add songs.</string>
     <string name="quickstart">Quickstart playlist</string>

@@ -32,11 +32,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -90,7 +89,6 @@ fun PlaylistDetailScreen(
     var showColor by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
     var showAddSong by remember { mutableStateOf(false) }
-    var remoteUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(playlistId) {
         playlist = viewModel.getPlaylist(playlistId)
@@ -98,17 +96,10 @@ fun PlaylistDetailScreen(
     }
 
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
+    val remoteActiveHere = remoteRunning && PlayRemoteController.isRunningFor(playlistId)
 
     LaunchedEffect(entries, dragState.draggingKey) {
         syncDisplayedKeys(displayedKeys, dragState.draggingKey, entries.map { "e:${it.id}" })
-    }
-
-    LaunchedEffect(remoteRunning, playlistId) {
-        remoteUrl = if (remoteRunning && PlayRemoteController.isRunningFor(playlistId)) {
-            PlayRemoteController.currentUrl()
-        } else {
-            null
-        }
     }
 
     LaunchedEffect(entries, remoteRunning, playlistId) {
@@ -117,151 +108,163 @@ fun PlaylistDetailScreen(
         }
     }
 
+    fun startRemote() {
+        scope.launch {
+            val list = viewModel.getPlaylistSongs(playlistId)
+            if (list.isEmpty()) {
+                Toast.makeText(context, R.string.remote_empty, Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            val name = playlist?.name.orEmpty()
+            PlayRemoteController.start(context, playlistId, name, list)
+                .onSuccess { url ->
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    Toast.makeText(context, R.string.remote_started, Toast.LENGTH_SHORT).show()
+                }
+                .onFailure { error ->
+                    val message = when {
+                        error.message?.contains("LAN IP") == true ->
+                            context.getString(R.string.remote_no_network)
+                        else -> context.getString(R.string.remote_failed, error.message ?: "unknown")
+                    }
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                }
+        }
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = playlist?.name.orEmpty(),
-                        color = playlist?.colorArgb?.let { Color(it) } ?: Color.Unspecified,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showAddSong = true }) {
-                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_song))
-                    }
-                    IconButton(onClick = { onPlay(playlistId) }) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.play))
-                    }
-                    IconButton(onClick = {
-                        if (PlayRemoteController.isRunningFor(playlistId)) {
-                            PlayRemoteController.currentUrl()?.let { url ->
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                            }
-                            return@IconButton
+            Surface(shadowElevation = 3.dp) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
-                        scope.launch {
-                            val list = viewModel.getPlaylistSongs(playlistId)
-                            if (list.isEmpty()) {
-                                Toast.makeText(context, R.string.remote_empty, Toast.LENGTH_LONG).show()
-                                return@launch
-                            }
-                            val name = playlist?.name.orEmpty()
-                            PlayRemoteController.start(context, playlistId, name, list)
-                                .onSuccess { url ->
-                                    remoteUrl = url
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                    Toast.makeText(context, R.string.remote_started, Toast.LENGTH_SHORT).show()
-                                }
-                                .onFailure { error ->
-                                    val message = when {
-                                        error.message?.contains("LAN IP") == true ->
-                                            context.getString(R.string.remote_no_network)
-                                        else -> context.getString(R.string.remote_failed, error.message ?: "unknown")
-                                    }
-                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                                }
-                        }
-                    }) {
-                        Icon(Icons.Default.Wifi, contentDescription = stringResource(R.string.remote_play))
+                        Text(
+                            text = playlist?.name.orEmpty(),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = playlist?.colorArgb?.let { Color(it) } ?: Color.Unspecified,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
                     }
-                    if (PlayRemoteController.isRunningFor(playlistId)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 4.dp, end = 8.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = { showAddSong = true }) {
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_song))
+                        }
+                        IconButton(onClick = { onPlay(playlistId) }) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.play))
+                        }
                         IconButton(onClick = {
-                            PlayRemoteController.stop()
-                            remoteUrl = null
+                            if (remoteActiveHere) {
+                                PlayRemoteController.currentUrl()?.let { url ->
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                }
+                            } else {
+                                startRemote()
+                            }
                         }) {
-                            Text(stringResource(R.string.remote_stop), style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    IconButton(onClick = { showRename = true }) {
-                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.rename_playlist))
-                    }
-                    IconButton(onClick = { showDuplicate = true }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.duplicate))
-                    }
-                    IconButton(onClick = { showColor = true }) {
-                        if (playlist?.colorArgb != null) {
-                            androidx.compose.foundation.layout.Box(
-                                modifier = Modifier
-                                    .padding(10.dp)
-                                    .size(20.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(playlist!!.colorArgb!!)),
-                            )
-                        } else {
                             Icon(
-                                Icons.Default.ColorLens,
-                                contentDescription = stringResource(R.string.playlist_color),
+                                Icons.Default.Wifi,
+                                contentDescription = stringResource(R.string.remote_play),
+                                tint = if (remoteActiveHere) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                },
                             )
                         }
+                        Text(
+                            text = stringResource(R.string.remote_play),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (remoteActiveHere) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            },
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
+                        IconButton(onClick = { showRename = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.rename_playlist))
+                        }
+                        IconButton(onClick = { showDuplicate = true }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.duplicate))
+                        }
+                        IconButton(onClick = { showColor = true }) {
+                            if (playlist?.colorArgb != null) {
+                                androidx.compose.foundation.layout.Box(
+                                    modifier = Modifier
+                                        .padding(10.dp)
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(playlist!!.colorArgb!!)),
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.ColorLens,
+                                    contentDescription = stringResource(R.string.playlist_color),
+                                )
+                            }
+                        }
+                        IconButton(onClick = { showDelete = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_playlist))
+                        }
                     }
-                    IconButton(onClick = { showDelete = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_playlist))
-                    }
-                },
-            )
+                }
+            }
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            if (remoteUrl != null) {
-                Text(
-                    text = stringResource(R.string.remote_url_label, remoteUrl!!),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(12.dp),
-                )
+        if (entries.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(stringResource(R.string.empty_playlist))
             }
-            if (entries.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(stringResource(R.string.empty_playlist))
-                }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    userScrollEnabled = !dragState.isDragging,
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    items(displayedKeys.toList(), key = { it }) { key ->
-                        val entryId = key.removePrefix("e:").toLongOrNull() ?: return@items
-                        val entry = entries.find { it.id == entryId } ?: return@items
-                        DraggableItem(
-                            isDragging = dragState.draggingKey == key,
-                            dragOffset = dragState.currentDragOffset(listState),
-                            onTap = { onOpenSong(entry.songId) },
-                            onDragStart = { dragState.onDragStart(key, listState) },
-                            onDrag = { delta -> dragState.onDrag(delta, listState, displayedKeys) },
-                            onDragEnd = {
-                                dragState.finishDrag {
-                                    val ids = displayedKeys.mapNotNull { it.removePrefix("e:").toLongOrNull() }
-                                    viewModel.reorderPlaylistSongs(playlistId, ids)
-                                }
-                            },
-                            onDragCancel = { dragState.cancelDrag() },
-                        ) {
-                            PlaylistSongRow(
-                                entry = entry,
-                                onRemove = { viewModel.removeSongFromPlaylist(entry.id) },
-                            )
-                        }
+        } else {
+            LazyColumn(
+                state = listState,
+                userScrollEnabled = !dragState.isDragging,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) {
+                items(displayedKeys.toList(), key = { it }) { key ->
+                    val entryId = key.removePrefix("e:").toLongOrNull() ?: return@items
+                    val entry = entries.find { it.id == entryId } ?: return@items
+                    DraggableItem(
+                        isDragging = dragState.draggingKey == key,
+                        dragOffset = dragState.currentDragOffset(listState),
+                        onTap = { onOpenSong(entry.songId) },
+                        onDragStart = { dragState.onDragStart(key, listState) },
+                        onDrag = { delta -> dragState.onDrag(delta, listState, displayedKeys) },
+                        onDragEnd = {
+                            dragState.finishDrag {
+                                val ids = displayedKeys.mapNotNull { it.removePrefix("e:").toLongOrNull() }
+                                viewModel.reorderPlaylistSongs(playlistId, ids)
+                            }
+                        },
+                        onDragCancel = { dragState.cancelDrag() },
+                    ) {
+                        PlaylistSongRow(
+                            entry = entry,
+                            onRemove = { viewModel.removeSongFromPlaylist(entry.id) },
+                        )
                     }
                 }
             }
@@ -362,18 +365,36 @@ private fun PlaylistSongRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(entry.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                val line = SongDisplay.playlistLine(entry.keySignature, entry.notes)
-                if (line.isNotEmpty()) {
-                    Text(line, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    text = SongDisplay.titleWithKey(entry.title, entry.keySignature),
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val notes = SongDisplay.notesLine(entry.notes)
+                if (notes.isNotEmpty()) {
+                    Text(
+                        notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-            OutlinedButton(onClick = onRemove) {
-                Text(stringResource(R.string.remove))
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.remove),
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }
@@ -412,7 +433,7 @@ private fun AddSongDialog(
                 ) {
                     items(results, key = { it.id }) { song ->
                         Text(
-                            text = song.title,
+                            text = SongDisplay.titleWithKey(song.title, song.keySignature),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onAdd(song.id) }

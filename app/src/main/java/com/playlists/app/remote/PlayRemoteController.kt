@@ -88,6 +88,7 @@ object PlayRemoteController {
             activePlaylistId = playlistId
             publicUrl = "http://$ip:$listeningPort/"
             _running.value = true
+            RemotePlayService.start(context.applicationContext, playlistName, publicUrl!!)
             Result.success(publicUrl!!)
         } catch (e: Exception) {
             remote.stop()
@@ -100,6 +101,7 @@ object PlayRemoteController {
     }
 
     fun stop() {
+        appContext?.let { RemotePlayService.stop(it) }
         server?.stop()
         server = null
         publicUrl = null

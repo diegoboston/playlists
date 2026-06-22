@@ -3,7 +3,6 @@ package com.playlists.app.ui.screens
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,8 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -56,22 +53,10 @@ fun MainTabsScreen(
     val scope = rememberCoroutineScope()
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    var remoteUrl by remember { mutableStateOf<String?>(null) }
-    var remotePlaylistName by remember { mutableStateOf<String?>(null) }
 
     val activePlaylistId = PlayRemoteController.activePlaylistId
     val entries by viewModel.observePlaylistSongs(activePlaylistId ?: -1L)
         .collectAsStateWithLifecycle()
-
-    LaunchedEffect(remoteRunning, activePlaylistId) {
-        if (remoteRunning && activePlaylistId != null) {
-            remoteUrl = PlayRemoteController.currentUrl()
-            remotePlaylistName = viewModel.getPlaylist(activePlaylistId)?.name
-        } else {
-            remoteUrl = null
-            remotePlaylistName = null
-        }
-    }
 
     LaunchedEffect(entries, remoteRunning, activePlaylistId) {
         if (remoteRunning && activePlaylistId != null && PlayRemoteController.isRunningFor(activePlaylistId)) {
@@ -93,8 +78,6 @@ fun MainTabsScreen(
             }
             PlayRemoteController.start(context, playlistId, playlist.name, list)
                 .onSuccess { url ->
-                    remoteUrl = url
-                    remotePlaylistName = playlist.name
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                     Toast.makeText(context, R.string.remote_started, Toast.LENGTH_SHORT).show()
                 }
@@ -119,7 +102,7 @@ fun MainTabsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(stringResource(R.string.app_name))
-                        Row {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
                                 onClick = {
                                     if (remoteRunning) {
@@ -150,19 +133,16 @@ fun MainTabsScreen(
                                     },
                                 )
                             }
-                            if (remoteRunning) {
-                                IconButton(onClick = {
-                                    PlayRemoteController.stop()
-                                    remoteUrl = null
-                                    remotePlaylistName = null
-                                    Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
-                                }) {
-                                    Text(
-                                        stringResource(R.string.remote_stop),
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                }
-                            }
+                            Text(
+                                text = stringResource(R.string.remote_play),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (remoteRunning) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                },
+                                modifier = Modifier.padding(end = 4.dp),
+                            )
                             IconButton(onClick = onSettings) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
@@ -180,19 +160,6 @@ fun MainTabsScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            remoteUrl?.let { url ->
-                Text(
-                    text = buildString {
-                        remotePlaylistName?.let { append("$it · ") }
-                        append(stringResource(R.string.remote_url_label, url))
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(12.dp),
-                )
-            }
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
