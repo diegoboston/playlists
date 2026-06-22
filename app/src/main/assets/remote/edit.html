@@ -30,6 +30,8 @@
     #searchResults { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
     .searchRow { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; }
     .searchRow:active { background: #252525; }
+    .searchRow.placeholder { border-color: #665500; }
+    .placeholder-warn { color: #ffb74d; margin-left: 6px; }
     #error { color: #ff8a80; font-size: 14px; margin: 12px 0; min-height: 1.2em; }
     #content.busy { opacity: .6; pointer-events: none; }
   </style>
@@ -77,6 +79,15 @@
       return parts.join(' · ');
     }
 
+    function titleWithKey(title, key) {
+      const k = (key || '').trim();
+      return k ? `${title} (${k})` : title;
+    }
+
+    function titleWithMarker(title, key, isPlaceholder) {
+      return titleWithKey(title, key) + (isPlaceholder ? ' ⚠' : '');
+    }
+
     function renderList() {
       listEl.innerHTML = '';
       if (!entries.length) {
@@ -97,7 +108,7 @@
           </div>
           <button class="removeBtn" type="button">Remove</button>
         `;
-        li.querySelector('.song-title').textContent = entry.title;
+        li.querySelector('.song-title').textContent = titleWithMarker(entry.title, entry.key, entry.isPlaceholder);
         const meta = metaLine(entry);
         const metaEl = li.querySelector('.song-meta');
         if (meta) metaEl.textContent = meta;
@@ -194,6 +205,29 @@
       }
     }
 
+    async function addPlaceholder(title) {
+      if (busy) return;
+      setBusy(true);
+      errorEl.textContent = '';
+      try {
+        const res = await fetch('/api/add-placeholder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Add placeholder failed');
+        entries = data.entries || [];
+        renderList();
+        searchInput.value = '';
+        searchResults.innerHTML = '';
+      } catch (err) {
+        errorEl.textContent = err.message || 'Add placeholder failed';
+      } finally {
+        setBusy(false);
+      }
+    }
+
     async function addSong(songId) {
       if (busy) return;
       setBusy(true);
@@ -223,12 +257,21 @@
         if (!res.ok) return;
         const data = await res.json();
         searchResults.innerHTML = '';
+        const trimmed = query.trim();
+        if (trimmed) {
+          const row = document.createElement('div');
+          row.className = 'searchRow placeholder';
+          row.innerHTML = '<div class="song-title"></div>';
+          row.querySelector('.song-title').textContent = `Add placeholder page: “${trimmed}” ⚠`;
+          row.addEventListener('click', () => addPlaceholder(trimmed));
+          searchResults.appendChild(row);
+        }
         (data.songs || []).forEach((song) => {
           const row = document.createElement('div');
           row.className = 'searchRow';
           const meta = [song.key, song.notes].filter(Boolean).join(' · ');
           row.innerHTML = `<div class="song-title"></div>${meta ? '<div class="song-meta"></div>' : ''}`;
-          row.querySelector('.song-title').textContent = song.title;
+          row.querySelector('.song-title').textContent = titleWithMarker(song.title, song.key, song.isPlaceholder);
           if (meta) row.querySelector('.song-meta').textContent = meta;
           row.addEventListener('click', () => addSong(song.id));
           searchResults.appendChild(row);

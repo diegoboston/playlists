@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import com.playlists.app.data.FileType
 import com.playlists.app.data.Song
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.components.SongMediaViewer
 import java.io.File
 
@@ -51,7 +53,15 @@ fun SongViewScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(loaded.title) },
+                title = {
+                    SongTitleWithKey(
+                        title = loaded.title,
+                        keySignature = loaded.keySignature,
+                        isPlaceholder = loaded.isPlaceholder,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)

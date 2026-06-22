@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -62,6 +63,7 @@ import com.playlists.app.remote.RemotePlayModeDialog
 import com.playlists.app.remote.RemotePlayStartedDialog
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
+import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.components.PlaylistColorDialog
 import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
@@ -334,6 +336,11 @@ fun PlaylistDetailScreen(
                 viewModel.addSongToPlaylist(playlistId, songId)
                 showAddSong = false
             },
+            onAddPlaceholder = { title ->
+                viewModel.addPlaceholderToPlaylist(playlistId, title) {
+                    showAddSong = false
+                }
+            },
         )
     }
 
@@ -385,11 +392,10 @@ private fun PlaylistSongRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = SongDisplay.titleWithKey(entry.title, entry.keySignature),
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                SongTitleWithKey(
+                    title = entry.title,
+                    keySignature = entry.keySignature,
+                    isPlaceholder = entry.isPlaceholder,
                 )
                 val notes = SongDisplay.notesLine(entry.notes)
                 if (notes.isNotEmpty()) {
@@ -421,6 +427,7 @@ private fun AddSongDialog(
     viewModel: PlaylistsViewModel,
     onDismiss: () -> Unit,
     onAdd: (Long) -> Unit,
+    onAddPlaceholder: (String) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<com.playlists.app.data.Song>>(emptyList()) }
@@ -428,6 +435,9 @@ private fun AddSongDialog(
     LaunchedEffect(query) {
         results = viewModel.searchSongs(query)
     }
+
+    val trimmedQuery = query.trim()
+    val showPlaceholder = trimmedQuery.isNotEmpty()
 
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
@@ -447,14 +457,45 @@ private fun AddSongDialog(
                         .padding(top = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    if (showPlaceholder) {
+                        item(key = "placeholder") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onAddPlaceholder(trimmedQuery) }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier
+                                        .padding(end = 8.dp)
+                                        .size(18.dp),
+                                )
+                                Text(
+                                    text = stringResource(R.string.add_placeholder, trimmedQuery),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                        }
+                    }
                     items(results, key = { it.id }) { song ->
-                        Text(
-                            text = SongDisplay.titleWithKey(song.title, song.keySignature),
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onAdd(song.id) }
                                 .padding(8.dp),
-                        )
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            SongTitleWithKey(
+                                title = song.title,
+                                keySignature = song.keySignature,
+                                isPlaceholder = song.isPlaceholder,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                 }
             }

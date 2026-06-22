@@ -116,6 +116,22 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
         playlistRepo.addSong(playlistId, songId)
     }
 
+    fun addPlaceholderToPlaylist(
+        playlistId: Long,
+        title: String,
+        onAdded: () -> Unit = {},
+    ) = viewModelScope.launch {
+        val parsed = com.playlists.app.util.SongTitleMigration.parse(title)
+        val songId = songRepo.createPlaceholder(
+            context = getApplication(),
+            title = parsed.title,
+            keySignature = parsed.keySignature,
+            notes = parsed.notes,
+        )
+        playlistRepo.addSong(playlistId, songId)
+        withContext(Dispatchers.Main.immediate) { onAdded() }
+    }
+
     fun removeSongFromPlaylist(entryId: Long) = viewModelScope.launch {
         playlistRepo.removeSong(entryId)
     }

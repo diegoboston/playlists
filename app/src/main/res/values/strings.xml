@@ -18,6 +18,8 @@
     <string name="notes_hint">Notes</string>
     <string name="add_song">Add song</string>
     <string name="search_songs">Search songs…</string>
+    <string name="add_placeholder">Add placeholder page: “%1$s”</string>
+    <string name="placeholder_song">Placeholder — sheet music not yet added</string>
     <string name="rename_playlist">Rename playlist</string>
     <string name="playlist_color">Playlist color</string>
     <string name="playlist_color_title">Choose a color</string>

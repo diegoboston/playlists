@@ -24,6 +24,7 @@ class PlayRemoteServer(
     private val onReorder: ((entryIds: List<Long>) -> Result<Unit>)? = null,
     private val onRemove: ((entryId: Long) -> Result<Unit>)? = null,
     private val onAdd: ((songId: Long) -> Result<Unit>)? = null,
+    private val onAddPlaceholder: ((title: String, key: String, notes: String) -> Result<Unit>)? = null,
     private val onSearchSongs: ((query: String) -> List<SearchSong>)? = null,
 ) : NanoHTTPD(hostname, port) {
 
@@ -40,6 +41,7 @@ class PlayRemoteServer(
         val filePath: String,
         val pageCount: Int,
         val isDeleted: Boolean,
+        val isPlaceholder: Boolean,
     )
 
     data class SearchSong(
@@ -47,6 +49,7 @@ class PlayRemoteServer(
         val title: String,
         val keySignature: String,
         val notes: String,
+        val isPlaceholder: Boolean,
     )
 
     @Volatile
@@ -82,6 +85,7 @@ class PlayRemoteServer(
             uri == "/api/reorder" && session.method == Method.POST -> handleReorder(session)
             uri == "/api/remove" && session.method == Method.POST -> handleRemove(session)
             uri == "/api/add" && session.method == Method.POST -> handleAdd(session)
+            uri == "/api/add-placeholder" && session.method == Method.POST -> handleAddPlaceholder(session)
             uri == "/api/media" -> serveMedia(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not found")
         }
@@ -131,6 +135,20 @@ class PlayRemoteServer(
         }
     }
 
+    private fun handleAddPlaceholder(session: IHTTPSession): Response {
+        val handler = onAddPlaceholder ?: return jsonError("Add placeholder not available")
+        val raw = readPostBody(session)
+        val title = parseStringField(raw, "title") ?: return jsonError("Missing title")
+        if (title.isBlank()) return jsonError("Missing title")
+        val key = parseStringField(raw, "key").orEmpty()
+        val notes = parseStringField(raw, "notes").orEmpty()
+        return if (handler(title, key, notes).isSuccess) {
+            jsonResponse(buildPlaylistJson())
+        } else {
+            jsonError("Add placeholder failed")
+        }
+    }
+
     private fun handleSearch(session: IHTTPSession): Response {
         val handler = onSearchSongs ?: return jsonError("Search not available")
         val query = session.parameters["q"]?.firstOrNull().orEmpty()
@@ -139,7 +157,7 @@ class PlayRemoteServer(
         results.forEachIndexed { i, song ->
             if (i > 0) sb.append(',')
             sb.append(
-                """{"id":${song.id},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)}}""",
+                """{"id":${song.id},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"isPlaceholder":${song.isPlaceholder}}""",
             )
         }
         sb.append("]}")
@@ -350,7 +368,9 @@ class PlayRemoteServer(
         sb.append("""{"playlistName":${jsonStr(playlistName)},"songIndex":$songIndex,"pageIndex":$pageIndex,"songs":[""")
         songs.forEachIndexed { i, song ->
             if (i > 0) sb.append(',')
-            sb.append("""{"title":${jsonStr(song.title)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount}}""")
+            sb.append(
+                """{"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount},"isPlaceholder":${song.isPlaceholder}}""",
+            )
         }
         sb.append("]}")
         return sb.toString()
@@ -364,7 +384,7 @@ class PlayRemoteServer(
         songs.forEachIndexed { i, song ->
             if (i > 0) sb.append(',')
             sb.append(
-                """{"entryId":${song.entryId},"songId":${song.songId},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount},"isDeleted":${song.isDeleted}}""",
+                """{"entryId":${song.entryId},"songId":${song.songId},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount},"isDeleted":${song.isDeleted},"isPlaceholder":${song.isPlaceholder}}""",
             )
         }
         sb.append("]}")
@@ -382,6 +402,14 @@ class PlayRemoteServer(
 
     private fun parseLongField(raw: String, field: String): Long? =
         Regex(""""$field"\s*:\s*(\d+)""").find(raw)?.groupValues?.get(1)?.toLongOrNull()
+
+    private fun parseStringField(raw: String, field: String): String? {
+        val match = Regex(""""$field"\s*:\s*"((?:\\.|[^"\\])*)"""").find(raw) ?: return null
+        return match.groupValues[1]
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
+            .replace("\\n", "\n")
+    }
 
     private fun parseLongArray(raw: String, field: String): List<Long>? {
         val match = Regex(""""$field"\s*:\s*\[([^\]]*)]""").find(raw) ?: return null

@@ -26,6 +26,8 @@ import com.playlists.app.data.FileType
 import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.ui.PdfHelper
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.SongDisplay
+import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.components.PlaybackStage
 import com.playlists.app.ui.components.SongMediaViewer
 import java.io.File
@@ -79,7 +81,11 @@ fun PlaylistPlaybackScreen(
                 R.string.playback_song_indicator,
                 frame.songIndex + 1,
                 songCount,
-                frame.entry.title,
+                SongDisplay.titleWithKey(
+                    frame.entry.title,
+                    frame.entry.keySignature,
+                    frame.entry.isPlaceholder,
+                ),
             ),
         )
         if (frame.pageCount > 1) {

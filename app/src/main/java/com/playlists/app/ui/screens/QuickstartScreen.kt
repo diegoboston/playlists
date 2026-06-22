@@ -77,7 +77,17 @@ fun QuickstartScreen(
                         val (results, ids) = viewModel.matchQuickstartLines(input)
                         matchedIds = ids
                         summary = results.joinToString("\n") { result ->
-                            "• ${result.line} → ${result.song?.title ?: "(no match)"}"
+                            val song = result.song
+                            val target = if (song != null) {
+                                com.playlists.app.ui.SongDisplay.titleWithKey(
+                                    song.title,
+                                    song.keySignature,
+                                    song.isPlaceholder,
+                                )
+                            } else {
+                                "(no match)"
+                            }
+                            "• ${result.line} → $target"
                         }
                     }
                 },

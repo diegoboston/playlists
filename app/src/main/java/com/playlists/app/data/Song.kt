@@ -16,6 +16,7 @@ data class Song(
     val deletedAt: Long? = null,
     val sortOrder: Int = 0,
     val lastViewedAt: Long? = null,
+    val isPlaceholder: Boolean = false,
 )
 
 enum class FileType {

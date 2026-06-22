@@ -45,4 +45,5 @@ data class PlaylistSongWithDetails(
     val filePath: String,
     val fileType: String,
     val isDeleted: Boolean,
+    val isPlaceholder: Boolean,
 )

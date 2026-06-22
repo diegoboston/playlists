@@ -74,6 +74,9 @@ object PlayRemoteController {
             onAdd = { songId ->
                 runBlocking { mutatePlaylist(playlistId) { app -> app.playlistRepository.addSong(playlistId, songId) } }
             },
+            onAddPlaceholder = { title, key, notes ->
+                runBlocking { handleAddPlaceholder(playlistId, title, key, notes) }
+            },
             onSearchSongs = { query ->
                 runBlocking { searchSongs(query) }
             },
@@ -164,6 +167,7 @@ object PlayRemoteController {
                 filePath = entry.filePath,
                 pageCount = pageCount.coerceAtLeast(1),
                 isDeleted = entry.isDeleted,
+                isPlaceholder = entry.isPlaceholder,
             )
         }
 
@@ -195,7 +199,39 @@ object PlayRemoteController {
                 title = song.title,
                 keySignature = song.keySignature,
                 notes = song.notes,
+                isPlaceholder = song.isPlaceholder,
             )
+        }
+    }
+
+    private suspend fun handleAddPlaceholder(
+        playlistId: Long,
+        title: String,
+        key: String,
+        notes: String,
+    ): Result<Unit> {
+        val ctx = appContext ?: return Result.failure(IllegalStateException("Server not ready"))
+        val app = PlaylistsApp.from(ctx as android.app.Application)
+        return try {
+            val parsed = com.playlists.app.util.SongTitleMigration.parse(
+                title,
+                existingKey = key,
+                existingNotes = notes,
+            )
+            val songId = app.songRepository.createPlaceholder(
+                context = ctx,
+                title = parsed.title,
+                keySignature = parsed.keySignature,
+                notes = parsed.notes,
+            )
+            app.playlistRepository.addSong(playlistId, songId)
+            val entries = app.playlistRepository.getSongs(playlistId)
+            server?.let { remote ->
+                remote.replaceSongs(entriesToRemoteSongs(entries))
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

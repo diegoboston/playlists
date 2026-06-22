@@ -24,14 +24,14 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores → spaces, extension dropped, trailing key → Key, trailing instrument → Notes).
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
-- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. **A–Z**, **Recently added** (import date), and **Recently viewed** buttons sort the archive (persists order). Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation.
+- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. Placeholder songs (no real sheet yet) show a ⚠ after the title. **A–Z**, **Recently added** (import date), and **Recently viewed** buttons sort the archive (persists order). Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation.
 - **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages.
 
 ### Playlists
 
 - **Create / rename** — New playlists get an editable name. The **Playlists** tab shows each playlist as a **colorful block** (NoTube-style folder colors) with inline **pencil** (rename), **color**, and **delete**.
 - **Ordered sequences** — A playlist is an ordered list of songs from the archive.
-- **Add songs** — Search dialog with full-text match across title, key, and notes.
+- **Add songs** — Search dialog with full-text match across title, key, and notes. If a title is not in the archive, tap **Add placeholder page** to create a synthetic sheet with just the title (stored in the archive with a ⚠ marker).
 - **Drag reorder** — Long-press and drag rows in the Songs tab, Playlists tab, or playlist detail screen. Uses the same center-vs-center swap logic as NoTube (`DraggableItem` + `ReorderLogic`).
 - **Duplicate playlist** — Copies name (with “(copy)”) and full song order.
 - **Playlist detail** — Two-line header: **back + title** (playlist accent color) on line 1; **tools** on line 2 (+ add, play, remote, rename, duplicate, color, delete). Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. Tap the highlighted **Wi‑Fi** icon again to stop remote play (or use the system notification).
@@ -136,7 +136,7 @@ REMOTE PLAY ACTIVE (notification shade)
 1. **Import a song** — Gallery or browser → Share → Stage Manager → fill Title, Key, Notes → Save.
 2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **A–Z**, **Recently added**, or **Recently viewed** to sort.
 3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete from the colorful blocks on the list.
-4. **Add songs** — Open a playlist → **+** → search → tap a result.
+4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (⚠) to add a title-only stand-in sheet.
 5. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 6. **Play** — Open a playlist → **Play** → swipe between songs.
 7. **Remote play** — Open a playlist → **Wi‑Fi** (or main-tab **Wi‑Fi** for the last-opened playlist). Pick Cloudflare (enter the 5-digit code) or LAN (code is the port in the URL). Tap **Wi‑Fi** again to stop. **Stop** also works from the system notification (or when deleting the playlist).
@@ -273,6 +273,7 @@ Project-local skills under `.cursor/skills/` guide automated edits:
 | ----- | ----------- |
 | **rebuild-app** | After any app change — run `rebuild-app.sh` (Java 17 env, compile, unit tests, debug APK; must print `VERIFY OK`) |
 | **compile-kotlin** | Fast Kotlin-only check (no APK) when explicitly requested |
+| **playlist-view-parity** | When changing playlist detail, playback, remote HTML, or `PlayRemoteServer` — keep local Compose and remote web views aligned |
 | **update-readme** | After user-facing or structural changes — keeps this README accurate |
 | **local-workspace** | When a path looks missing — search locally; do not rsync or run `update.sh` from this repo |
 

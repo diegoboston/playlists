@@ -43,6 +43,7 @@ import com.playlists.app.R
 import com.playlists.app.data.Song
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
+import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
@@ -260,11 +261,10 @@ private fun SongRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = SongDisplay.titleWithKey(song.title, song.keySignature),
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                SongTitleWithKey(
+                    title = song.title,
+                    keySignature = song.keySignature,
+                    isPlaceholder = song.isPlaceholder,
                 )
                 val noteLine = SongDisplay.notesLine(song.notes)
                 if (noteLine.isNotEmpty()) {

@@ -12,7 +12,8 @@ interface PlaylistSongDao {
         """
         SELECT ps.id, ps.playlistId, ps.songId, ps.position,
                s.title, s.keySignature, s.notes, s.filePath, s.fileType,
-               (s.deletedAt IS NOT NULL) AS isDeleted
+               (s.deletedAt IS NOT NULL) AS isDeleted,
+               s.isPlaceholder AS isPlaceholder
         FROM playlist_songs ps
         INNER JOIN songs s ON s.id = ps.songId
         WHERE ps.playlistId = :playlistId
@@ -25,7 +26,8 @@ interface PlaylistSongDao {
         """
         SELECT ps.id, ps.playlistId, ps.songId, ps.position,
                s.title, s.keySignature, s.notes, s.filePath, s.fileType,
-               (s.deletedAt IS NOT NULL) AS isDeleted
+               (s.deletedAt IS NOT NULL) AS isDeleted,
+               s.isPlaceholder AS isPlaceholder
         FROM playlist_songs ps
         INNER JOIN songs s ON s.id = ps.songId
         WHERE ps.playlistId = :playlistId

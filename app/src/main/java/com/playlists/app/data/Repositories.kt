@@ -1,5 +1,8 @@
 package com.playlists.app.data
 
+import android.content.Context
+import com.playlists.app.util.FileStorage
+import com.playlists.app.util.PlaceholderImageGenerator
 import kotlinx.coroutines.flow.Flow
 
 class SongRepository(private val songDao: SongDao) {
@@ -46,6 +49,28 @@ class SongRepository(private val songDao: SongDao) {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return songDao.getAll()
         return songDao.search(trimmed)
+    }
+
+    suspend fun createPlaceholder(
+        context: Context,
+        title: String,
+        keySignature: String = "",
+        notes: String = "",
+    ): Long {
+        val trimmedTitle = title.trim().ifBlank { "Untitled" }
+        val bytes = PlaceholderImageGenerator.render(trimmedTitle)
+        val stored = FileStorage.storeBytes(context, bytes, "png")
+        return insert(
+            Song(
+                title = trimmedTitle,
+                keySignature = keySignature.trim(),
+                notes = notes.trim(),
+                filePath = stored.absolutePath,
+                fileType = FileType.IMAGE.name,
+                mimeType = "image/png",
+                isPlaceholder = true,
+            ),
+        )
     }
 }
 

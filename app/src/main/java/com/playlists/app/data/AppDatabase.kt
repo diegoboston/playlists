@@ -10,7 +10,7 @@ import com.playlists.app.util.SongTitleMigration
 
 @Database(
     entities = [Song::class, Playlist::class, PlaylistSong::class],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -65,6 +65,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE songs ADD COLUMN isPlaceholder INTEGER NOT NULL DEFAULT 0",
+                )
+            }
+        }
+
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.query("SELECT id, title, keySignature, notes FROM songs").use { cursor ->
@@ -105,6 +113,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
+                        MIGRATION_6_7,
                     )
                     .build().also { instance = it }
             }
