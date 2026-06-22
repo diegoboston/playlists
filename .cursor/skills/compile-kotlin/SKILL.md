@@ -1,18 +1,17 @@
 ---
 name: compile-kotlin
 description: >-
-  Mandatory verify step after editing Kotlin in this Android app: run
-  compile-kotlin.sh (Java 17 env + compile + all JVM unit tests). Use when
-  changing any .kt file, Gradle Kotlin deps, or before finishing any task
-  that touches app/src/main/java or app/src/test/java.
+  Fast Kotlin-only verify (compile + JVM unit tests, no APK). Prefer rebuild-app
+  after any app change. Use compile-kotlin only when the user explicitly wants
+  a quicker check without assembleDebug, or when editing compile-kotlin itself.
 ---
 
 # Compile Kotlin
 
-After **every** change to Kotlin (`.kt`) files, run the verify script in **this**
-session and confirm its `VERIFY OK` line before marking the task done.
+**For task completion after app changes, use [rebuild-app](../rebuild-app/SKILL.md)**
+instead — it also assembles the debug APK.
 
-Compile-only checks are **not** sufficient — `testDebugUnitTest` must run and pass.
+This skill is a **faster subset**: compile + unit tests only (no APK packaging).
 
 ## Mandatory command
 

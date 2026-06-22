@@ -44,6 +44,6 @@ Keep prose in the same voice as the existing README: complete sentences, concret
 
 | Change | Run before README |
 | ------ | ----------------- |
-| Any `.kt` under `app/` | **compile-kotlin** |
+| Any file under `app/` or Gradle/Android config | **rebuild-app** |
 
 Then update the README and re-read diffs for consistency.

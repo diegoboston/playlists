@@ -213,7 +213,8 @@ Project-local skills under `.cursor/skills/` guide automated edits:
 
 | Skill | When to run |
 | ----- | ----------- |
-| **compile-kotlin** | After any `.kt` change — run `compile-kotlin.sh` (Java 17 env, compile, all JVM unit tests; must print `VERIFY OK`) |
+| **rebuild-app** | After any app change — run `rebuild-app.sh` (Java 17 env, compile, unit tests, debug APK; must print `VERIFY OK`) |
+| **compile-kotlin** | Fast Kotlin-only check (no APK) when explicitly requested |
 | **update-readme** | After user-facing or structural changes — keeps this README accurate |
 | **local-workspace** | When a path looks missing — search locally; do not rsync or run `update.sh` from this repo |
 
