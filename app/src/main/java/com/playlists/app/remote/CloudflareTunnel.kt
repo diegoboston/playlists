@@ -2,20 +2,34 @@ package com.playlists.app.remote
 
 import android.content.Context
 import java.io.File
+import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
 
 object CloudflareTunnel {
+    internal const val CLOUDFLARED_LIB_NAME = "libcloudflared.so"
+
     private val URL_PATTERN = Pattern.compile("""https://[a-z0-9-]+\.trycloudflare\.com""")
 
     private var process: Process? = null
     private var outputThread: Thread? = null
+    private var waitThread: Thread? = null
+
+    fun binaryPath(context: Context): File =
+        File(context.applicationInfo.nativeLibraryDir, CLOUDFLARED_LIB_NAME)
 
     fun start(context: Context, localPort: Int, timeoutSeconds: Long = 60): Result<String> {
         stop()
-        val binary = ensureBinary(context)
+        val binaryResult = ensureBinary(context)
+        if (binaryResult.isFailure) {
+            return Result.failure(
+                binaryResult.exceptionOrNull() ?: IllegalStateException("cloudflared missing"),
+            )
+        }
+        val binary = binaryResult.getOrThrow()
         val command = listOf(
             binary.absolutePath,
             "tunnel",
@@ -29,10 +43,13 @@ object CloudflareTunnel {
                 .start()
             process = proc
             val urlRef = AtomicReference<String>()
+            val exitCode = AtomicInteger(-1)
+            val outputLines = Collections.synchronizedList(mutableListOf<String>())
             val latch = CountDownLatch(1)
             outputThread = Thread({
                 proc.inputStream.bufferedReader().useLines { lines ->
                     for (line in lines) {
+                        outputLines.add(line)
                         val matcher = URL_PATTERN.matcher(line)
                         if (matcher.find()) {
                             urlRef.set(matcher.group())
@@ -42,16 +59,30 @@ object CloudflareTunnel {
                     }
                 }
             }, "cloudflared-output").apply { isDaemon = true; start() }
+            waitThread = Thread({
+                exitCode.set(proc.waitFor())
+                if (urlRef.get() == null) {
+                    latch.countDown()
+                }
+            }, "cloudflared-wait").apply { isDaemon = true; start() }
 
             if (!latch.await(timeoutSeconds, TimeUnit.SECONDS)) {
                 stop()
-                return Result.failure(IllegalStateException("Cloudflare tunnel timed out"))
+                return Result.failure(
+                    tunnelFailure("Cloudflare tunnel timed out after ${timeoutSeconds}s", outputLines),
+                )
             }
             val url = urlRef.get()
-                ?: run {
-                    stop()
-                    return Result.failure(IllegalStateException("Cloudflare tunnel did not return a URL"))
+            if (url == null) {
+                stop()
+                val code = exitCode.get()
+                val prefix = if (code >= 0) {
+                    "cloudflared exited with code $code"
+                } else {
+                    "Cloudflare tunnel did not return a URL"
                 }
+                return Result.failure(tunnelFailure(prefix, outputLines))
+            }
             Result.success(url)
         } catch (e: Exception) {
             stop()
@@ -62,22 +93,31 @@ object CloudflareTunnel {
     fun stop() {
         outputThread?.interrupt()
         outputThread = null
+        waitThread?.interrupt()
+        waitThread = null
         process?.destroy()
         process?.waitFor(3, TimeUnit.SECONDS)
         process?.destroyForcibly()
         process = null
     }
 
-    private fun ensureBinary(context: Context): File {
-        val dest = File(context.filesDir, "cloudflared")
-        if (dest.exists() && dest.length() > 0) {
-            dest.setExecutable(true, false)
-            return dest
+    private fun ensureBinary(context: Context): Result<File> {
+        val binary = binaryPath(context)
+        if (binary.exists() && binary.length() > 0) {
+            return Result.success(binary)
         }
-        context.assets.open("cloudflared").use { input ->
-            dest.outputStream().use { output -> input.copyTo(output) }
-        }
-        dest.setExecutable(true, false)
-        return dest
+        return Result.failure(
+            IllegalStateException(
+                "Bundled cloudflared missing from APK.\n" +
+                    "Expected: ${binary.absolutePath}\n" +
+                    "Run scripts/fetch-cloudflared.sh and rebuild.",
+            ),
+        )
+    }
+
+    private fun tunnelFailure(prefix: String, outputLines: List<String>): IllegalStateException {
+        val output = outputLines.joinToString("\n").trim()
+        val detail = if (output.isNotEmpty()) "$prefix\n\n$output" else prefix
+        return IllegalStateException(detail)
     }
 }

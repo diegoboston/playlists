@@ -24,7 +24,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**. Underscores in the filename become spaces in the suggested title.
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
-- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation.
+- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. **A–Z**, **Recently added** (import date), and **Recently viewed** buttons sort the archive (persists order). Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation.
 - **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages.
 
 ### Playlists
@@ -56,6 +56,8 @@ Sketch of the main flows (not to scale):
 ├─────────────────────────────────────┤
 │                                     │
 │  SONGS TAB                          │
+│  [ A–Z ]  [ Recently added ]        │
+│  [ Recently viewed ]                │
 │  ┌─────────────────────────────┐    │
 │  │ Amazing Grace (G)          ✎ │    │
 │  │ intro notes                  │    │
@@ -132,7 +134,7 @@ REMOTE PLAY ACTIVE (notification shade)
 ## Usage
 
 1. **Import a song** — Gallery or browser → Share → Stage Manager → fill Title, Key, Notes → Save.
-2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen.
+2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **A–Z**, **Recently added**, or **Recently viewed** to sort.
 3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete from the colorful blocks on the list.
 4. **Add songs** — Open a playlist → **+** → search → tap a result.
 5. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
@@ -157,7 +159,7 @@ playlists/
 │   ├── keystore/playlists.keystore # Shared sideload signing key (committed)
 │   └── src/main/
 │       ├── assets/
-│       │   ├── cloudflared         # Bundled tunnel binary (gitignored; built by script)
+│       │   ├── jniLibs/arm64-v8a/libcloudflared.so  # Bundled tunnel binary (gitignored; built by script)
 │       │   └── remote/             # play.html, edit.html, pin.html
 │       └── java/com/playlists/app/
 │           ├── data/               # Room: Song, Playlist, PlaylistSong
@@ -190,7 +192,7 @@ playlists/
 ./gradlew :app:assembleDebug
 
 # Release (arm64-v8a — same as CI; remote play tunnel needs cloudflared in assets)
-bash scripts/fetch-cloudflared.sh   # requires Go 1.22+; writes app/src/main/assets/cloudflared
+bash scripts/fetch-cloudflared.sh   # requires Go 1.22+; writes app/src/main/jniLibs/arm64-v8a/libcloudflared.so
 ./gradlew :app:assembleRelease
 ```
 
@@ -278,7 +280,7 @@ See each skill's `SKILL.md` for the exact command or checklist.
 
 ## Data model
 
-- **Song** — title, key, notes, file path, type (IMAGE/PDF), mime type, sort order. Multiple songs can point at the same file with different metadata.
+- **Song** — title, key, notes, file path, type (IMAGE/PDF), mime type, sort order, last viewed at. Multiple songs can point at the same file with different metadata.
 - **Playlist** — name, optional accent color, creation time.
 - **PlaylistSong** — playlist + song + position (ordered).
 

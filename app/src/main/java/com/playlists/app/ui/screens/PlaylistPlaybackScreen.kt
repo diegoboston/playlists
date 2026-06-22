@@ -69,6 +69,10 @@ fun PlaylistPlaybackScreen(
 
     val frame = frames[currentIndex.coerceIn(frames.indices)]
 
+    LaunchedEffect(frame.entry.songId) {
+        viewModel.recordSongView(frame.entry.songId)
+    }
+
     val indicator = buildString {
         append(
             stringResource(

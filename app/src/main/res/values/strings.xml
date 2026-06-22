@@ -4,6 +4,9 @@
     <string name="tab_songs">Songs</string>
     <string name="tab_playlists">Playlists</string>
     <string name="empty_songs">Share a PDF or image to add your first song.</string>
+    <string name="sort_songs_alpha">A–Z</string>
+    <string name="sort_songs_recently_added">Recently added</string>
+    <string name="sort_songs_recently_viewed">Recently viewed</string>
     <string name="empty_playlists">Create a playlist to get started.</string>
     <string name="new_playlist">New playlist</string>
     <string name="playlist_name_hint">Playlist name</string>
@@ -29,6 +32,7 @@
     <string name="remote_started">Remote play started</string>
     <string name="remote_empty">Add songs before starting remote play.</string>
     <string name="remote_tunnel_failed">Remote play failed: %1$s</string>
+    <string name="remote_error_copy">Copy</string>
     <string name="remote_open_playlist">Open a playlist to start remote play.</string>
     <string name="remote_no_last_playlist">Open a playlist first — remote uses your last opened playlist.</string>
     <string name="remote_playlist_gone">That playlist was deleted.</string>

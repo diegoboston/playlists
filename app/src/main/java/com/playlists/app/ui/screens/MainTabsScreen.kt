@@ -25,6 +25,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -36,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
 import com.playlists.app.remote.PlayRemoteController
+import com.playlists.app.remote.RemotePlayErrorDialog
+import com.playlists.app.remote.RemotePlayErrors
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.util.AppPrefs
 import kotlinx.coroutines.launch
@@ -53,6 +57,7 @@ fun MainTabsScreen(
     val scope = rememberCoroutineScope()
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var remoteError by remember { mutableStateOf<String?>(null) }
 
     val activePlaylistId = PlayRemoteController.activePlaylistId
     val entries by viewModel.observePlaylistSongs(activePlaylistId ?: -1L)
@@ -82,11 +87,7 @@ fun MainTabsScreen(
                     Toast.makeText(context, R.string.remote_started, Toast.LENGTH_SHORT).show()
                 }
                 .onFailure { error ->
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.remote_tunnel_failed, error.message ?: "unknown"),
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    remoteError = RemotePlayErrors.format(error)
                 }
         }
     }
@@ -166,5 +167,9 @@ fun MainTabsScreen(
                 1 -> PlaylistsScreen(viewModel, onOpenPlaylist, onQuickstart)
             }
         }
+    }
+
+    remoteError?.let { message ->
+        RemotePlayErrorDialog(message = message, onDismiss = { remoteError = null })
     }
 }

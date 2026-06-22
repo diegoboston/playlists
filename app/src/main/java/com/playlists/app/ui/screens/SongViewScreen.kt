@@ -34,6 +34,7 @@ fun SongViewScreen(
 
     LaunchedEffect(songId) {
         song = viewModel.getSong(songId)
+        viewModel.recordSongView(songId)
     }
 
     val loaded = song

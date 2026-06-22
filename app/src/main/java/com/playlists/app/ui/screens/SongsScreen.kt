@@ -2,6 +2,8 @@ package com.playlists.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +22,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,6 +47,7 @@ import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SongsScreen(
     viewModel: PlaylistsViewModel,
@@ -60,48 +64,69 @@ fun SongsScreen(
         syncDisplayedKeys(displayedKeys, dragState.draggingKey, songs.map { "s:${it.id}" })
     }
 
-    if (songs.isEmpty()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(stringResource(R.string.empty_songs), style = MaterialTheme.typography.bodyLarge)
-        }
-        return
-    }
-
-    LazyColumn(
-        state = listState,
-        userScrollEnabled = !dragState.isDragging,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        items(
-            items = displayedKeys.toList(),
-            key = { it },
-        ) { key ->
-            val songId = key.removePrefix("s:").toLongOrNull() ?: return@items
-            val song = songs.find { it.id == songId } ?: return@items
-            DraggableItem(
-                isDragging = dragState.draggingKey == key,
-                dragOffset = dragState.currentDragOffset(listState),
-                onTap = { onOpenSong(song.id) },
-                onDragStart = { dragState.onDragStart(key, listState) },
-                onDrag = { delta -> dragState.onDrag(delta, listState, displayedKeys) },
-                onDragEnd = {
-                    dragState.finishDrag {
-                        val ids = displayedKeys.mapNotNull { it.removePrefix("s:").toLongOrNull() }
-                        viewModel.reorderSongs(ids)
-                    }
-                },
-                onDragCancel = { dragState.cancelDrag() },
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (songs.isNotEmpty()) {
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SongRow(
-                    song = song,
-                    onEdit = { editTarget = song },
-                )
+                OutlinedButton(onClick = { viewModel.sortSongsAlpha() }) {
+                    Text(stringResource(R.string.sort_songs_alpha))
+                }
+                OutlinedButton(onClick = { viewModel.sortSongsByRecentlyAdded() }) {
+                    Text(stringResource(R.string.sort_songs_recently_added))
+                }
+                OutlinedButton(onClick = { viewModel.sortSongsByRecentlyViewed() }) {
+                    Text(stringResource(R.string.sort_songs_recently_viewed))
+                }
+            }
+        }
+
+        if (songs.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(stringResource(R.string.empty_songs), style = MaterialTheme.typography.bodyLarge)
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                userScrollEnabled = !dragState.isDragging,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                items(
+                    items = displayedKeys.toList(),
+                    key = { it },
+                ) { key ->
+                    val songId = key.removePrefix("s:").toLongOrNull() ?: return@items
+                    val song = songs.find { it.id == songId } ?: return@items
+                    DraggableItem(
+                        isDragging = dragState.draggingKey == key,
+                        dragOffset = dragState.currentDragOffset(listState),
+                        onTap = { onOpenSong(song.id) },
+                        onDragStart = { dragState.onDragStart(key, listState) },
+                        onDrag = { delta -> dragState.onDrag(delta, listState, displayedKeys) },
+                        onDragEnd = {
+                            dragState.finishDrag {
+                                val ids = displayedKeys.mapNotNull { it.removePrefix("s:").toLongOrNull() }
+                                viewModel.reorderSongs(ids)
+                            }
+                        },
+                        onDragCancel = { dragState.cancelDrag() },
+                    ) {
+                        SongRow(
+                            song = song,
+                            onEdit = { editTarget = song },
+                        )
+                    }
+                }
             }
         }
     }

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Build cloudflared for Android arm64 (bundled into app assets for Quick Tunnels).
+# Build cloudflared for Android arm64 (bundled as a native lib for Quick Tunnels).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="$ROOT/app/src/main/assets/cloudflared"
+OUT_DIR="$ROOT/app/src/main/jniLibs/arm64-v8a"
+OUT="$OUT_DIR/libcloudflared.so"
+mkdir -p "$OUT_DIR"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

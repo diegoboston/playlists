@@ -80,6 +80,14 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reorderSongs(idsInOrder: List<Long>) = viewModelScope.launch { songRepo.reorder(idsInOrder) }
 
+    fun sortSongsAlpha() = viewModelScope.launch { songRepo.sortAlpha() }
+
+    fun sortSongsByRecentlyAdded() = viewModelScope.launch { songRepo.sortByRecentlyAdded() }
+
+    fun sortSongsByRecentlyViewed() = viewModelScope.launch { songRepo.sortByRecentlyViewed() }
+
+    fun recordSongView(id: Long) = viewModelScope.launch { songRepo.markViewed(id) }
+
     fun createPlaylist(name: String, onCreated: (Long) -> Unit = {}) = viewModelScope.launch {
         val id = playlistRepo.create(name)
         withContext(Dispatchers.Main.immediate) { onCreated(id) }

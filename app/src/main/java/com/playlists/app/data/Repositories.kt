@@ -17,6 +17,31 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun reorder(idsInOrder: List<Long>) = songDao.replaceOrder(idsInOrder)
 
+    suspend fun sortAlpha() {
+        val ids = songDao.getAll().sortedBy { it.title.lowercase() }.map { it.id }
+        songDao.replaceOrder(ids)
+    }
+
+    suspend fun sortByRecentlyAdded() {
+        val ids = songDao.getAll()
+            .sortedWith(compareByDescending<Song> { it.createdAt }.thenByDescending { it.id })
+            .map { it.id }
+        songDao.replaceOrder(ids)
+    }
+
+    suspend fun sortByRecentlyViewed() {
+        val ids = songDao.getAll()
+            .sortedWith(
+                compareBy<Song> { it.lastViewedAt == null }
+                    .thenByDescending { it.lastViewedAt }
+                    .thenByDescending { it.id },
+            )
+            .map { it.id }
+        songDao.replaceOrder(ids)
+    }
+
+    suspend fun markViewed(id: Long) = songDao.updateLastViewedAt(id, System.currentTimeMillis())
+
     suspend fun search(query: String): List<Song> {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return songDao.getAll()

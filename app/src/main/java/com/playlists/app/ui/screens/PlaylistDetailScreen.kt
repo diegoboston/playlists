@@ -57,6 +57,8 @@ import com.playlists.app.R
 import com.playlists.app.data.Playlist
 import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.remote.PlayRemoteController
+import com.playlists.app.remote.RemotePlayErrorDialog
+import com.playlists.app.remote.RemotePlayErrors
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.components.PlaylistColorDialog
@@ -89,6 +91,7 @@ fun PlaylistDetailScreen(
     var showColor by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
     var showAddSong by remember { mutableStateOf(false) }
+    var remoteError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(playlistId) {
         playlist = viewModel.getPlaylist(playlistId)
@@ -122,11 +125,7 @@ fun PlaylistDetailScreen(
                     Toast.makeText(context, R.string.remote_started, Toast.LENGTH_SHORT).show()
                 }
                 .onFailure { error ->
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.remote_tunnel_failed, error.message ?: "unknown"),
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    remoteError = RemotePlayErrors.format(error)
                 }
         }
     }
@@ -333,6 +332,10 @@ fun PlaylistDetailScreen(
                 showAddSong = false
             },
         )
+    }
+
+    remoteError?.let { message ->
+        RemotePlayErrorDialog(message = message, onDismiss = { remoteError = null })
     }
 }
 

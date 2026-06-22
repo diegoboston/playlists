@@ -27,6 +27,9 @@ interface SongDao {
     @Query("UPDATE songs SET deletedAt = :deletedAt WHERE id = :id")
     suspend fun markDeleted(id: Long, deletedAt: Long)
 
+    @Query("UPDATE songs SET lastViewedAt = :viewedAt WHERE id = :id")
+    suspend fun updateLastViewedAt(id: Long, viewedAt: Long)
+
     @Query(
         """
         SELECT * FROM songs
