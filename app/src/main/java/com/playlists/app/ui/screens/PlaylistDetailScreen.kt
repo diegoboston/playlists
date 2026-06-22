@@ -38,7 +38,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -66,6 +65,7 @@ import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
+import com.playlists.app.util.AppPrefs
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,6 +94,7 @@ fun PlaylistDetailScreen(
 
     LaunchedEffect(playlistId) {
         playlist = viewModel.getPlaylist(playlistId)
+        AppPrefs.setLastPlaylistId(context, playlistId)
     }
 
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
@@ -113,14 +114,6 @@ fun PlaylistDetailScreen(
     LaunchedEffect(entries, remoteRunning, playlistId) {
         if (remoteRunning && PlayRemoteController.isRunningFor(playlistId)) {
             PlayRemoteController.refreshSongs(entries)
-        }
-    }
-
-    DisposableEffect(playlistId) {
-        onDispose {
-            if (PlayRemoteController.isRunningFor(playlistId)) {
-                PlayRemoteController.stop()
-            }
         }
     }
 

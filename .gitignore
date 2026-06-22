@@ -15,8 +15,3 @@ captures/
 *.jks
 *.keystore
 !app/keystore/playlists.keystore
-
-# Gradle wrapper jar — generated on demand, not committed
-gradle/wrapper/gradle-wrapper.jar
-gradlew
-gradlew.bat

@@ -110,8 +110,10 @@ Sketch of the main flows (not to scale):
 
 ```
 playlists/
+├── .cursor/skills/                 # Cursor agent skills (compile, README sync)
 ├── .github/workflows/android.yml   # CI: test → build → GitHub Release
 ├── update.sh                       # Interactive rsync sync, commit, push
+├── gradlew                         # Gradle wrapper (committed)
 ├── app/
 │   ├── build.gradle.kts
 │   ├── keystore/playlists.keystore # Shared sideload signing key (committed)
@@ -142,7 +144,7 @@ playlists/
 
 Requires Android SDK (API 34 platform + build-tools 34.0.0) and JDK 17. Set `sdk.dir` in `local.properties` or via `ANDROID_HOME`.
 
-CI bootstraps the Gradle wrapper on each run (`gradlew` is not committed; see `.gitignore`).
+The Gradle wrapper (`gradlew`, `gradle/wrapper/`) is committed so `./gradlew` works after clone. Keep `local.properties` (SDK path) out of git — it is in `.gitignore`.
 
 ## Signing
 
@@ -204,6 +206,18 @@ Interactive script to pull sources from a remote machine (via rsync), review cha
 2. Rsyncs from the configured remote into the parent directory (edit the host/path in the script if needed)
 3. Shows `git status` / `git diff` with confirmation prompts
 4. Commits (min 10-char message) and pushes to `origin main`
+
+## Cursor agent skills
+
+Project-local skills under `.cursor/skills/` guide automated edits:
+
+| Skill | When to run |
+| ----- | ----------- |
+| **compile-kotlin** | After any `.kt` change — run `compile-kotlin.sh` (Java 17 env, compile, all JVM unit tests; must print `VERIFY OK`) |
+| **update-readme** | After user-facing or structural changes — keeps this README accurate |
+| **local-workspace** | When a path looks missing — search locally; do not rsync or run `update.sh` from this repo |
+
+See each skill's `SKILL.md` for the exact command or checklist.
 
 ## Data model
 

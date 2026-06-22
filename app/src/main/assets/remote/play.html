@@ -29,6 +29,11 @@
     #uploadForm label { display: block; font-size: 13px; opacity: .8; margin-bottom: 4px; }
     #uploadForm input[type="text"] { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #444; border-radius: 8px; background: #000; color: #fff; font-size: 16px; }
     #uploadForm input[type="file"] { width: 100%; margin-bottom: 12px; color: #ccc; font-size: 14px; }
+    #uploadDropZone { border: 2px dashed #555; border-radius: 10px; padding: 28px 16px; margin-bottom: 12px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+    #uploadDropZone.drag-over { border-color: #7ecbff; background: rgba(126,203,255,.08); }
+    #uploadDropZone.has-file { border-style: solid; border-color: #444; }
+    #dropZoneText { font-size: 14px; opacity: .75; display: block; }
+    #dropZoneFile { font-size: 14px; color: #7ecbff; display: block; margin-top: 4px; }
     #uploadError { color: #ff8a80; font-size: 13px; margin-bottom: 12px; min-height: 1.2em; }
     #uploadActions { display: flex; gap: 10px; justify-content: flex-end; }
     #uploadActions button { padding: 10px 16px; border-radius: 8px; border: none; font-size: 15px; cursor: pointer; }
@@ -53,7 +58,7 @@
       <img id="media" alt="" />
     </div>
     <div id="empty" hidden>No songs in this playlist.</div>
-    <div id="hint">Pinch to zoom · swipe ← → · arrow keys</div>
+    <div id="hint">Tap left/right · pinch to zoom · swipe · arrow keys</div>
   </div>
   <div id="uploadOverlay" hidden>
     <form id="uploadForm">
@@ -65,7 +70,11 @@
       <label for="uploadNotes">Notes</label>
       <input id="uploadNotes" type="text" autocomplete="off" />
       <label for="uploadFile">File (PDF or image)</label>
-      <input id="uploadFile" type="file" accept="image/*,application/pdf,.pdf" required />
+      <div id="uploadDropZone" role="button" tabindex="0" aria-label="Drop or choose file">
+        <span id="dropZoneText">Drop PDF or image here, or tap to choose</span>
+        <span id="dropZoneFile" hidden></span>
+      </div>
+      <input id="uploadFile" type="file" accept="image/*,application/pdf,.pdf" required hidden />
       <div id="uploadError"></div>
       <div id="uploadActions">
         <button id="uploadCancel" type="button">Cancel</button>
@@ -74,6 +83,14 @@
     </form>
   </div>
   <script>
+    // Keep in sync with PlaybackNav.kt
+    const NAV = {
+      TAP_MOVE_PX: 12,
+      SWIPE_PX: 48,
+      ZOOM_NAV_MAX: 1.05,
+      MAX_ZOOM: 5,
+    };
+
     const zoomWrap = document.getElementById('zoomWrap');
     const media = document.getElementById('media');
     const metaEl = document.getElementById('meta');
@@ -90,6 +107,44 @@
     const uploadError = document.getElementById('uploadError');
     const uploadSubmit = document.getElementById('uploadSubmit');
     const uploadCancel = document.getElementById('uploadCancel');
+    const uploadDropZone = document.getElementById('uploadDropZone');
+    const dropZoneText = document.getElementById('dropZoneText');
+    const dropZoneFile = document.getElementById('dropZoneFile');
+
+    function isAllowedFile(file) {
+      if (!file) return false;
+      const type = file.type || '';
+      if (type.startsWith('image/') || type === 'application/pdf') return true;
+      const name = file.name.toLowerCase();
+      return /\.(pdf|png|jpe?g|gif|webp)$/.test(name);
+    }
+
+    function setUploadFile(file) {
+      if (!isAllowedFile(file)) {
+        uploadError.textContent = 'Choose a PDF or image.';
+        return false;
+      }
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      uploadFile.files = dt.files;
+      uploadDropZone.classList.add('has-file');
+      dropZoneText.hidden = true;
+      dropZoneFile.hidden = false;
+      dropZoneFile.textContent = file.name;
+      if (!uploadTitle.value.trim()) {
+        uploadTitle.value = file.name.replace(/\.[^.]+$/, '');
+      }
+      uploadError.textContent = '';
+      return true;
+    }
+
+    function clearUploadFile() {
+      uploadFile.value = '';
+      uploadDropZone.classList.remove('has-file');
+      dropZoneText.hidden = false;
+      dropZoneFile.hidden = true;
+      dropZoneFile.textContent = '';
+    }
 
     let touchStartX = 0;
     let touchStartY = 0;
@@ -106,6 +161,16 @@
     let panStartY = 0;
     let panOffsetStartX = 0;
     let panOffsetStartY = 0;
+    let tapMoved = false;
+    let lastTouchEnd = 0;
+
+    function handleSideTap(clientX) {
+      if (!remoteOn || busy || scale > NAV.ZOOM_NAV_MAX) return;
+      const rect = stage.getBoundingClientRect();
+      const x = clientX - rect.left;
+      if (x >= rect.width / 2) navigate('next');
+      else navigate('prev');
+    }
 
     function setRemoteState(on) {
       remoteOn = on;
@@ -121,7 +186,7 @@
       uploadTitle.value = '';
       uploadKey.value = '';
       uploadNotes.value = '';
-      uploadFile.value = '';
+      clearUploadFile();
       uploadOverlay.hidden = false;
     }
 
@@ -133,11 +198,36 @@
     uploadBtn.addEventListener('click', openUpload);
     uploadCancel.addEventListener('click', closeUpload);
 
+    uploadDropZone.addEventListener('click', () => uploadFile.click());
+    uploadDropZone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        uploadFile.click();
+      }
+    });
+
+    ['dragenter', 'dragover'].forEach((type) => {
+      uploadDropZone.addEventListener(type, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadDropZone.classList.add('drag-over');
+      });
+    });
+    ['dragleave', 'drop'].forEach((type) => {
+      uploadDropZone.addEventListener(type, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadDropZone.classList.remove('drag-over');
+      });
+    });
+    uploadDropZone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer?.files?.[0];
+      if (file) setUploadFile(file);
+    });
+
     uploadFile.addEventListener('change', () => {
       const file = uploadFile.files?.[0];
-      if (file && !uploadTitle.value.trim()) {
-        uploadTitle.value = file.name.replace(/\.[^.]+$/, '');
-      }
+      if (file) setUploadFile(file);
     });
 
     uploadForm.addEventListener('submit', async (e) => {
@@ -249,7 +339,7 @@
     }
 
     async function navigate(direction) {
-      if (busy || !remoteOn || scale > 1.05) return;
+      if (busy || !remoteOn || scale > NAV.ZOOM_NAV_MAX) return;
       busy = true;
       try {
         await fetch('/api/navigate', {
@@ -268,7 +358,8 @@
       if (e.touches.length === 1) {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
-        if (scale > 1) {
+        tapMoved = false;
+        if (scale > NAV.ZOOM_NAV_MAX) {
           panStartX = e.touches[0].clientX;
           panStartY = e.touches[0].clientY;
           panOffsetStartX = offsetX;
@@ -282,10 +373,15 @@
 
     stage.addEventListener('touchmove', (e) => {
       if (!remoteOn) return;
+      if (e.touches.length === 1) {
+        const dx = e.touches[0].clientX - touchStartX;
+        const dy = e.touches[0].clientY - touchStartY;
+        if (Math.abs(dx) > NAV.TAP_MOVE_PX || Math.abs(dy) > NAV.TAP_MOVE_PX) tapMoved = true;
+      }
       if (e.touches.length === 2) {
         const dist = touchDistance(e.touches[0], e.touches[1]);
         if (pinchStartDist > 0) {
-          scale = Math.min(5, Math.max(1, pinchStartScale * (dist / pinchStartDist)));
+          scale = Math.min(NAV.MAX_ZOOM, Math.max(1, pinchStartScale * (dist / pinchStartDist)));
           if (scale <= 1) {
             scale = 1;
             offsetX = 0;
@@ -293,7 +389,7 @@
           }
           applyTransform();
         }
-      } else if (e.touches.length === 1 && scale > 1) {
+      } else if (e.touches.length === 1 && scale > NAV.ZOOM_NAV_MAX) {
         offsetX = panOffsetStartX + (e.touches[0].clientX - panStartX);
         offsetY = panOffsetStartY + (e.touches[0].clientY - panStartY);
         applyTransform();
@@ -302,12 +398,17 @@
 
     stage.addEventListener('touchend', (e) => {
       if (!remoteOn) return;
-      if (e.touches.length === 0 && scale <= 1.05) {
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        const dy = e.changedTouches[0].clientY - touchStartY;
-        if (Math.abs(dx) >= 48 && Math.abs(dx) >= Math.abs(dy)) {
+      if (e.touches.length === 0 && scale <= NAV.ZOOM_NAV_MAX) {
+        const endX = e.changedTouches[0].clientX;
+        const endY = e.changedTouches[0].clientY;
+        const dx = endX - touchStartX;
+        const dy = endY - touchStartY;
+        if (Math.abs(dx) >= NAV.SWIPE_PX && Math.abs(dx) >= Math.abs(dy)) {
           navigate(dx < 0 ? 'next' : 'prev');
+        } else if (!tapMoved) {
+          handleSideTap(endX);
         }
+        lastTouchEnd = Date.now();
       }
       if (e.touches.length < 2) {
         pinchStartDist = 0;
@@ -316,6 +417,11 @@
         resetZoom();
       }
     }, { passive: true });
+
+    stage.addEventListener('click', (e) => {
+      if (Date.now() - lastTouchEnd < 400) return;
+      handleSideTap(e.clientX);
+    });
 
     document.addEventListener('keydown', (e) => {
       if (!remoteOn) return;

@@ -30,6 +30,7 @@ import com.playlists.app.ui.screens.MainTabsScreen
 import com.playlists.app.ui.screens.PlaylistDetailScreen
 import com.playlists.app.ui.screens.PlaylistPlaybackScreen
 import com.playlists.app.ui.screens.QuickstartScreen
+import com.playlists.app.ui.screens.SettingsScreen
 import com.playlists.app.ui.screens.SongViewScreen
 import com.playlists.app.util.AppUpdate
 import java.io.File
@@ -38,6 +39,7 @@ object Routes {
     const val MAIN = "main"
     const val IMPORT = "import"
     const val QUICKSTART = "quickstart"
+    const val SETTINGS = "settings"
     const val SONG = "song/{songId}"
     const val PLAYLIST = "playlist/{playlistId}"
     const val PLAYBACK = "playlist/{playlistId}/play"
@@ -106,6 +108,7 @@ fun AppNavigation(
                         onOpenSong = { navController.navigate(Routes.song(it)) },
                         onOpenPlaylist = { navController.navigate(Routes.playlist(it)) },
                         onQuickstart = { navController.navigate(Routes.QUICKSTART) },
+                        onSettings = { navController.navigate(Routes.SETTINGS) },
                     )
                 }
                 composable(Routes.IMPORT) {
@@ -121,6 +124,9 @@ fun AppNavigation(
                             navController.navigate(Routes.song(songId))
                         },
                     )
+                }
+                composable(Routes.SETTINGS) {
+                    SettingsScreen(onBack = { navController.popBackStack() })
                 }
                 composable(Routes.QUICKSTART) {
                     QuickstartScreen(

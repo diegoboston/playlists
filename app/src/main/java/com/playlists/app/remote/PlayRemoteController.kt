@@ -6,6 +6,7 @@ import com.playlists.app.data.FileType
 import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.data.Song
 import com.playlists.app.ui.PdfHelper
+import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.FileStorage
 import fi.iki.elonen.NanoHTTPD
 import java.io.File
@@ -46,8 +47,9 @@ object PlayRemoteController {
         appContext = context.applicationContext
         val songs = entriesToRemoteSongs(entries)
         val html = context.assets.open("remote/play.html").bufferedReader().readText()
+        val port = AppPrefs.getRemotePort(context)
         val remote = PlayRemoteServer(
-            port = 0,
+            port = port,
             playlistName = playlistName,
             songs = songs,
             html = html,
@@ -60,14 +62,16 @@ object PlayRemoteController {
         )
         return try {
             remote.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
-            val port = remote.listeningPort
-            if (port <= 0) {
+            val listeningPort = remote.listeningPort
+            if (listeningPort <= 0) {
                 remote.stop()
-                return Result.failure(IllegalStateException("Could not bind port"))
+                return Result.failure(
+                    IllegalStateException("Could not bind port $port — try another in Settings"),
+                )
             }
             server = remote
             activePlaylistId = playlistId
-            publicUrl = "http://$ip:$port/"
+            publicUrl = "http://$ip:$listeningPort/"
             _running.value = true
             Result.success(publicUrl!!)
         } catch (e: Exception) {

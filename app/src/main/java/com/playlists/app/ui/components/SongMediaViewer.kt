@@ -42,20 +42,35 @@ fun SongMediaViewer(
     file: File,
     fileType: FileType,
     modifier: Modifier = Modifier,
+    pdfPageIndex: Int? = null,
+    enableZoom: Boolean = true,
     onPdfPageChanged: ((page: Int, pageCount: Int) -> Unit)? = null,
 ) {
     when (fileType) {
-        FileType.IMAGE -> ZoomableImage(file = file, modifier = modifier)
-        FileType.PDF -> PdfPagerViewer(
-            file = file,
-            modifier = modifier,
-            onPageChanged = onPdfPageChanged,
-        )
+        FileType.IMAGE -> ZoomableImage(file = file, modifier = modifier, enableZoom = enableZoom)
+        FileType.PDF -> if (pdfPageIndex != null) {
+            SinglePdfPageViewer(
+                file = file,
+                pageIndex = pdfPageIndex,
+                modifier = modifier,
+                enableZoom = enableZoom,
+            )
+        } else {
+            PdfPagerViewer(
+                file = file,
+                modifier = modifier,
+                onPageChanged = onPdfPageChanged,
+            )
+        }
     }
 }
 
 @Composable
-private fun ZoomableImage(file: File, modifier: Modifier = Modifier) {
+private fun ZoomableImage(
+    file: File,
+    modifier: Modifier = Modifier,
+    enableZoom: Boolean = true,
+) {
     var scale by remember(file) { mutableFloatStateOf(1f) }
     var offset by remember(file) { mutableStateOf(Offset.Zero) }
 
@@ -63,16 +78,22 @@ private fun ZoomableImage(file: File, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(file) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    if (scale > 1f) {
-                        offset += pan
-                    } else {
-                        offset = Offset.Zero
+            .then(
+                if (enableZoom) {
+                    Modifier.pointerInput(file) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 5f)
+                            if (scale > 1f) {
+                                offset += pan
+                            } else {
+                                offset = Offset.Zero
+                            }
+                        }
                     }
-                }
-            },
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
@@ -83,12 +104,42 @@ private fun ZoomableImage(file: File, modifier: Modifier = Modifier) {
             contentDescription = null,
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    translationX = offset.x
-                    translationY = offset.y
-                },
+                .then(
+                    if (enableZoom) {
+                        Modifier.graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offset.x
+                            translationY = offset.y
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
+        )
+    }
+}
+
+@Composable
+private fun SinglePdfPageViewer(
+    file: File,
+    pageIndex: Int,
+    modifier: Modifier = Modifier,
+    enableZoom: Boolean = true,
+) {
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .onSizeChanged { containerSize = it },
+    ) {
+        PdfPageImage(
+            file = file,
+            pageIndex = pageIndex,
+            width = containerSize.width.coerceAtLeast(1),
+            enableZoom = enableZoom,
         )
     }
 }
@@ -146,7 +197,12 @@ private fun PdfPagerViewer(
 }
 
 @Composable
-private fun PdfPageImage(file: File, pageIndex: Int, width: Int) {
+private fun PdfPageImage(
+    file: File,
+    pageIndex: Int,
+    width: Int,
+    enableZoom: Boolean = true,
+) {
     var bitmap by remember(file, pageIndex, width) { mutableStateOf<Bitmap?>(null) }
     var scale by remember(file, pageIndex) { mutableFloatStateOf(1f) }
     var offset by remember(file, pageIndex) { mutableStateOf(Offset.Zero) }
@@ -161,16 +217,22 @@ private fun PdfPageImage(file: File, pageIndex: Int, width: Int) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(file, pageIndex) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    if (scale > 1f) {
-                        offset += pan
-                    } else {
-                        offset = Offset.Zero
+            .then(
+                if (enableZoom) {
+                    Modifier.pointerInput(file, pageIndex) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 5f)
+                            if (scale > 1f) {
+                                offset += pan
+                            } else {
+                                offset = Offset.Zero
+                            }
+                        }
                     }
-                }
-            },
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         bitmap?.let { bmp ->
@@ -179,12 +241,18 @@ private fun PdfPageImage(file: File, pageIndex: Int, width: Int) {
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                        translationX = offset.x
-                        translationY = offset.y
-                    },
+                    .then(
+                        if (enableZoom) {
+                            Modifier.graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offset.x
+                                translationY = offset.y
+                            }
+                        } else {
+                            Modifier
+                        },
+                    ),
             )
         }
     }
