@@ -29,7 +29,20 @@ object RemotePlayErrors {
             parts.add("$label: $text")
             current = current.cause
         }
-        return parts.joinToString("\n\n")
+        val body = parts.joinToString("\n\n")
+        return if (looksLikeDnsFailure(body)) {
+            "$body\n\nHint: Cloudflare could not resolve hostnames on this device. " +
+                "Install the latest app update (fixes cloudflared DNS), or use LAN only on the same Wi‑Fi."
+        } else {
+            body
+        }
+    }
+
+    internal fun looksLikeDnsFailure(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("lookup") &&
+            lower.contains(":53") &&
+            (lower.contains("connection refused") || lower.contains("no such host"))
     }
 
     fun copyToClipboard(context: Context, text: String) {

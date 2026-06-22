@@ -31,7 +31,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125'
 
       - name: Resolve version
         id: version
@@ -43,6 +43,8 @@ jobs:
           go-version: '1.22'
 
       - name: Build cloudflared for Android
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
         run: bash scripts/fetch-cloudflared.sh
 
       - name: Unit tests

@@ -192,11 +192,11 @@ playlists/
 ./gradlew :app:assembleDebug
 
 # Release (arm64-v8a — same as CI; remote play tunnel needs cloudflared in assets)
-bash scripts/fetch-cloudflared.sh   # requires Go 1.22+; writes app/src/main/jniLibs/arm64-v8a/libcloudflared.so
+bash scripts/fetch-cloudflared.sh   # requires Go 1.22+, Android NDK (CGO), writes app/src/main/jniLibs/arm64-v8a/libcloudflared.so
 ./gradlew :app:assembleRelease
 ```
 
-Requires Android SDK (API 34 platform + build-tools 34.0.0) and JDK 17. Set `sdk.dir` in `local.properties` or via `ANDROID_HOME`. Release builds that include remote play need Go to run `fetch-cloudflared.sh` first — the binary is gitignored and CI builds it on every release workflow run.
+Requires Android SDK (API 34 platform + build-tools 34.0.0) and JDK 17. Set `sdk.dir` in `local.properties` or via `ANDROID_HOME`. Release builds that include remote play need Go 1.22+ and the Android NDK (`ndk;26.1.10909125` or newer) to run `fetch-cloudflared.sh` — the bundled `cloudflared` must be built with CGO or DNS fails on device. The binary is gitignored and CI builds it on every release workflow run.
 
 The Gradle wrapper (`gradlew`, `gradle/wrapper/`) is committed so `./gradlew` works after clone. Keep `local.properties` (SDK path) out of git — it is in `.gitignore`.
 
@@ -217,7 +217,7 @@ This is a personal sideload key, not a Play Store key.
 On push to `main` or `master`, GitHub Actions (`.github/workflows/android.yml`):
 
 1. Compiles and runs unit tests
-2. Builds `cloudflared` for Android arm64 (`scripts/fetch-cloudflared.sh`, Go 1.22)
+2. Builds `cloudflared` for Android arm64 with CGO + NDK (`scripts/fetch-cloudflared.sh`, Go 1.22, `ndk;26.1.10909125`)
 3. Builds an arm64-v8a release APK
 4. Publishes a GitHub Release tagged `v1.0.<run>` with:
    - `app-1.0.<run>.apk` (versioned)

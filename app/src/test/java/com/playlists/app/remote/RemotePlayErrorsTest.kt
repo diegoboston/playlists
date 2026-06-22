@@ -46,4 +46,10 @@ class RemotePlayErrorsTest {
             CloudflareTunnel.extractPublicTunnelUrl(line),
         )
     }
+
+    @Test
+    fun looksLikeDnsFailure_detectsPort53Refused() {
+        val msg = """failed to request quick Tunnel: lookup api.trycloudflare.com on [::1]:53: read udp [::1]:39143->[::1]:53: read: connection refused"""
+        assertTrue(RemotePlayErrors.looksLikeDnsFailure(msg))
+    }
 }
