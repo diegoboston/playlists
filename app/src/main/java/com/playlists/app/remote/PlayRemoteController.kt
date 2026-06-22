@@ -38,6 +38,7 @@ object PlayRemoteController {
         playlistId: Long,
         playlistName: String,
         entries: List<PlaylistSongWithDetails>,
+        mode: RemotePlayMode = RemotePlayMode.CLOUDFLARE,
     ): Result<String> {
         stop()
         if (entries.isEmpty()) {
@@ -51,7 +52,7 @@ object PlayRemoteController {
         val port = AppPrefs.getRemotePort(context)
         val pin = AppPrefs.getRemotePin(context)
         val remote = PlayRemoteServer(
-            hostname = "127.0.0.1",
+            hostname = if (mode == RemotePlayMode.LAN) "0.0.0.0" else "127.0.0.1",
             port = port,
             pin = pin,
             playlistName = playlistName,
@@ -87,15 +88,31 @@ object PlayRemoteController {
                     IllegalStateException("Could not bind port $port — try another in Settings"),
                 )
             }
-            val tunnelResult = CloudflareTunnel.start(context.applicationContext, listeningPort)
-            if (tunnelResult.isFailure) {
-                remote.stop()
-                return Result.failure(
-                    tunnelResult.exceptionOrNull()
-                        ?: IllegalStateException("Cloudflare tunnel failed"),
-                )
+            val tunnelUrl = when (mode) {
+                RemotePlayMode.CLOUDFLARE -> {
+                    val tunnelResult = CloudflareTunnel.start(context.applicationContext, listeningPort)
+                    if (tunnelResult.isFailure) {
+                        remote.stop()
+                        return Result.failure(
+                            tunnelResult.exceptionOrNull()
+                                ?: IllegalStateException("Cloudflare tunnel failed"),
+                        )
+                    }
+                    tunnelResult.getOrThrow()
+                }
+                RemotePlayMode.LAN -> {
+                    val ip = NetworkAddresses.localLanIp()
+                    if (ip == null) {
+                        remote.stop()
+                        return Result.failure(
+                            IllegalStateException(
+                                "No LAN IP found — connect to Wi‑Fi or choose Cloudflare tunnel",
+                            ),
+                        )
+                    }
+                    "http://$ip:$listeningPort"
+                }
             }
-            val tunnelUrl = tunnelResult.getOrThrow()
             server = remote
             activePlaylistId = playlistId
             publicUrl = "$tunnelUrl/"

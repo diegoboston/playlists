@@ -40,6 +40,8 @@ import com.playlists.app.R
 import com.playlists.app.remote.PlayRemoteController
 import com.playlists.app.remote.RemotePlayErrorDialog
 import com.playlists.app.remote.RemotePlayErrors
+import com.playlists.app.remote.RemotePlayMode
+import com.playlists.app.remote.RemotePlayModeDialog
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.util.AppPrefs
 import kotlinx.coroutines.launch
@@ -58,6 +60,8 @@ fun MainTabsScreen(
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var remoteError by remember { mutableStateOf<String?>(null) }
+    var showRemoteModeDialog by remember { mutableStateOf(false) }
+    var pendingRemotePlaylistId by remember { mutableStateOf<Long?>(null) }
 
     val activePlaylistId = PlayRemoteController.activePlaylistId
     val entries by viewModel.observePlaylistSongs(activePlaylistId ?: -1L)
@@ -69,7 +73,7 @@ fun MainTabsScreen(
         }
     }
 
-    fun startRemote(playlistId: Long) {
+    fun startRemote(playlistId: Long, mode: RemotePlayMode) {
         scope.launch {
             val playlist = viewModel.getPlaylist(playlistId)
             if (playlist == null) {
@@ -81,7 +85,7 @@ fun MainTabsScreen(
                 Toast.makeText(context, R.string.remote_empty, Toast.LENGTH_LONG).show()
                 return@launch
             }
-            PlayRemoteController.start(context, playlistId, playlist.name, list)
+            PlayRemoteController.start(context, playlistId, playlist.name, list, mode)
                 .onSuccess { url ->
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                     Toast.makeText(context, R.string.remote_started, Toast.LENGTH_SHORT).show()
@@ -120,7 +124,8 @@ fun MainTabsScreen(
                                         ).show()
                                         return@IconButton
                                     }
-                                    startRemote(playlistId)
+                                    pendingRemotePlaylistId = playlistId
+                                    showRemoteModeDialog = true
                                 },
                             ) {
                                 Icon(
@@ -171,5 +176,19 @@ fun MainTabsScreen(
 
     remoteError?.let { message ->
         RemotePlayErrorDialog(message = message, onDismiss = { remoteError = null })
+    }
+
+    if (showRemoteModeDialog) {
+        RemotePlayModeDialog(
+            onDismiss = {
+                showRemoteModeDialog = false
+                pendingRemotePlaylistId = null
+            },
+            onSelect = { mode ->
+                showRemoteModeDialog = false
+                pendingRemotePlaylistId?.let { startRemote(it, mode) }
+                pendingRemotePlaylistId = null
+            },
+        )
     }
 }

@@ -59,6 +59,8 @@ import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.remote.PlayRemoteController
 import com.playlists.app.remote.RemotePlayErrorDialog
 import com.playlists.app.remote.RemotePlayErrors
+import com.playlists.app.remote.RemotePlayMode
+import com.playlists.app.remote.RemotePlayModeDialog
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.components.PlaylistColorDialog
@@ -92,6 +94,7 @@ fun PlaylistDetailScreen(
     var showDelete by remember { mutableStateOf(false) }
     var showAddSong by remember { mutableStateOf(false) }
     var remoteError by remember { mutableStateOf<String?>(null) }
+    var showRemoteModeDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(playlistId) {
         playlist = viewModel.getPlaylist(playlistId)
@@ -111,7 +114,7 @@ fun PlaylistDetailScreen(
         }
     }
 
-    fun startRemote() {
+    fun startRemote(mode: RemotePlayMode) {
         scope.launch {
             val list = viewModel.getPlaylistSongs(playlistId)
             if (list.isEmpty()) {
@@ -119,7 +122,7 @@ fun PlaylistDetailScreen(
                 return@launch
             }
             val name = playlist?.name.orEmpty()
-            PlayRemoteController.start(context, playlistId, name, list)
+            PlayRemoteController.start(context, playlistId, name, list, mode)
                 .onSuccess { url ->
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                     Toast.makeText(context, R.string.remote_started, Toast.LENGTH_SHORT).show()
@@ -168,7 +171,7 @@ fun PlaylistDetailScreen(
                                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                                 }
                             } else {
-                                startRemote()
+                                showRemoteModeDialog = true
                             }
                         }) {
                             Icon(
@@ -336,6 +339,16 @@ fun PlaylistDetailScreen(
 
     remoteError?.let { message ->
         RemotePlayErrorDialog(message = message, onDismiss = { remoteError = null })
+    }
+
+    if (showRemoteModeDialog) {
+        RemotePlayModeDialog(
+            onDismiss = { showRemoteModeDialog = false },
+            onSelect = { mode ->
+                showRemoteModeDialog = false
+                startRemote(mode)
+            },
+        )
     }
 }
 

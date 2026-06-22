@@ -33,12 +33,16 @@
     <string name="remote_empty">Add songs before starting remote play.</string>
     <string name="remote_tunnel_failed">Remote play failed: %1$s</string>
     <string name="remote_error_copy">Copy</string>
+    <string name="remote_mode_title">Start remote play</string>
+    <string name="remote_mode_message">How should other devices reach this phone?</string>
+    <string name="remote_mode_cloudflare">Cloudflare tunnel (internet)</string>
+    <string name="remote_mode_lan">LAN only (same Wi‑Fi)</string>
     <string name="remote_open_playlist">Open a playlist to start remote play.</string>
     <string name="remote_no_last_playlist">Open a playlist first — remote uses your last opened playlist.</string>
     <string name="remote_playlist_gone">That playlist was deleted.</string>
     <string name="settings">Settings</string>
     <string name="settings_remote_port">Local server port</string>
-    <string name="settings_remote_port_hint">Default 44444. Used only on this device for the Cloudflare tunnel.</string>
+    <string name="settings_remote_port_hint">Default 44444. Local HTTP port for remote play (LAN and Cloudflare tunnel).</string>
     <string name="settings_remote_pin">Remote play PIN</string>
     <string name="settings_remote_pin_hint">4 digits. Anyone with the remote URL must enter this PIN in the browser.</string>
     <string name="settings_port_invalid">Enter a port between 1024 and 65535.</string>

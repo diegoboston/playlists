@@ -5,6 +5,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$ROOT/app/src/main/jniLibs/arm64-v8a"
 OUT="$OUT_DIR/libcloudflared.so"
 mkdir -p "$OUT_DIR"
+GOCACHE="$ROOT/.go-build-cache"
+mkdir -p "$GOCACHE"
+export GOCACHE
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

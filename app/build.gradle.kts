@@ -71,6 +71,11 @@ android {
                 "META-INF/NOTICE*"
             )
         }
+        // cloudflared is executed via ProcessBuilder; native libs must be
+        // extracted to nativeLibraryDir (same pattern as NoTube / youtubedl-android).
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
