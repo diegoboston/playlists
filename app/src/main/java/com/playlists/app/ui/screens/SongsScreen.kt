@@ -38,7 +38,7 @@ import com.playlists.app.data.Song
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.reorder.DraggableItem
-import com.playlists.app.ui.reorder.handleLazyListDrag
+import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
 
 @Composable
@@ -49,11 +49,11 @@ fun SongsScreen(
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val displayedKeys = remember { mutableStateListOf<String>() }
-    var draggingKey by remember { mutableStateOf<String?>(null) }
+    val dragState = remember { ReorderDragState() }
     var deleteTarget by remember { mutableStateOf<Song?>(null) }
 
-    LaunchedEffect(songs, draggingKey) {
-        syncDisplayedKeys(displayedKeys, draggingKey, songs.map { "s:${it.id}" })
+    LaunchedEffect(songs, dragState.draggingKey) {
+        syncDisplayedKeys(displayedKeys, dragState.draggingKey, songs.map { "s:${it.id}" })
     }
 
     if (songs.isEmpty()) {
@@ -69,7 +69,7 @@ fun SongsScreen(
 
     LazyColumn(
         state = listState,
-        userScrollEnabled = draggingKey == null,
+        userScrollEnabled = !dragState.isDragging,
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize(),
@@ -81,19 +81,18 @@ fun SongsScreen(
             val songId = key.removePrefix("s:").toLongOrNull() ?: return@items
             val song = songs.find { it.id == songId } ?: return@items
             DraggableItem(
-                key = key,
-                enabled = draggingKey == null || draggingKey == key,
-                draggingKey = draggingKey,
-                onDragStart = { draggingKey = it },
-                onDrag = { dragKey, visualTop ->
-                    handleLazyListDrag(listState, dragKey, visualTop, displayedKeys)
-                },
+                isDragging = dragState.draggingKey == key,
+                dragOffset = dragState.currentDragOffset(listState),
+                onTap = { onOpenSong(song.id) },
+                onDragStart = { dragState.onDragStart(key, listState) },
+                onDrag = { delta -> dragState.onDrag(delta, listState, displayedKeys) },
                 onDragEnd = {
-                    draggingKey = null
-                    val ids = displayedKeys.mapNotNull { it.removePrefix("s:").toLongOrNull() }
-                    viewModel.reorderSongs(ids)
+                    dragState.finishDrag {
+                        val ids = displayedKeys.mapNotNull { it.removePrefix("s:").toLongOrNull() }
+                        viewModel.reorderSongs(ids)
+                    }
                 },
-                onClick = { onOpenSong(song.id) },
+                onDragCancel = { dragState.cancelDrag() },
             ) {
                 SongRow(
                     song = song,

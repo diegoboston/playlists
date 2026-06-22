@@ -1,108 +1,115 @@
 package com.playlists.app.ui.reorder
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.math.roundToInt
 
+/**
+ * Drag-reorder row wrapper ported from NoTube's HistoryScreen.
+ * Tap and long-press-drag share one gesture loop so drag never opens the row.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DraggableItem(
-    key: String,
-    enabled: Boolean,
-    draggingKey: String?,
-    onDragStart: (String) -> Unit,
-    onDrag: (String, Float) -> Unit,
-    onDragEnd: (String) -> Unit,
+    isDragging: Boolean,
+    dragOffset: Float,
+    dragEnabled: Boolean = true,
+    onTap: () -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
     modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    val isDragging = draggingKey == key
-    var dragOffsetY by remember(key) { mutableFloatStateOf(0f) }
-    var itemTopInRoot by remember(key) { mutableFloatStateOf(0f) }
+    val haptics = LocalHapticFeedback.current
+    val tapState = rememberUpdatedState(onTap)
+    val startState = rememberUpdatedState(onDragStart)
+    val dragState = rememberUpdatedState(onDrag)
+    val endState = rememberUpdatedState(onDragEnd)
+    val cancelState = rememberUpdatedState(onDragCancel)
+    val dragEnabledState = rememberUpdatedState(dragEnabled)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .onGloballyPositioned { coords ->
-                if (!isDragging) {
-                    itemTopInRoot = coords.positionInRoot().y
-                }
-            }
-            .offset { IntOffset(0, if (isDragging) dragOffsetY.roundToInt() else 0) }
-            .zIndex(if (isDragging) 1f else 0f)
-            .graphicsLayer {
-                if (isDragging) {
-                    shadowElevation = 8f
-                    alpha = 0.95f
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    if (down.isConsumed) return@awaitEachGesture
+
+                    val touchSlop = viewConfiguration.touchSlop
+                    var totalDelta = Offset.Zero
+                    var releasedUp: PointerInputChange? = null
+                    var swiped = false
+
+                    val timedOut = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            val change = event.changes
+                                .firstOrNull { it.id == down.id }
+                                ?: return@withTimeoutOrNull
+                            if (change.changedToUpIgnoreConsumed()) {
+                                releasedUp = change
+                                return@withTimeoutOrNull
+                            }
+                            totalDelta += change.positionChange()
+                            if (totalDelta.getDistance() > touchSlop) {
+                                swiped = true
+                                return@withTimeoutOrNull
+                            }
+                        }
+                        @Suppress("UNREACHABLE_CODE")
+                        Unit
+                    } == null
+
+                    val up = releasedUp
+                    when {
+                        timedOut && dragEnabledState.value -> {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            startState.value()
+                            try {
+                                val ended = drag(down.id) { change ->
+                                    dragState.value(change.positionChange().y)
+                                    change.consume()
+                                }
+                                if (ended) endState.value() else cancelState.value()
+                            } catch (e: CancellationException) {
+                                cancelState.value()
+                                throw e
+                            }
+                        }
+                        up != null && !swiped && !up.isConsumed -> {
+                            up.consume()
+                            tapState.value()
+                        }
+                    }
                 }
             }
             .then(
-                if (enabled) {
-                    Modifier.pointerInput(key) {
-                        val longPressTimeout = viewConfiguration.longPressTimeoutMillis
-                        val touchSlop = viewConfiguration.touchSlop
-
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                            val downPos = down.position
-
-                            val longPress = withTimeoutOrNull(longPressTimeout) {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    val change = event.changes.firstOrNull { it.id == down.id }
-                                        ?: return@withTimeoutOrNull false
-                                    if (!change.pressed) return@withTimeoutOrNull false
-                                    if ((change.position - downPos).getDistance() > touchSlop) {
-                                        return@withTimeoutOrNull false
-                                    }
-                                }
-                                @Suppress("UNREACHABLE_CODE")
-                                true
-                            } != false
-
-                            if (!longPress) {
-                                onClick?.invoke()
-                                return@awaitEachGesture
-                            }
-
-                            val dragStartTop = itemTopInRoot
-                            dragOffsetY = 0f
-                            onDragStart(key)
-                            down.consume()
-
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                if (!change.pressed) break
-                                val dy = change.position.y - change.previousPosition.y
-                                if (dy != 0f) {
-                                    change.consume()
-                                    dragOffsetY += dy
-                                    onDrag(key, dragStartTop + dragOffsetY)
-                                }
-                            }
-
-                            dragOffsetY = 0f
-                            onDragEnd(key)
-                        }
-                    }
+                if (isDragging) {
+                    Modifier
+                        .zIndex(1f)
+                        .graphicsLayer { translationY = dragOffset }
                 } else {
                     Modifier
                 },

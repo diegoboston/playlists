@@ -1,7 +1,7 @@
 package com.playlists.app.ui.reorder
 
+import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListState
-import com.playlists.app.ui.ReorderLogic
 
 fun handleLazyListDrag(
     listState: LazyListState,
@@ -9,10 +9,32 @@ fun handleLazyListDrag(
     dragVisualTop: Float,
     displayedKeys: MutableList<String>,
 ): Boolean {
-    val visible = listState.layoutInfo.visibleItemsInfo
-    val tops = visible.associate { info -> info.key.toString() to info.offset.toFloat() }
-    val heights = visible.associate { info -> info.key.toString() to info.size.toFloat() }
-    return ReorderLogic.handleDrag(draggingKey, dragVisualTop, displayedKeys, tops, heights)
+    val visibleItems = listState.layoutInfo.visibleItemsInfo
+    val draggedItem = visibleItems.firstOrNull { it.key == draggingKey } ?: return false
+    val draggedCenter = dragVisualTop + draggedItem.size / 2f
+
+    val fromIdx = displayedKeys.indexOf(draggingKey).takeIf { it >= 0 } ?: return false
+
+    val step = if (draggedCenter > draggedItem.offset + draggedItem.size / 2f) 1 else -1
+    var target: LazyListItemInfo? = null
+    var probeIdx = fromIdx + step
+    while (probeIdx in displayedKeys.indices) {
+        val info = visibleItems.firstOrNull { it.key == displayedKeys[probeIdx] } ?: break
+        val infoCenter = info.offset + info.size / 2f
+        val crossed = if (step > 0) draggedCenter > infoCenter else draggedCenter < infoCenter
+        if (!crossed) break
+        target = info
+        probeIdx += step
+    }
+    val targetItem = target ?: return false
+
+    val targetKey = targetItem.key.toString()
+    val toIdx = displayedKeys.indexOf(targetKey)
+    if (toIdx < 0 || toIdx == fromIdx) return false
+
+    displayedKeys.removeAt(fromIdx)
+    displayedKeys.add(toIdx, draggingKey)
+    return true
 }
 
 fun syncDisplayedKeys(

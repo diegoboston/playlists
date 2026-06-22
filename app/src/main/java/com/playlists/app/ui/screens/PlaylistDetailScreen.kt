@@ -64,7 +64,7 @@ import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.components.PlaylistColorDialog
 import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
-import com.playlists.app.ui.reorder.handleLazyListDrag
+import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
 import kotlinx.coroutines.launch
 
@@ -75,6 +75,7 @@ fun PlaylistDetailScreen(
     viewModel: PlaylistsViewModel,
     onBack: () -> Unit,
     onPlay: (Long) -> Unit,
+    onOpenSong: (Long) -> Unit,
     onNavigateToDuplicate: (Long) -> Unit,
 ) {
     val context = LocalContext.current
@@ -83,7 +84,7 @@ fun PlaylistDetailScreen(
     val entries by viewModel.observePlaylistSongs(playlistId).collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val displayedKeys = remember { mutableStateListOf<String>() }
-    var draggingKey by remember { mutableStateOf<String?>(null) }
+    val dragState = remember { ReorderDragState() }
     var showRename by remember { mutableStateOf(false) }
     var showDuplicate by remember { mutableStateOf(false) }
     var showColor by remember { mutableStateOf(false) }
@@ -97,8 +98,8 @@ fun PlaylistDetailScreen(
 
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
 
-    LaunchedEffect(entries, draggingKey) {
-        syncDisplayedKeys(displayedKeys, draggingKey, entries.map { "e:${it.id}" })
+    LaunchedEffect(entries, dragState.draggingKey) {
+        syncDisplayedKeys(displayedKeys, dragState.draggingKey, entries.map { "e:${it.id}" })
     }
 
     LaunchedEffect(remoteRunning, playlistId) {
@@ -241,7 +242,7 @@ fun PlaylistDetailScreen(
             } else {
                 LazyColumn(
                     state = listState,
-                    userScrollEnabled = draggingKey == null,
+                    userScrollEnabled = !dragState.isDragging,
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxSize(),
@@ -250,18 +251,18 @@ fun PlaylistDetailScreen(
                         val entryId = key.removePrefix("e:").toLongOrNull() ?: return@items
                         val entry = entries.find { it.id == entryId } ?: return@items
                         DraggableItem(
-                            key = key,
-                            enabled = draggingKey == null || draggingKey == key,
-                            draggingKey = draggingKey,
-                            onDragStart = { draggingKey = it },
-                            onDrag = { dragKey, visualTop ->
-                                handleLazyListDrag(listState, dragKey, visualTop, displayedKeys)
-                            },
+                            isDragging = dragState.draggingKey == key,
+                            dragOffset = dragState.currentDragOffset(listState),
+                            onTap = { onOpenSong(entry.songId) },
+                            onDragStart = { dragState.onDragStart(key, listState) },
+                            onDrag = { delta -> dragState.onDrag(delta, listState, displayedKeys) },
                             onDragEnd = {
-                                draggingKey = null
-                                val ids = displayedKeys.mapNotNull { it.removePrefix("e:").toLongOrNull() }
-                                viewModel.reorderPlaylistSongs(playlistId, ids)
+                                dragState.finishDrag {
+                                    val ids = displayedKeys.mapNotNull { it.removePrefix("e:").toLongOrNull() }
+                                    viewModel.reorderPlaylistSongs(playlistId, ids)
+                                }
                             },
+                            onDragCancel = { dragState.cancelDrag() },
                         ) {
                             PlaylistSongRow(
                                 entry = entry,

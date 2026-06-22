@@ -52,6 +52,9 @@ interface PlaylistSongDao {
     @Transaction
     suspend fun replaceOrder(playlistId: Long, entryIdsInOrder: List<Long>) {
         entryIdsInOrder.forEachIndexed { index, entryId ->
+            updatePosition(playlistId, entryId, -(index + 1))
+        }
+        entryIdsInOrder.forEachIndexed { index, entryId ->
             updatePosition(playlistId, entryId, index)
         }
     }

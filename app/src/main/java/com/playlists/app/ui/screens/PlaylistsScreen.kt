@@ -37,7 +37,7 @@ import com.playlists.app.data.Playlist
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
-import com.playlists.app.ui.reorder.handleLazyListDrag
+import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
 
 @Composable
@@ -49,11 +49,11 @@ fun PlaylistsScreen(
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val displayedKeys = remember { mutableStateListOf<String>() }
-    var draggingKey by remember { mutableStateOf<String?>(null) }
+    val dragState = remember { ReorderDragState() }
     var showNewDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(playlists, draggingKey) {
-        syncDisplayedKeys(displayedKeys, draggingKey, playlists.map { "p:${it.id}" })
+    LaunchedEffect(playlists, dragState.draggingKey) {
+        syncDisplayedKeys(displayedKeys, dragState.draggingKey, playlists.map { "p:${it.id}" })
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -82,7 +82,7 @@ fun PlaylistsScreen(
         } else {
             LazyColumn(
                 state = listState,
-                userScrollEnabled = draggingKey == null,
+                userScrollEnabled = !dragState.isDragging,
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize(),
@@ -91,19 +91,18 @@ fun PlaylistsScreen(
                     val playlistId = key.removePrefix("p:").toLongOrNull() ?: return@items
                     val playlist = playlists.find { it.id == playlistId } ?: return@items
                     DraggableItem(
-                        key = key,
-                        enabled = draggingKey == null || draggingKey == key,
-                        draggingKey = draggingKey,
-                        onDragStart = { draggingKey = it },
-                        onDrag = { dragKey, visualTop ->
-                            handleLazyListDrag(listState, dragKey, visualTop, displayedKeys)
-                        },
+                        isDragging = dragState.draggingKey == key,
+                        dragOffset = dragState.currentDragOffset(listState),
+                        onTap = { onOpenPlaylist(playlist.id) },
+                        onDragStart = { dragState.onDragStart(key, listState) },
+                        onDrag = { delta -> dragState.onDrag(delta, listState, displayedKeys) },
                         onDragEnd = {
-                            draggingKey = null
-                            val ids = displayedKeys.mapNotNull { it.removePrefix("p:").toLongOrNull() }
-                            viewModel.reorderPlaylists(ids)
+                            dragState.finishDrag {
+                                val ids = displayedKeys.mapNotNull { it.removePrefix("p:").toLongOrNull() }
+                                viewModel.reorderPlaylists(ids)
+                            }
                         },
-                        onClick = { onOpenPlaylist(playlist.id) },
+                        onDragCancel = { dragState.cancelDrag() },
                     ) {
                         PlaylistRow(playlist = playlist)
                     }

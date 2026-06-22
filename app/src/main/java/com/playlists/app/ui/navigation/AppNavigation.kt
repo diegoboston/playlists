@@ -153,6 +153,7 @@ fun AppNavigation(
                         viewModel = viewModel,
                         onBack = { navController.popBackStack() },
                         onPlay = { navController.navigate(Routes.playback(it)) },
+                        onOpenSong = { navController.navigate(Routes.song(it)) },
                         onNavigateToDuplicate = { newId ->
                             navController.popBackStack()
                             navController.navigate(Routes.playlist(newId))
