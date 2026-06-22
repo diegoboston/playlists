@@ -6,16 +6,19 @@ import org.junit.Test
 
 class AppPrefsRemotePinTest {
     @Test
-    fun validRemotePin_acceptsFourDigits() {
-        assertTrue(AppPrefs.isValidRemotePin("0000"))
-        assertTrue(AppPrefs.isValidRemotePin("4829"))
+    fun validRemoteCode_acceptsFiveDigitPortRange() {
+        assertTrue(AppPrefs.isValidRemoteCode("10000"))
+        assertTrue(AppPrefs.isValidRemoteCode("44444"))
+        assertTrue(AppPrefs.isValidRemoteCode("65535"))
     }
 
     @Test
-    fun validRemotePin_rejectsWrongLengthOrNonDigits() {
-        assertFalse(AppPrefs.isValidRemotePin("123"))
-        assertFalse(AppPrefs.isValidRemotePin("12345"))
-        assertFalse(AppPrefs.isValidRemotePin("12a4"))
-        assertFalse(AppPrefs.isValidRemotePin(""))
+    fun validRemoteCode_rejectsWrongLengthOrOutOfRange() {
+        assertFalse(AppPrefs.isValidRemoteCode("1234"))
+        assertFalse(AppPrefs.isValidRemoteCode("123456"))
+        assertFalse(AppPrefs.isValidRemoteCode("09999"))
+        assertFalse(AppPrefs.isValidRemoteCode("65536"))
+        assertFalse(AppPrefs.isValidRemoteCode("12a45"))
+        assertFalse(AppPrefs.isValidRemoteCode(""))
     }
 }

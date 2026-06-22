@@ -21,8 +21,8 @@
   <main>
     <form id="pinForm">
       <h1>Remote play</h1>
-      <p>Enter the 4-digit PIN from Stage Manager Settings on the phone.</p>
-      <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" autofocus />
+      <p>Enter the 5-digit code from Stage Manager Settings on the phone.</p>
+      <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" autofocus />
       <button type="submit">Connect</button>
       <div id="error"></div>
     </form>
@@ -33,15 +33,15 @@
     const errorEl = document.getElementById('error');
 
     pinInput.addEventListener('input', () => {
-      pinInput.value = pinInput.value.replace(/\D/g, '').slice(0, 4);
+      pinInput.value = pinInput.value.replace(/\D/g, '').slice(0, 5);
       errorEl.textContent = '';
     });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const pin = pinInput.value;
-      if (pin.length !== 4) {
-        errorEl.textContent = 'Enter 4 digits.';
+      if (pin.length !== 5) {
+        errorEl.textContent = 'Enter 5 digits.';
         return;
       }
       form.querySelector('button').disabled = true;

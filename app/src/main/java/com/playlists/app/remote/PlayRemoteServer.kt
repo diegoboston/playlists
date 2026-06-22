@@ -13,6 +13,7 @@ class PlayRemoteServer(
     hostname: String,
     port: Int,
     private val pin: String,
+    private val requirePin: Boolean = true,
     private val playlistName: String,
     songs: List<RemoteSong>,
     private val html: String,
@@ -61,7 +62,7 @@ class PlayRemoteServer(
         if (uri == "/api/auth" && session.method == Method.POST) {
             return handleAuth(session)
         }
-        if (!isAuthorized(session)) {
+        if (requirePin && !isAuthorized(session)) {
             return when {
                 uri == "/" || uri == "/index.html" || uri == "/edit" || uri == "/edit.html" ->
                     htmlResponse(pinHtml)
@@ -237,7 +238,7 @@ class PlayRemoteServer(
 
     private fun handleAuth(session: IHTTPSession): Response {
         val raw = readPostBody(session)
-        val submittedPin = Regex(""""pin"\s*:\s*"(\d{4})"""").find(raw)?.groupValues?.get(1)
+        val submittedPin = Regex(""""pin"\s*:\s*"(\d{5})"""").find(raw)?.groupValues?.get(1)
         if (submittedPin != pin) {
             return newFixedLengthResponse(
                 Response.Status.UNAUTHORIZED,

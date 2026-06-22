@@ -6,10 +6,11 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.playlists.app.util.SongTitleMigration
 
 @Database(
     entities = [Song::class, Playlist::class, PlaylistSong::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -64,6 +65,33 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.query("SELECT id, title, keySignature, notes FROM songs").use { cursor ->
+                    val idIdx = cursor.getColumnIndexOrThrow("id")
+                    val titleIdx = cursor.getColumnIndexOrThrow("title")
+                    val keyIdx = cursor.getColumnIndexOrThrow("keySignature")
+                    val notesIdx = cursor.getColumnIndexOrThrow("notes")
+                    while (cursor.moveToNext()) {
+                        val parsed = SongTitleMigration.parse(
+                            title = cursor.getString(titleIdx).orEmpty(),
+                            existingKey = cursor.getString(keyIdx).orEmpty(),
+                            existingNotes = cursor.getString(notesIdx).orEmpty(),
+                        )
+                        db.execSQL(
+                            "UPDATE songs SET title = ?, keySignature = ?, notes = ? WHERE id = ?",
+                            arrayOf(
+                                parsed.title,
+                                parsed.keySignature,
+                                parsed.notes,
+                                cursor.getLong(idIdx),
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
         fun get(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -71,7 +99,13 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "playlists.db",
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6,
+                    )
                     .build().also { instance = it }
             }
         }

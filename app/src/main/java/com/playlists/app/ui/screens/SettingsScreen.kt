@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -49,13 +50,10 @@ fun SettingsScreen(
     val versionName = remember { AppUpdate.installedVersionName(context) }
     val updateInProgress = updateState is AppUpdateUiState.Checking ||
         updateState is AppUpdateUiState.Downloading
-    var portText by remember {
-        mutableStateOf(AppPrefs.getRemotePort(context).toString())
+    var codeText by remember {
+        mutableStateOf(AppPrefs.getRemoteCode(context).toString())
     }
-    var pinText by remember {
-        mutableStateOf(AppPrefs.getRemotePin(context))
-    }
-    var pinVisible by remember { mutableStateOf(false) }
+    var codeVisible by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -76,34 +74,43 @@ fun SettingsScreen(
                 .padding(16.dp),
         ) {
             Text(
-                text = stringResource(R.string.settings_remote_pin),
+                text = stringResource(R.string.settings_remote_section),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            Text(
+                text = stringResource(R.string.settings_remote_section_hint),
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+            Text(
+                text = stringResource(R.string.settings_remote_code),
                 modifier = Modifier.padding(bottom = 8.dp),
             )
             OutlinedTextField(
-                value = pinText,
-                onValueChange = { pinText = it.filter { ch -> ch.isDigit() }.take(4) },
+                value = codeText,
+                onValueChange = { codeText = it.filter { ch -> ch.isDigit() }.take(5) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                visualTransformation = if (pinVisible) {
+                visualTransformation = if (codeVisible) {
                     VisualTransformation.None
                 } else {
                     PasswordVisualTransformation()
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                placeholder = { Text(AppPrefs.DEFAULT_REMOTE_PIN) },
+                placeholder = { Text(AppPrefs.DEFAULT_REMOTE_CODE.toString()) },
                 trailingIcon = {
-                    IconButton(onClick = { pinVisible = !pinVisible }) {
+                    IconButton(onClick = { codeVisible = !codeVisible }) {
                         Icon(
-                            imageVector = if (pinVisible) {
+                            imageVector = if (codeVisible) {
                                 Icons.Filled.VisibilityOff
                             } else {
                                 Icons.Filled.Visibility
                             },
                             contentDescription = stringResource(
-                                if (pinVisible) {
-                                    R.string.settings_remote_pin_hide
+                                if (codeVisible) {
+                                    R.string.settings_remote_code_hide
                                 } else {
-                                    R.string.settings_remote_pin_show
+                                    R.string.settings_remote_code_show
                                 },
                             ),
                         )
@@ -111,38 +118,24 @@ fun SettingsScreen(
                 },
             )
             Text(
-                text = stringResource(R.string.settings_remote_pin_hint),
-                modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
+                text = stringResource(R.string.settings_remote_code_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
             )
             Text(
-                text = stringResource(R.string.settings_remote_port),
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-            OutlinedTextField(
-                value = portText,
-                onValueChange = { portText = it.filter { ch -> ch.isDigit() } },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                placeholder = { Text(AppPrefs.DEFAULT_REMOTE_PORT.toString()) },
-            )
-            Text(
-                text = stringResource(R.string.settings_remote_port_hint),
+                text = stringResource(R.string.settings_remote_code_port_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
             )
             Button(
                 onClick = {
-                    val port = portText.toIntOrNull()
-                    if (port == null || port !in 1024..65535) {
-                        Toast.makeText(context, R.string.settings_port_invalid, Toast.LENGTH_SHORT).show()
+                    if (!AppPrefs.isValidRemoteCode(codeText)) {
+                        Toast.makeText(context, R.string.settings_remote_code_invalid, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    if (!AppPrefs.isValidRemotePin(pinText)) {
-                        Toast.makeText(context, R.string.settings_pin_invalid, Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    AppPrefs.setRemotePort(context, port)
-                    AppPrefs.setRemotePin(context, pinText)
+                    AppPrefs.setRemoteCode(context, codeText.toInt())
                     Toast.makeText(context, R.string.settings_saved, Toast.LENGTH_SHORT).show()
                     onBack()
                 },

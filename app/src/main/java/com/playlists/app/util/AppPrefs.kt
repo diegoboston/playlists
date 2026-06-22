@@ -4,38 +4,46 @@ import android.content.Context
 
 object AppPrefs {
     private const val PREFS = "playlists_prefs"
+    private const val KEY_REMOTE_CODE = "remote_code"
     private const val KEY_REMOTE_PORT = "remote_port"
     private const val KEY_REMOTE_PIN = "remote_pin"
     private const val KEY_LAST_PLAYLIST_ID = "last_playlist_id"
 
-    const val DEFAULT_REMOTE_PORT = 44444
-    const val DEFAULT_REMOTE_PIN = "0000"
+    const val DEFAULT_REMOTE_CODE = 44444
+    const val REMOTE_CODE_MIN = 10000
+    const val REMOTE_CODE_MAX = 65535
 
-    fun getRemotePort(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_REMOTE_PORT, DEFAULT_REMOTE_PORT)
+    fun getRemoteCode(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.contains(KEY_REMOTE_CODE)) {
+            return prefs.getInt(KEY_REMOTE_CODE, DEFAULT_REMOTE_CODE)
+                .coerceIn(REMOTE_CODE_MIN, REMOTE_CODE_MAX)
+        }
+        val legacyPort = prefs.getInt(KEY_REMOTE_PORT, DEFAULT_REMOTE_CODE)
+        if (legacyPort in REMOTE_CODE_MIN..REMOTE_CODE_MAX) {
+            return legacyPort
+        }
+        return DEFAULT_REMOTE_CODE
+    }
 
-    fun setRemotePort(context: Context, port: Int) {
+    fun setRemoteCode(context: Context, code: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putInt(KEY_REMOTE_PORT, port)
+            .putInt(KEY_REMOTE_CODE, code)
+            .remove(KEY_REMOTE_PORT)
+            .remove(KEY_REMOTE_PIN)
             .apply()
     }
 
-    fun getRemotePin(context: Context): String =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_REMOTE_PIN, DEFAULT_REMOTE_PIN)
-            ?: DEFAULT_REMOTE_PIN
+    fun getRemotePort(context: Context): Int = getRemoteCode(context)
 
-    fun setRemotePin(context: Context, pin: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_REMOTE_PIN, pin)
-            .apply()
+    fun getRemotePin(context: Context): String = getRemoteCode(context).toString()
+
+    fun isValidRemoteCode(text: String): Boolean {
+        if (text.length != 5 || !text.all { it.isDigit() }) return false
+        val value = text.toIntOrNull() ?: return false
+        return value in REMOTE_CODE_MIN..REMOTE_CODE_MAX
     }
-
-    fun isValidRemotePin(pin: String): Boolean =
-        pin.length == 4 && pin.all { it.isDigit() }
 
     fun getLastPlaylistId(context: Context): Long? {
         val id = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

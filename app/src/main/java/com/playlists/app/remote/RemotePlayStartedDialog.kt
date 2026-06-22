@@ -20,6 +20,7 @@ import com.playlists.app.R
 @Composable
 fun RemotePlayStartedDialog(
     url: String,
+    mode: RemotePlayMode,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -32,7 +33,12 @@ fun RemotePlayStartedDialog(
         text = {
             Column {
                 Text(
-                    stringResource(R.string.remote_started_message),
+                    stringResource(
+                        when (mode) {
+                            RemotePlayMode.CLOUDFLARE -> R.string.remote_started_message_cloudflare
+                            RemotePlayMode.LAN -> R.string.remote_started_message_lan
+                        },
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(

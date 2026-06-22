@@ -61,14 +61,16 @@ object CloudflareTunnel {
             val outputLines = Collections.synchronizedList(mutableListOf<String>())
             val latch = CountDownLatch(1)
             outputThread = Thread({
+                // Keep reading until cloudflared exits — closing stdout early sends SIGPIPE
+                // and kills the tunnel (Cloudflare 530 on the public URL).
                 proc.inputStream.bufferedReader().useLines { lines ->
                     for (line in lines) {
                         outputLines.add(line)
-                        val url = extractPublicTunnelUrl(line)
-                        if (url != null) {
-                            urlRef.set(url)
-                            latch.countDown()
-                            break
+                        if (urlRef.get() == null) {
+                            extractPublicTunnelUrl(line)?.let { url ->
+                                urlRef.set(url)
+                                latch.countDown()
+                            }
                         }
                     }
                 }

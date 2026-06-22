@@ -49,12 +49,13 @@ object PlayRemoteController {
         val html = context.assets.open("remote/play.html").bufferedReader().readText()
         val editHtml = context.assets.open("remote/edit.html").bufferedReader().readText()
         val pinHtml = context.assets.open("remote/pin.html").bufferedReader().readText()
-        val port = AppPrefs.getRemotePort(context)
+        val port = AppPrefs.getRemoteCode(context)
         val pin = AppPrefs.getRemotePin(context)
         val remote = PlayRemoteServer(
             hostname = if (mode == RemotePlayMode.LAN) "0.0.0.0" else "127.0.0.1",
             port = port,
             pin = pin,
+            requirePin = mode == RemotePlayMode.CLOUDFLARE,
             playlistName = playlistName,
             songs = songs,
             html = html,

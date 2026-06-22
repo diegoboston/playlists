@@ -62,6 +62,7 @@ fun MainTabsScreen(
     var showRemoteModeDialog by remember { mutableStateOf(false) }
     var pendingRemotePlaylistId by remember { mutableStateOf<Long?>(null) }
     var remoteStartedUrl by remember { mutableStateOf<String?>(null) }
+    var remoteStartedMode by remember { mutableStateOf<RemotePlayMode?>(null) }
 
     val activePlaylistId = PlayRemoteController.activePlaylistId
     val entries by viewModel.observePlaylistSongs(activePlaylistId ?: -1L)
@@ -86,7 +87,10 @@ fun MainTabsScreen(
                 return@launch
             }
             PlayRemoteController.start(context, playlistId, playlist.name, list, mode)
-                .onSuccess { url -> remoteStartedUrl = url }
+                .onSuccess { url ->
+                    remoteStartedUrl = url
+                    remoteStartedMode = mode
+                }
                 .onFailure { error ->
                     remoteError = RemotePlayErrors.format(error)
                 }
@@ -193,6 +197,13 @@ fun MainTabsScreen(
     }
 
     remoteStartedUrl?.let { url ->
-        RemotePlayStartedDialog(url = url, onDismiss = { remoteStartedUrl = null })
+        RemotePlayStartedDialog(
+            url = url,
+            mode = remoteStartedMode ?: RemotePlayMode.CLOUDFLARE,
+            onDismiss = {
+                remoteStartedUrl = null
+                remoteStartedMode = null
+            },
+        )
     }
 }

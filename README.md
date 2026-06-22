@@ -36,8 +36,8 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Duplicate playlist** — Copies name (with “(copy)”) and full song order.
 - **Playlist detail** — Two-line header: **back + title** (playlist accent color) on line 1; **tools** on line 2 (+ add, play, remote, rename, duplicate, color, delete). Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. Tap the highlighted **Wi‑Fi** icon again to stop remote play (or use the system notification).
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs).
-- **Settings** — **Gear** icon on the main tabs opens **Settings**: configure the **4-digit remote play PIN** (default `0000`) and the **local HTTP port** (default `44444`) used before the Cloudflare tunnel starts. Shows the **installed app version** and a **Check for updates** button (same GitHub Release flow as the launch snackbar).
-- **Remote play** — Tap the **Wi‑Fi** icon and choose **Cloudflare tunnel (internet)** or **LAN only (same Wi‑Fi)**. Both start a local HTTP server on the phone; Cloudflare adds a public `*.trycloudflare.com` URL, while LAN serves `http://<phone-ip>:port/` on your Wi‑Fi. On start, a dialog shows the URL with a clickable link and **Open in browser** (the app does not navigate there automatically). Open the URL on another device (tablet, laptop) for a fullscreen browser view. Visitors enter the PIN from **Settings** before the stage UI loads. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. While active, a **foreground notification** (default priority) shows a generic “remote play active” message and a **Stop** action — it does **not** show the public URL or PIN. Tap the highlighted **Wi‑Fi** icon again to stop remote play. The main-tab **Wi‑Fi** shortcut uses the last-opened playlist when remote is off; the playlist detail screen starts remote for that playlist. The Wi‑Fi icon is highlighted when active, gray when off. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen).
+- **Settings** — **Gear** icon on the main tabs opens **Settings**: under **Remote play**, set one **5-digit code** (default `44444`) used as the Cloudflare PIN and the LAN port. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Shows the **installed app version** and a **Check for updates** button (same GitHub Release flow as the launch snackbar).
+- **Remote play** — Tap the **Wi‑Fi** icon and choose **Cloudflare tunnel (internet)** or **LAN only (same Wi‑Fi)**. Both start the same local HTTP server on the phone; Cloudflare adds a public `*.trycloudflare.com` URL (enter the code from Settings — no port in the link), while LAN serves `http://<phone-ip>:code/` on your Wi‑Fi with no code prompt. On start, a dialog shows the URL with a clickable link and **Open in browser** (the app does not navigate there automatically). Open the URL on another device (tablet, laptop) for a fullscreen browser view. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. While active, a **foreground notification** (default priority) shows a generic “remote play active” message and a **Stop** action — it does **not** show the public URL or code. Tap the highlighted **Wi‑Fi** icon again to stop remote play. The main-tab **Wi‑Fi** shortcut uses the last-opened playlist when remote is off; the playlist detail screen starts remote for that playlist. The Wi‑Fi icon is highlighted when active, gray when off. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen).
 - **In-app updates** — On cold start, checks GitHub Releases for a newer signed APK; snackbar prompt, download progress banner, then system installer (requires **Install unknown apps** permission for this package).
 
 ### Quickstart playlist
@@ -115,8 +115,8 @@ PLAYLISTS TAB
 ┌─────────────────────────────────────┐
 │ ← Settings                          │
 ├─────────────────────────────────────┤
-│ Remote play PIN  [____]             │
-│ HTTP port        [44444]            │
+│ Remote play                         │
+│ Code [44444] 👁                     │
 │              [ Save ]               │
 │ App version      1.0.42             │
 │      [ Check for updates ]          │
@@ -139,8 +139,8 @@ REMOTE PLAY ACTIVE (notification shade)
 4. **Add songs** — Open a playlist → **+** → search → tap a result.
 5. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 6. **Play** — Open a playlist → **Play** → swipe between songs.
-7. **Remote play** — Open a playlist → **Wi‑Fi** (or main-tab **Wi‑Fi** for the last-opened playlist). A dialog shows the URL — tap the link or **Open in browser** to preview on the phone, or share it to the tablet. Enter the PIN from **Settings**. Tap **Wi‑Fi** again to stop. **Stop** also works from the system notification (or when deleting the playlist).
-8. **Settings** — Main tabs → **gear** → set remote PIN and local port → **Save**. **Check for updates** anytime from the same screen.
+7. **Remote play** — Open a playlist → **Wi‑Fi** (or main-tab **Wi‑Fi** for the last-opened playlist). Pick Cloudflare (enter the 5-digit code) or LAN (code is the port in the URL). Tap **Wi‑Fi** again to stop. **Stop** also works from the system notification (or when deleting the playlist).
+8. **Settings** — Main tabs → **gear** → set the remote code → **Save**. **Check for updates** anytime from the same screen.
 9. **Quickstart** — **Playlists** tab → **Quickstart playlist** → paste text → **Match songs** → **Create**.
 10. **Update** — If a newer GitHub Release exists, a snackbar offers **Update now**; allow installs from this app when prompted.
 
@@ -242,9 +242,9 @@ Implementation: `AppUpdate.kt`, `PlaylistsViewModel.kt`, `MainActivity.kt`, `App
 
 Control playback from a **second screen** over the internet (e.g. iPad on a music stand while the phone sits on a stand).
 
-1. **PIN** — In **Settings** (gear on main tabs), set a **4-digit remote play PIN** (default `0000`). Anyone opening the remote URL must enter this PIN once per browser session. Optionally change the **local server port** (default `44444`).
-2. **Start** — Open a playlist → tap **Wi‑Fi** (or the main-tab shortcut). Pick **Cloudflare tunnel** for internet access or **LAN only** for same-Wi‑Fi (`http://phone-ip:port/`). The phone starts the HTTP server and shows a dialog with the URL (clickable link + **Open in browser**). A **foreground notification** with **Stop** also appears; it does not include the URL or PIN.
-3. **Connect** — On the tablet or laptop, open the URL from the start dialog (or from the phone browser if you opened it there) and enter the PIN.
+1. **Settings** — In **Settings** (gear on main tabs), under **Remote play**, set a **5-digit code** (default `44444`, range 10000–65535). The same number is the Cloudflare PIN and the LAN port.
+2. **Start** — Open a playlist → tap **Wi‑Fi** (or the main-tab shortcut). Pick **Cloudflare tunnel** for internet (`https://….trycloudflare.com/` — no port) or **LAN only** for same-Wi‑Fi (`http://phone-ip:code/`). The phone starts the HTTP server and shows a dialog with the URL (clickable link + **Open in browser**). A **foreground notification** with **Stop** also appears; it does not include the URL or code.
+3. **Connect** — Cloudflare: open the URL and enter the code. LAN: open the URL on the same Wi‑Fi — no code prompt.
 4. **Browser UI** — Fullscreen sheet music / image for the current song and page. Title bar shows playlist name and `3/12: Song title · page 2/3`. **+** uploads a new file; **pencil** opens `/edit` to reorder, remove, or add songs from the archive.
 5. **Navigate** — Swipe left/right (or laptop arrow keys) for next/previous song; multi-page PDFs advance page before moving to the next song.
 6. **Edit playlist** — On `/edit`, drag rows to reorder, tap **Remove**, or search the archive to add. **Done** returns to the stage view. Changes sync to the phone database immediately.
