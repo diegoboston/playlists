@@ -132,16 +132,6 @@ fun MainTabsScreen(
                                     },
                                 )
                             }
-                            Text(
-                                text = stringResource(R.string.remote_play),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (remoteRunning) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                },
-                                modifier = Modifier.padding(end = 4.dp),
-                            )
                             IconButton(onClick = onSettings) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,

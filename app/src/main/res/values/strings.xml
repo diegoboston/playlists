@@ -40,6 +40,9 @@
     <string name="settings_port_invalid">Enter a port between 1024 and 65535.</string>
     <string name="settings_pin_invalid">Enter exactly 4 digits for the PIN.</string>
     <string name="settings_saved">Settings saved</string>
+    <string name="settings_app_version">App version</string>
+    <string name="settings_app_version_value">%1$s</string>
+    <string name="settings_check_for_updates">Check for updates</string>
     <string name="remote_stopped">Remote play stopped</string>
     <string name="remote_notification_channel">Remote play</string>
     <string name="remote_notification_channel_desc">Shows while remote play is active</string>

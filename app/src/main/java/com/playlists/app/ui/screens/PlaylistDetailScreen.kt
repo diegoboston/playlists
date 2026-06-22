@@ -182,16 +182,6 @@ fun PlaylistDetailScreen(
                                 },
                             )
                         }
-                        Text(
-                            text = stringResource(R.string.remote_play),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (remoteActiveHere) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                            },
-                            modifier = Modifier.padding(end = 4.dp),
-                        )
                         IconButton(onClick = { showRename = true }) {
                             Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.rename_playlist))
                         }

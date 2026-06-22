@@ -43,6 +43,14 @@ object AppUpdate {
         return pi.versionCode.toLong()
     }
 
+    fun installedVersionName(context: Context): String {
+        val pi = context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.GET_META_DATA,
+        )
+        return pi.versionName ?: installedVersionCode(context).toString()
+    }
+
     fun parseVersionCodeFromTag(tagName: String): Long? {
         val stripped = tagName.trim().removePrefix("v").removePrefix("V")
         return stripped.substringAfterLast('.', missingDelimiterValue = stripped)

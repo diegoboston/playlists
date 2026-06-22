@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -27,13 +28,24 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
+import com.playlists.app.ui.AppUpdateUiState
+import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.util.AppPrefs
+import com.playlists.app.util.AppUpdate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(
+    viewModel: PlaylistsViewModel,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
+    val updateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
+    val versionName = remember { AppUpdate.installedVersionName(context) }
+    val updateInProgress = updateState is AppUpdateUiState.Checking ||
+        updateState is AppUpdateUiState.Downloading
     var portText by remember {
         mutableStateOf(AppPrefs.getRemotePort(context).toString())
     }
@@ -111,6 +123,21 @@ fun SettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.save))
+            }
+            Text(
+                text = stringResource(R.string.settings_app_version),
+                modifier = Modifier.padding(top = 32.dp, bottom = 8.dp),
+            )
+            Text(
+                text = stringResource(R.string.settings_app_version_value, versionName),
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+            OutlinedButton(
+                onClick = { viewModel.startAppUpdateDownload(context) },
+                enabled = !updateInProgress,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.settings_check_for_updates))
             }
         }
     }

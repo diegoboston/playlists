@@ -36,8 +36,8 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Duplicate playlist** — Copies name (with “(copy)”) and full song order.
 - **Playlist detail** — Two-line header: **back + title** (playlist accent color) on line 1; **tools** on line 2 (+ add, play, remote, rename, duplicate, color, delete). Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. No in-app **Stop** for remote — use the system notification.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs).
-- **Settings** — **Gear** icon on the main tabs opens **Settings**: configure the **4-digit remote play PIN** (default `0000`) and the **local HTTP port** (default `44444`) used before the Cloudflare tunnel starts.
-- **Remote play** — Wi‑Fi icon starts a local HTTP server and a free **Cloudflare Quick Tunnel** (`*.trycloudflare.com`). Open the HTTPS URL on another device (tablet, laptop) anywhere on the internet for a fullscreen browser view. Visitors enter the PIN from **Settings** before the stage UI loads. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. On start the URL opens in the phone’s browser automatically. While active, a **foreground notification** (default priority) shows a generic “remote play active” message and a **Stop** action — it does **not** show the public URL or PIN (tap the highlighted **Wi‑Fi** icon in the app to reopen the link). The main-tab **Wi‑Fi** shortcut uses the last-opened playlist when remote is off; the playlist detail screen starts remote for that playlist. Wi‑Fi icon and “Remote play” label are highlighted when active, gray when off. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen).
+- **Settings** — **Gear** icon on the main tabs opens **Settings**: configure the **4-digit remote play PIN** (default `0000`) and the **local HTTP port** (default `44444`) used before the Cloudflare tunnel starts. Shows the **installed app version** and a **Check for updates** button (same GitHub Release flow as the launch snackbar).
+- **Remote play** — Wi‑Fi icon starts a local HTTP server and a free **Cloudflare Quick Tunnel** (`*.trycloudflare.com`). Open the HTTPS URL on another device (tablet, laptop) anywhere on the internet for a fullscreen browser view. Visitors enter the PIN from **Settings** before the stage UI loads. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. On start the URL opens in the phone’s browser automatically. While active, a **foreground notification** (default priority) shows a generic “remote play active” message and a **Stop** action — it does **not** show the public URL or PIN (tap the highlighted **Wi‑Fi** icon in the app to reopen the link). The main-tab **Wi‑Fi** shortcut uses the last-opened playlist when remote is off; the playlist detail screen starts remote for that playlist. The Wi‑Fi icon is highlighted when active, gray when off. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen).
 - **In-app updates** — On cold start, checks GitHub Releases for a newer signed APK; snackbar prompt, download progress banner, then system installer (requires **Install unknown apps** permission for this package).
 
 ### Quickstart playlist
@@ -50,7 +50,7 @@ Sketch of the main flows (not to scale):
 
 ```
 ┌─────────────────────────────────────┐
-│ Stage Manager     📶 Remote play  ⚙ │  ← Wi‑Fi + label + Settings
+│ Stage Manager              📶  ⚙ │  ← Wi‑Fi + Settings
 ├─────────────────────────────────────┤
 │ [ Songs ]  [ Playlists ]            │
 ├─────────────────────────────────────┤
@@ -86,7 +86,7 @@ Sketch of the main flows (not to scale):
 ┌─────────────────────────────────────┐
 │ ← Sunday set                        │  ← line 1: back + title (accent color)
 ├─────────────────────────────────────┤
-│  +   ▶   📶 Remote  ✎   ⧉   ○   🗑   │  ← line 2: tools (remote gray when off)
+│  +   ▶   📶   ✎   ⧉   ○   🗑   │  ← line 2: tools (Wi‑Fi gray when off)
 ├─────────────────────────────────────┤
 │  Amazing Grace (G)              🗑  │
 │  intro notes                        │
@@ -116,6 +116,8 @@ PLAYLISTS TAB
 │ Remote play PIN  [____]             │
 │ HTTP port        [44444]            │
 │              [ Save ]               │
+│ App version      1.0.42             │
+│      [ Check for updates ]          │
 └─────────────────────────────────────┘
 
 REMOTE PLAY ACTIVE (notification shade)
@@ -136,7 +138,7 @@ REMOTE PLAY ACTIVE (notification shade)
 5. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 6. **Play** — Open a playlist → **Play** → swipe between songs.
 7. **Remote play** — Open a playlist → **Wi‑Fi** (or main-tab **Wi‑Fi** for the last-opened playlist). The URL opens in the phone browser; share that link to the tablet. Enter the PIN from **Settings**. Tap **Wi‑Fi** again anytime to reopen the link. **Stop** via the system notification (or when deleting the playlist).
-8. **Settings** — Main tabs → **gear** → set remote PIN and local port → **Save**.
+8. **Settings** — Main tabs → **gear** → set remote PIN and local port → **Save**. **Check for updates** anytime from the same screen.
 9. **Quickstart** — **Playlists** tab → **Quickstart playlist** → paste text → **Match songs** → **Create**.
 10. **Update** — If a newer GitHub Release exists, a snackbar offers **Update now**; allow installs from this app when prompted.
 
@@ -228,7 +230,7 @@ Each CI run sets `versionCode = GITHUB_RUN_NUMBER` and `versionName = 1.0.<run>`
 On cold start the app checks GitHub Releases for a newer build:
 
 1. **Check** — `GET https://api.github.com/repos/diegoboston/playlists/releases/latest`, read `tag_name` (e.g. `v1.0.42`), parse `versionCode` `42`, compare to the installed app.
-2. **Prompt** — If remote is newer, a snackbar offers to update.
+2. **Prompt** — If remote is newer, a snackbar offers to update (or use **Check for updates** in **Settings**).
 3. **Download** — Progress banner; fetches `app.apk` from the release.
 4. **Install** — Opens the system package installer via `FileProvider`. Android may prompt to allow **Install unknown apps** for Stage Manager first.
 
