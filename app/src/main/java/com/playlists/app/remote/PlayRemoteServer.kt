@@ -7,22 +7,27 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
+import java.util.UUID
 
 class PlayRemoteServer(
+    hostname: String,
     port: Int,
+    private val pin: String,
     private val playlistName: String,
     songs: List<RemoteSong>,
     private val html: String,
     private val editHtml: String,
+    private val pinHtml: String,
     private val onStopRequested: () -> Unit = {},
     private val onUpload: ((title: String, key: String, notes: String, tempFile: File, mimeType: String) -> Result<Unit>)? = null,
     private val onReorder: ((entryIds: List<Long>) -> Result<Unit>)? = null,
     private val onRemove: ((entryId: Long) -> Result<Unit>)? = null,
     private val onAdd: ((songId: Long) -> Result<Unit>)? = null,
     private val onSearchSongs: ((query: String) -> List<SearchSong>)? = null,
-) : NanoHTTPD(port) {
+) : NanoHTTPD(hostname, port) {
 
     private val songs: MutableList<RemoteSong> = songs.toMutableList()
+    private val sessionToken: String = UUID.randomUUID().toString()
 
     data class RemoteSong(
         val entryId: Long,
@@ -53,6 +58,17 @@ class PlayRemoteServer(
 
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri.substringBefore('?')
+        if (uri == "/api/auth" && session.method == Method.POST) {
+            return handleAuth(session)
+        }
+        if (!isAuthorized(session)) {
+            return when {
+                uri == "/" || uri == "/index.html" || uri == "/edit" || uri == "/edit.html" ->
+                    htmlResponse(pinHtml)
+                uri.startsWith("/api/") -> jsonUnauthorized()
+                else -> newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not found")
+            }
+        }
         return when {
             uri == "/" || uri == "/index.html" -> htmlResponse(html)
             uri == "/edit" || uri == "/edit.html" -> htmlResponse(editHtml)
@@ -217,6 +233,37 @@ class PlayRemoteServer(
             Response.Status.BAD_REQUEST,
             "application/json",
             """{"error":${jsonStr(message)}}""",
+        )
+
+    private fun handleAuth(session: IHTTPSession): Response {
+        val raw = readPostBody(session)
+        val submittedPin = Regex(""""pin"\s*:\s*"(\d{4})"""").find(raw)?.groupValues?.get(1)
+        if (submittedPin != pin) {
+            return newFixedLengthResponse(
+                Response.Status.UNAUTHORIZED,
+                "application/json",
+                """{"error":${jsonStr("Invalid PIN")}}""",
+            )
+        }
+        val response = jsonResponse("""{"ok":true}""")
+        response.addHeader("Set-Cookie", "remote_auth=$sessionToken; Path=/; HttpOnly; SameSite=Lax")
+        return response
+    }
+
+    private fun isAuthorized(session: IHTTPSession): Boolean {
+        val cookieHeader = session.headers["cookie"] ?: return false
+        return cookieHeader.split(';').any { part ->
+            val trimmed = part.trim()
+            trimmed.startsWith("remote_auth=") &&
+                trimmed.removePrefix("remote_auth=").trim() == sessionToken
+        }
+    }
+
+    private fun jsonUnauthorized(): Response =
+        newFixedLengthResponse(
+            Response.Status.UNAUTHORIZED,
+            "application/json",
+            """{"error":${jsonStr("Authentication required")}}""",
         )
 
     private fun step(delta: Int) {

@@ -20,7 +20,7 @@ object RemotePlayNotification {
         val channel = NotificationChannel(
             CHANNEL_ID,
             context.getString(R.string.remote_notification_channel),
-            NotificationManager.IMPORTANCE_HIGH,
+            NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
             description = context.getString(R.string.remote_notification_channel_desc)
             setShowBadge(false)
@@ -28,8 +28,9 @@ object RemotePlayNotification {
         manager.createNotificationChannel(channel)
     }
 
-    fun build(context: Context, playlistName: String, url: String): Notification {
+    fun build(context: Context, playlistName: String): Notification {
         ensureChannel(context)
+        val body = context.getString(R.string.remote_notification_body)
         val stopIntent = Intent(context, RemotePlayService::class.java).apply {
             action = RemotePlayService.ACTION_STOP
         }
@@ -42,11 +43,11 @@ object RemotePlayNotification {
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_share)
             .setContentTitle(context.getString(R.string.remote_notification_title, playlistName))
-            .setContentText(url)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(url))
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .addAction(
                 android.R.drawable.ic_media_pause,

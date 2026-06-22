@@ -122,12 +122,11 @@ fun PlaylistDetailScreen(
                     Toast.makeText(context, R.string.remote_started, Toast.LENGTH_SHORT).show()
                 }
                 .onFailure { error ->
-                    val message = when {
-                        error.message?.contains("LAN IP") == true ->
-                            context.getString(R.string.remote_no_network)
-                        else -> context.getString(R.string.remote_failed, error.message ?: "unknown")
-                    }
-                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.remote_tunnel_failed, error.message ?: "unknown"),
+                        Toast.LENGTH_LONG,
+                    ).show()
                 }
         }
     }

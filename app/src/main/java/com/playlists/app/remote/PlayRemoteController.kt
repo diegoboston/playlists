@@ -43,19 +43,22 @@ object PlayRemoteController {
         if (entries.isEmpty()) {
             return Result.failure(IllegalStateException("Playlist is empty"))
         }
-        val ip = NetworkAddresses.localLanIp()
-            ?: return Result.failure(IllegalStateException("No LAN IP found — connect to Wi‑Fi"))
         appContext = context.applicationContext
         val songs = entriesToRemoteSongs(entries)
         val html = context.assets.open("remote/play.html").bufferedReader().readText()
         val editHtml = context.assets.open("remote/edit.html").bufferedReader().readText()
+        val pinHtml = context.assets.open("remote/pin.html").bufferedReader().readText()
         val port = AppPrefs.getRemotePort(context)
+        val pin = AppPrefs.getRemotePin(context)
         val remote = PlayRemoteServer(
+            hostname = "127.0.0.1",
             port = port,
+            pin = pin,
             playlistName = playlistName,
             songs = songs,
             html = html,
             editHtml = editHtml,
+            pinHtml = pinHtml,
             onStopRequested = { stop() },
             onUpload = { title, key, notes, tempFile, mimeType ->
                 runBlocking {
@@ -84,13 +87,23 @@ object PlayRemoteController {
                     IllegalStateException("Could not bind port $port — try another in Settings"),
                 )
             }
+            val tunnelResult = CloudflareTunnel.start(context.applicationContext, listeningPort)
+            if (tunnelResult.isFailure) {
+                remote.stop()
+                return Result.failure(
+                    tunnelResult.exceptionOrNull()
+                        ?: IllegalStateException("Cloudflare tunnel failed"),
+                )
+            }
+            val tunnelUrl = tunnelResult.getOrThrow()
             server = remote
             activePlaylistId = playlistId
-            publicUrl = "http://$ip:$listeningPort/"
+            publicUrl = "$tunnelUrl/"
             _running.value = true
-            RemotePlayService.start(context.applicationContext, playlistName, publicUrl!!)
+            RemotePlayService.start(context.applicationContext, playlistName)
             Result.success(publicUrl!!)
         } catch (e: Exception) {
+            CloudflareTunnel.stop()
             remote.stop()
             Result.failure(e)
         }
@@ -102,6 +115,7 @@ object PlayRemoteController {
 
     fun stop() {
         appContext?.let { RemotePlayService.stop(it) }
+        CloudflareTunnel.stop()
         server?.stop()
         server = null
         publicUrl = null

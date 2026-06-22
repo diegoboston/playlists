@@ -28,6 +28,7 @@ RSYNC_EXCLUDES=(
     --exclude='captures/'
     --exclude='.externalNativeBuild/'
     --exclude='.cxx/'
+    --exclude='.go-build-cache/'
 )
 
 clean_artifacts() {
@@ -39,7 +40,8 @@ clean_artifacts() {
         .idea \
         captures \
         .externalNativeBuild \
-        .cxx
+        .cxx \
+        .go-build-cache
     rm -f local.properties
     find . -name '.DS_Store' -delete 2>/dev/null || true
     find . -name '*.iml' -delete 2>/dev/null || true
@@ -69,12 +71,11 @@ run git commit -m "$message"
 run git push origin main
 
 echo
-echo "==> Files that would be deleted if rsync used --delete (dry run):"
+echo "==> Files that would be deleted (--delete, .git preserved; dry run):"
 would_delete=$(
-    rsync -avn --delete --delete-excluded "${RSYNC_EXCLUDES[@]}" \
+    rsync -avn --delete --exclude='.git/' "${RSYNC_EXCLUDES[@]}" \
         shared6:code/d-a/playlists .. 2>/dev/null \
-        | grep '^deleting ' | sed 's/^deleting //' \
-        | grep -vE '^playlists/\.git(/|$)|^\.git(/|$)' || true
+        | grep '^deleting ' | sed 's/^deleting //' || true
 )
 if [ -z "$would_delete" ]; then
     echo "  (none)"

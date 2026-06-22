@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stage Manager Remote</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #000; color: #fff; font-family: system-ui, sans-serif; }
+    main { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    form { width: min(320px, 100%); text-align: center; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    p { opacity: .75; font-size: 14px; margin-bottom: 20px; line-height: 1.4; }
+    input { width: 100%; padding: 14px; font-size: 28px; letter-spacing: .35em; text-align: center; border-radius: 10px; border: 1px solid #444; background: #111; color: #fff; }
+    button { margin-top: 16px; width: 100%; padding: 12px; border: none; border-radius: 10px; background: #7ecbff; color: #000; font-size: 16px; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    #error { color: #ff8a80; font-size: 14px; min-height: 1.4em; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <form id="pinForm">
+      <h1>Remote play</h1>
+      <p>Enter the 4-digit PIN from Stage Manager Settings on the phone.</p>
+      <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" autofocus />
+      <button type="submit">Connect</button>
+      <div id="error"></div>
+    </form>
+  </main>
+  <script>
+    const form = document.getElementById('pinForm');
+    const pinInput = document.getElementById('pin');
+    const errorEl = document.getElementById('error');
+
+    pinInput.addEventListener('input', () => {
+      pinInput.value = pinInput.value.replace(/\D/g, '').slice(0, 4);
+      errorEl.textContent = '';
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pin = pinInput.value;
+      if (pin.length !== 4) {
+        errorEl.textContent = 'Enter 4 digits.';
+        return;
+      }
+      form.querySelector('button').disabled = true;
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin }),
+        });
+        if (res.ok) {
+          window.location.href = '/';
+          return;
+        }
+        errorEl.textContent = 'Wrong PIN. Try again.';
+        pinInput.select();
+      } catch (_) {
+        errorEl.textContent = 'Could not connect.';
+      } finally {
+        form.querySelector('button').disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.playlists.app.R
 import com.playlists.app.util.AppPrefs
@@ -35,6 +36,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var portText by remember {
         mutableStateOf(AppPrefs.getRemotePort(context).toString())
+    }
+    var pinText by remember {
+        mutableStateOf(AppPrefs.getRemotePin(context))
     }
 
     Scaffold(
@@ -55,6 +59,23 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .padding(padding)
                 .padding(16.dp),
         ) {
+            Text(
+                text = stringResource(R.string.settings_remote_pin),
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            OutlinedTextField(
+                value = pinText,
+                onValueChange = { pinText = it.filter { ch -> ch.isDigit() }.take(4) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                placeholder = { Text(AppPrefs.DEFAULT_REMOTE_PIN) },
+            )
+            Text(
+                text = stringResource(R.string.settings_remote_pin_hint),
+                modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
+            )
             Text(
                 text = stringResource(R.string.settings_remote_port),
                 modifier = Modifier.padding(bottom = 8.dp),
@@ -78,7 +99,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                         Toast.makeText(context, R.string.settings_port_invalid, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
+                    if (!AppPrefs.isValidRemotePin(pinText)) {
+                        Toast.makeText(context, R.string.settings_pin_invalid, Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
                     AppPrefs.setRemotePort(context, port)
+                    AppPrefs.setRemotePin(context, pinText)
                     Toast.makeText(context, R.string.settings_saved, Toast.LENGTH_SHORT).show()
                     onBack()
                 },

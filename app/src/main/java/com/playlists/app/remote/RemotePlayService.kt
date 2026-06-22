@@ -18,8 +18,7 @@ class RemotePlayService : Service() {
             }
             ACTION_START -> {
                 val name = intent.getStringExtra(EXTRA_PLAYLIST_NAME).orEmpty()
-                val url = intent.getStringExtra(EXTRA_URL).orEmpty()
-                val notification = RemotePlayNotification.build(this, name, url)
+                val notification = RemotePlayNotification.build(this, name)
                 startForeground(RemotePlayNotification.NOTIFICATION_ID, notification)
                 return START_STICKY
             }
@@ -34,13 +33,11 @@ class RemotePlayService : Service() {
         const val ACTION_START = "com.playlists.app.remote.START"
         const val ACTION_STOP = "com.playlists.app.remote.STOP"
         const val EXTRA_PLAYLIST_NAME = "playlist_name"
-        const val EXTRA_URL = "url"
 
-        fun start(context: Context, playlistName: String, url: String) {
+        fun start(context: Context, playlistName: String) {
             val intent = Intent(context, RemotePlayService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_PLAYLIST_NAME, playlistName)
-                putExtra(EXTRA_URL, url)
             }
             context.startForegroundService(intent)
         }
