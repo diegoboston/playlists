@@ -1,6 +1,7 @@
 package com.playlists.app.ui.reorder
 
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
@@ -25,6 +26,7 @@ fun DraggableItem(
     onDrag: (String, Float) -> Unit,
     onDragEnd: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val isDragging = draggingKey == key
@@ -45,6 +47,15 @@ fun DraggableItem(
                     alpha = 0.95f
                 }
             }
+            .then(
+                if (onClick != null && draggingKey == null) {
+                    Modifier.pointerInput(key) {
+                        detectTapGestures(onTap = { onClick() })
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .then(
                 if (enabled) {
                     Modifier.pointerInput(key, draggingKey) {

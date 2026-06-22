@@ -1,7 +1,6 @@
 package com.playlists.app.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +38,7 @@ import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.handleLazyListDrag
+import com.playlists.app.ui.reorder.syncDisplayedKeys
 
 @Composable
 fun PlaylistsScreen(
@@ -53,10 +53,7 @@ fun PlaylistsScreen(
     var showNewDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(playlists, draggingKey) {
-        if (draggingKey == null) {
-            displayedKeys.clear()
-            displayedKeys.addAll(playlists.map { "p:${it.id}" })
-        }
+        syncDisplayedKeys(displayedKeys, draggingKey, playlists.map { "p:${it.id}" })
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -105,8 +102,9 @@ fun PlaylistsScreen(
                             val ids = displayedKeys.mapNotNull { it.removePrefix("p:").toLongOrNull() }
                             viewModel.reorderPlaylists(ids)
                         },
+                        onClick = { onOpenPlaylist(playlist.id) },
                     ) {
-                        PlaylistRow(playlist = playlist, onClick = { onOpenPlaylist(playlist.id) })
+                        PlaylistRow(playlist = playlist)
                     }
                 }
             }
@@ -128,11 +126,9 @@ fun PlaylistsScreen(
 }
 
 @Composable
-private fun PlaylistRow(playlist: Playlist, onClick: () -> Unit) {
+private fun PlaylistRow(playlist: Playlist) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(

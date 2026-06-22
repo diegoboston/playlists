@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     private val songRepo = PlaylistsApp.from(app).songRepository
@@ -40,9 +41,13 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     private var launchUpdatePromptHandled = false
 
+    private val playlistSongsFlows = ConcurrentHashMap<Long, StateFlow<List<PlaylistSongWithDetails>>>()
+
     fun observePlaylistSongs(playlistId: Long): StateFlow<List<PlaylistSongWithDetails>> =
-        playlistRepo.observeSongs(playlistId)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        playlistSongsFlows.getOrPut(playlistId) {
+            playlistRepo.observeSongs(playlistId)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        }
 
     fun setPendingImport(pending: PendingImport?) {
         _pendingImport.value = pending

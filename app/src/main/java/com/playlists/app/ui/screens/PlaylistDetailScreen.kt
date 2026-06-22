@@ -65,6 +65,7 @@ import com.playlists.app.ui.components.PlaylistColorDialog
 import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.handleLazyListDrag
+import com.playlists.app.ui.reorder.syncDisplayedKeys
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,10 +96,7 @@ fun PlaylistDetailScreen(
     }
 
     LaunchedEffect(entries, draggingKey) {
-        if (draggingKey == null) {
-            displayedKeys.clear()
-            displayedKeys.addAll(entries.map { "e:${it.id}" })
-        }
+        syncDisplayedKeys(displayedKeys, draggingKey, entries.map { "e:${it.id}" })
     }
 
     LaunchedEffect(Unit) {

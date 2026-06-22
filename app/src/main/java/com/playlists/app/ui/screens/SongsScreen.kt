@@ -1,6 +1,5 @@
 package com.playlists.app.ui.screens
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -40,6 +39,7 @@ import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.handleLazyListDrag
+import com.playlists.app.ui.reorder.syncDisplayedKeys
 
 @Composable
 fun SongsScreen(
@@ -53,10 +53,7 @@ fun SongsScreen(
     var deleteTarget by remember { mutableStateOf<Song?>(null) }
 
     LaunchedEffect(songs, draggingKey) {
-        if (draggingKey == null) {
-            displayedKeys.clear()
-            displayedKeys.addAll(songs.map { "s:${it.id}" })
-        }
+        syncDisplayedKeys(displayedKeys, draggingKey, songs.map { "s:${it.id}" })
     }
 
     if (songs.isEmpty()) {
@@ -95,11 +92,11 @@ fun SongsScreen(
                     val ids = displayedKeys.mapNotNull { it.removePrefix("s:").toLongOrNull() }
                     viewModel.reorderSongs(ids)
                 },
+                onClick = { onOpenSong(song.id) },
             ) {
                 SongRow(
                     song = song,
                     pageCount = viewModel.pageCount(song),
-                    onClick = { onOpenSong(song.id) },
                     onDelete = { deleteTarget = song },
                 )
             }
@@ -132,13 +129,10 @@ fun SongsScreen(
 private fun SongRow(
     song: Song,
     pageCount: Int,
-    onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (song.deletedAt != null) {
                 MaterialTheme.colorScheme.errorContainer

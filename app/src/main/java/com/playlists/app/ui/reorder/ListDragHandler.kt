@@ -14,3 +14,14 @@ fun handleLazyListDrag(
     val heights = visible.associate { info -> info.key.toString() to info.size.toFloat() }
     return ReorderLogic.handleDrag(draggingKey, dragVisualTop, displayedKeys, tops, heights)
 }
+
+fun syncDisplayedKeys(
+    displayedKeys: MutableList<String>,
+    draggingKey: String?,
+    newKeys: List<String>,
+) {
+    if (draggingKey == null && displayedKeys.toList() != newKeys) {
+        displayedKeys.clear()
+        displayedKeys.addAll(newKeys)
+    }
+}
