@@ -188,7 +188,7 @@ internal fun RemotePlayStartedDialogContent(
             ),
             style = MaterialTheme.typography.bodyMedium,
         )
-        RemotePlayClickableUrl(
+        RemotePlayUrlSection(
             url = url,
             modifier = Modifier.padding(top = 12.dp),
         )

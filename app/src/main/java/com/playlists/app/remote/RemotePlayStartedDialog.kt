@@ -1,8 +1,5 @@
 package com.playlists.app.remote
 
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.playlists.app.R
 import kotlinx.coroutines.Dispatchers
@@ -59,7 +55,7 @@ fun RemotePlayDebugDialog(
             ) {
                 val url = debug?.publicUrl ?: PlayRemoteController.currentUrl()
                 if (url != null) {
-                    RemotePlayClickableUrl(url = url)
+                    RemotePlayUrlSection(url = url)
                     Spacer(Modifier.height(12.dp))
                 }
                 val info = debug
@@ -81,24 +77,6 @@ fun RemotePlayDebugDialog(
             TextButton(onClick = onDismiss) {
                 Text(stringResource(android.R.string.ok))
             }
-        },
-    )
-}
-
-@Composable
-internal fun RemotePlayClickableUrl(
-    url: String,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    Text(
-        text = url,
-        style = MaterialTheme.typography.bodyMedium.copy(
-            color = MaterialTheme.colorScheme.primary,
-            textDecoration = TextDecoration.Underline,
-        ),
-        modifier = modifier.clickable {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         },
     )
 }
