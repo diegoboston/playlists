@@ -52,4 +52,14 @@ class RemotePlayErrorsTest {
         val msg = """failed to request quick Tunnel: lookup api.trycloudflare.com on [::1]:53: read udp [::1]:39143->[::1]:53: read: connection refused"""
         assertTrue(RemotePlayErrors.looksLikeDnsFailure(msg))
     }
+
+    @Test
+    fun tunnelReachabilityWarning_dnsPropagationHint() {
+        val detail =
+            """Unable to resolve host "abc.trycloudflare.com": No address associated with hostname"""
+        val warning = RemotePlayErrors.tunnelReachabilityWarning(detail)
+        assertTrue(RemotePlayErrors.looksLikeTunnelHostnameUnresolved(detail))
+        assertTrue(warning.contains("30–60 seconds"))
+        assertTrue(warning.contains("airplane mode"))
+    }
 }

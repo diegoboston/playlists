@@ -120,10 +120,14 @@ fun PlaylistDetailScreen(
         }
     }
 
-    fun dismissRemoteFlow() {
+    fun cancelRemoteFlow() {
         remoteStartGeneration++
         remoteFlow = null
         scope.launch(Dispatchers.IO) { PlayRemoteController.stop() }
+    }
+
+    fun closeRemoteStartedDialog() {
+        remoteFlow = null
     }
 
     fun startRemote(mode: RemotePlayMode) {
@@ -370,7 +374,8 @@ fun PlaylistDetailScreen(
     remoteFlow?.let { flow ->
         RemotePlayFlowDialog(
             state = flow,
-            onDismiss = { dismissRemoteFlow() },
+            onCancel = { cancelRemoteFlow() },
+            onCloseStarted = { closeRemoteStartedDialog() },
             onSelectMode = { mode -> startRemote(mode) },
         )
     }

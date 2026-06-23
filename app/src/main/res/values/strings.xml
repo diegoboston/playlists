@@ -89,7 +89,12 @@
     <string name="quickstart_default_name">Quickstart</string>
     <string name="delete_song">Delete song</string>
     <string name="edit_song">Edit song</string>
-    <string name="delete_song_confirm">Remove “%1$s” from the song archive? It will stay in playlists but appear in red.</string>
+    <string name="delete_song_confirm">Remove “%1$s” from the song archive and delete its file? This cannot be undone.</string>
+    <string name="delete_song_confirm_in_playlists">Remove “%1$s” from the song archive? It is used in: %2$s. The file will be kept so playlists still work; removed songs appear in red.</string>
+    <string name="orphan_files_title">Unused song files</string>
+    <string name="orphan_files_message">These files in Music/StageManager/songs are not linked to any song in the archive. Delete them?</string>
+    <string name="orphan_files_delete">Delete files</string>
+    <string name="orphan_files_keep">Keep files</string>
     <string name="deleted_from_archive">Removed from archive</string>
     <string name="playback_song_indicator">%1$d/%2$d: %3$s</string>
     <string name="playback_page_indicator">page %1$d/%2$d</string>

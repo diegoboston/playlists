@@ -51,6 +51,16 @@ interface PlaylistSongDao {
     @Query("UPDATE playlist_songs SET position = :position WHERE id = :entryId AND playlistId = :playlistId")
     suspend fun updatePosition(playlistId: Long, entryId: Long, position: Int)
 
+    @Query(
+        """
+        SELECT p.name FROM playlists p
+        INNER JOIN playlist_songs ps ON ps.playlistId = p.id
+        WHERE ps.songId = :songId
+        ORDER BY p.sortOrder ASC, p.id ASC
+        """
+    )
+    suspend fun playlistNamesForSong(songId: Long): List<String>
+
     @Transaction
     suspend fun replaceOrder(playlistId: Long, entryIdsInOrder: List<Long>) {
         entryIdsInOrder.forEachIndexed { index, entryId ->

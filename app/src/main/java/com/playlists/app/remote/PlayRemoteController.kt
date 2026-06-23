@@ -47,7 +47,7 @@ object PlayRemoteController {
         val localUrl = "http://127.0.0.1:${active.localPort}/"
         val localProbe = RemotePlayHealth.probeGet(localUrl, timeoutMs = 4_000)
         val tunnelProbe = active.tunnelBaseUrl?.let {
-            RemotePlayHealth.probeTunnelWithRetries(it, attempts = 3, pauseMs = 1_000, timeoutMs = 5_000)
+            RemotePlayHealth.probeTunnelWithRetries(it, attempts = 2, pauseMs = 2_000, timeoutMs = 6_000)
         }
         val warnings = active.startWarnings.toMutableList()
         if (active.mode == RemotePlayMode.CLOUDFLARE && !CloudflareTunnel.isRunning()) {
@@ -57,10 +57,10 @@ object PlayRemoteController {
             }
         }
         if (tunnelProbe != null && !tunnelProbe.ok) {
-            warnings.add(
-                "Tunnel URL did not respond (${tunnelProbe.detail}). " +
-                    "Browser “unreachable” usually means the tunnel died or is still starting.",
-            )
+            val tunnelWarning = RemotePlayErrors.tunnelReachabilityWarning(tunnelProbe.detail)
+            if (tunnelWarning !in warnings) {
+                warnings.add(tunnelWarning)
+            }
         }
         if (!localProbe.ok) {
             warnings.add("Local HTTP server did not respond (${localProbe.detail}).")
@@ -188,12 +188,13 @@ object PlayRemoteController {
             }
             val startWarnings = mutableListOf<String>()
             if (mode == RemotePlayMode.CLOUDFLARE) {
-                val tunnelProbe = RemotePlayHealth.probeTunnelWithRetries(tunnelUrl)
+                // One quick probe — retrying immediately often poisons mobile DNS with NXDOMAIN.
+                val tunnelProbe = RemotePlayHealth.probeGet(
+                    tunnelUrl.trimEnd('/') + "/",
+                    timeoutMs = 5_000,
+                )
                 if (!tunnelProbe.ok) {
-                    startWarnings.add(
-                        "Tunnel not reachable yet (${tunnelProbe.detail}). " +
-                            "Wait a few seconds, tap Refresh in the dialog, then open the URL.",
-                    )
+                    startWarnings.add(RemotePlayErrors.tunnelReachabilityWarning(tunnelProbe.detail))
                 }
             }
             val resolvedPublicUrl = if (playlistId != null) {

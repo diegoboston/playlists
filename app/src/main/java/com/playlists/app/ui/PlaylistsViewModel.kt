@@ -9,6 +9,8 @@ import com.playlists.app.data.Playlist
 import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.data.Song
 import com.playlists.app.util.AppUpdate
+import com.playlists.app.util.OrphanSongFiles
+import com.playlists.app.util.OrphanSongFilesMigration
 import com.playlists.app.util.PendingImport
 import com.playlists.app.util.QuickstartMatcher
 import com.playlists.app.util.ShareImporter
@@ -40,6 +42,9 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     private val _appUpdateState = MutableStateFlow<AppUpdateUiState?>(null)
     val appUpdateState: StateFlow<AppUpdateUiState?> = _appUpdateState.asStateFlow()
 
+    private val _orphanSongFiles = MutableStateFlow<List<File>?>(null)
+    val orphanSongFiles: StateFlow<List<File>?> = _orphanSongFiles.asStateFlow()
+
     private var launchUpdatePromptHandled = false
 
     private val playlistSongsFlows = ConcurrentHashMap<Long, StateFlow<List<PlaylistSongWithDetails>>>()
@@ -65,7 +70,37 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun getPlaylistSongs(playlistId: Long): List<PlaylistSongWithDetails> =
         playlistRepo.getSongs(playlistId)
 
-    fun deleteSong(id: Long) = viewModelScope.launch { songRepo.delete(id) }
+    suspend fun prepareSongDelete(id: Long): SongDeletePrompt? = withContext(Dispatchers.IO) {
+        val song = songRepo.getById(id) ?: return@withContext null
+        val playlistNames = playlistRepo.playlistNamesForSong(id)
+        val deleteFileOnConfirm = playlistNames.isEmpty() &&
+            !songRepo.isFileSharedWithOtherSongs(id)
+        SongDeletePrompt(
+            song = song,
+            playlistNames = playlistNames,
+            deleteFileOnConfirm = deleteFileOnConfirm,
+        )
+    }
+
+    fun deleteSong(id: Long, deleteFile: Boolean = false) =
+        viewModelScope.launch { songRepo.delete(id, deleteFile) }
+
+    fun scanOrphanSongFiles() = viewModelScope.launch(Dispatchers.IO) {
+        if (_orphanSongFiles.value != null) return@launch
+        val orphans = OrphanSongFilesMigration.findOrphansIfNeeded(getApplication(), songRepo)
+        if (orphans != null) {
+            _orphanSongFiles.value = orphans
+        }
+    }
+
+    fun dismissOrphanSongFiles(keepFiles: Boolean) = viewModelScope.launch(Dispatchers.IO) {
+        val orphans = _orphanSongFiles.value ?: return@launch
+        if (!keepFiles) {
+            OrphanSongFiles.deleteFiles(orphans)
+        }
+        OrphanSongFilesMigration.markPrompted()
+        _orphanSongFiles.value = null
+    }
 
     fun updateSong(id: Long, title: String, keySignature: String, notes: String) =
         viewModelScope.launch {

@@ -2,7 +2,6 @@ package com.playlists.app.remote
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -28,23 +27,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.playlists.app.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 @Composable
 fun RemotePlayFlowDialog(
     state: RemotePlayFlowState,
-    onDismiss: () -> Unit,
+    onCancel: () -> Unit,
+    onCloseStarted: () -> Unit,
     onSelectMode: (RemotePlayMode) -> Unit,
 ) {
     when (state) {
         RemotePlayFlowState.ChooseMode -> {
             AlertDialog(
-                onDismissRequest = onDismiss,
+                onDismissRequest = onCancel,
                 title = { Text(stringResource(R.string.remote_mode_title)) },
                 text = {
                     Column {
@@ -69,7 +69,7 @@ fun RemotePlayFlowDialog(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = onDismiss) {
+                    TextButton(onClick = onCancel) {
                         Text(stringResource(android.R.string.cancel))
                     }
                 },
@@ -77,7 +77,7 @@ fun RemotePlayFlowDialog(
         }
         is RemotePlayFlowState.Starting -> {
             AlertDialog(
-                onDismissRequest = onDismiss,
+                onDismissRequest = onCancel,
                 title = { Text(stringResource(R.string.remote_play)) },
                 text = {
                     Column(
@@ -100,7 +100,7 @@ fun RemotePlayFlowDialog(
                 },
                 confirmButton = {},
                 dismissButton = {
-                    TextButton(onClick = onDismiss) {
+                    TextButton(onClick = onCancel) {
                         Text(stringResource(android.R.string.cancel))
                     }
                 },
@@ -110,7 +110,7 @@ fun RemotePlayFlowDialog(
             RemotePlayStartedDialog(
                 url = state.url,
                 mode = state.mode,
-                onDismiss = onDismiss,
+                onDismiss = onCloseStarted,
             )
         }
     }
@@ -127,11 +127,17 @@ fun RemotePlayStartedDialog(
     var refreshTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(refreshTick) {
-        debug = withContext(Dispatchers.IO) { PlayRemoteController.collectDebugInfo() }
+        if (mode != RemotePlayMode.CLOUDFLARE) return@LaunchedEffect
+        val info = withContext(Dispatchers.IO) { PlayRemoteController.collectDebugInfo() }
+        if (isActive) {
+            debug = info
+        }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(mode) {
+        if (mode != RemotePlayMode.CLOUDFLARE) return@LaunchedEffect
         while (true) {
-            delay(3_000)
+            // Quick tunnels need DNS propagation; polling every few seconds can negative-cache NXDOMAIN.
+            delay(15_000)
             refreshTick++
         }
     }
@@ -148,7 +154,6 @@ fun RemotePlayStartedDialog(
                 url = url,
                 mode = mode,
                 debug = debug,
-                onOpenBrowser = openBrowser,
                 onRefreshDebug = { refreshTick++ },
             )
         },
@@ -170,7 +175,6 @@ internal fun RemotePlayStartedDialogContent(
     url: String,
     mode: RemotePlayMode,
     debug: RemotePlayDebugInfo?,
-    onOpenBrowser: () -> Unit,
     onRefreshDebug: () -> Unit,
 ) {
     Column(
@@ -188,22 +192,18 @@ internal fun RemotePlayStartedDialogContent(
             ),
             style = MaterialTheme.typography.bodyMedium,
         )
-        Text(
-            text = url,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                color = MaterialTheme.colorScheme.primary,
-                textDecoration = TextDecoration.Underline,
-            ),
-            modifier = Modifier
-                .padding(top = 12.dp)
-                .clickable(onClick = onOpenBrowser),
+        RemotePlayClickableUrl(
+            url = url,
+            modifier = Modifier.padding(top = 12.dp),
         )
-        debug?.let { info ->
-            Spacer(Modifier.height(16.dp))
-            RemotePlayDebugPanel(
-                info = info,
-                onRefresh = onRefreshDebug,
-            )
+        if (mode == RemotePlayMode.CLOUDFLARE) {
+            debug?.let { info ->
+                Spacer(Modifier.height(16.dp))
+                RemotePlayDebugPanel(
+                    info = info,
+                    onRefresh = onRefreshDebug,
+                )
+            }
         }
     }
 }

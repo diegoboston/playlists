@@ -45,6 +45,23 @@ object RemotePlayErrors {
             (lower.contains("connection refused") || lower.contains("no such host"))
     }
 
+    internal fun looksLikeTunnelHostnameUnresolved(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("unable to resolve host") ||
+            lower.contains("no address associated with hostname")
+    }
+
+    fun tunnelReachabilityWarning(detail: String): String {
+        val base = "Tunnel not reachable yet ($detail)."
+        return if (looksLikeTunnelHostnameUnresolved(detail)) {
+            "$base The tunnel hostname can take 30–60 seconds to appear in DNS after cloudflared " +
+                "starts. Wait, then tap Refresh — checking too early can cache “not found” on " +
+                "mobile networks. If it still fails, toggle airplane mode or use LAN on the same Wi‑Fi."
+        } else {
+            "$base Wait a few seconds, tap Refresh in the dialog, then open the URL."
+        }
+    }
+
     fun copyToClipboard(context: Context, text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("remote play error", text))

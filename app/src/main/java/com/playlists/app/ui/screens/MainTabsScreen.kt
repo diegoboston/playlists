@@ -77,11 +77,15 @@ fun MainTabsScreen(
         }
     }
 
-    fun dismissRemoteFlow() {
+    fun cancelRemoteFlow() {
         remoteStartGeneration++
         remoteFlow = null
         pendingRemotePlaylistId = null
         scope.launch(Dispatchers.IO) { PlayRemoteController.stop() }
+    }
+
+    fun closeRemoteStartedDialog() {
+        remoteFlow = null
     }
 
     fun startRemote(playlistId: Long?, mode: RemotePlayMode) {
@@ -187,7 +191,8 @@ fun MainTabsScreen(
     remoteFlow?.let { flow ->
         RemotePlayFlowDialog(
             state = flow,
-            onDismiss = { dismissRemoteFlow() },
+            onCancel = { cancelRemoteFlow() },
+            onCloseStarted = { closeRemoteStartedDialog() },
             onSelectMode = { mode ->
                 pendingRemotePlaylistId?.let { startRemote(it, mode) }
             },

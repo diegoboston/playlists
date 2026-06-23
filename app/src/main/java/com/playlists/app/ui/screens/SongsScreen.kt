@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
 import com.playlists.app.data.Song
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.SongDeletePrompt
+import kotlinx.coroutines.launch
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.reorder.DraggableItem
@@ -59,7 +62,8 @@ fun SongsScreen(
     val displayedKeys = remember { mutableStateListOf<String>() }
     val dragState = remember { ReorderDragState() }
     var editTarget by remember { mutableStateOf<Song?>(null) }
-    var deleteTarget by remember { mutableStateOf<Song?>(null) }
+    var deleteTarget by remember { mutableStateOf<SongDeletePrompt?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(songs, dragState.draggingKey) {
         syncDisplayedKeys(displayedKeys, dragState.draggingKey, songs.map { "s:${it.id}" })
@@ -142,19 +146,35 @@ fun SongsScreen(
             },
             onDelete = {
                 editTarget = null
-                deleteTarget = song
+                scope.launch {
+                    deleteTarget = viewModel.prepareSongDelete(song.id)
+                }
             },
         )
     }
 
-    deleteTarget?.let { song ->
+    deleteTarget?.let { prompt ->
+        val song = prompt.song
+        val playlistList = prompt.playlistNames.joinToString(", ")
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
             title = { Text(stringResource(R.string.delete_song)) },
-            text = { Text(stringResource(R.string.delete_song_confirm, song.title)) },
+            text = {
+                Text(
+                    if (prompt.playlistNames.isEmpty()) {
+                        stringResource(R.string.delete_song_confirm, song.title)
+                    } else {
+                        stringResource(
+                            R.string.delete_song_confirm_in_playlists,
+                            song.title,
+                            playlistList,
+                        )
+                    },
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.deleteSong(song.id)
+                    viewModel.deleteSong(song.id, deleteFile = prompt.deleteFileOnConfirm)
                     deleteTarget = null
                 }) {
                     Text(stringResource(R.string.delete_song))

@@ -1,5 +1,8 @@
 package com.playlists.app.remote
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,9 +26,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.playlists.app.R
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -36,7 +41,10 @@ fun RemotePlayDebugDialog(
     var refreshTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(refreshTick) {
-        debug = withContext(Dispatchers.IO) { PlayRemoteController.collectDebugInfo() }
+        val info = withContext(Dispatchers.IO) { PlayRemoteController.collectDebugInfo() }
+        if (isActive) {
+            debug = info
+        }
     }
 
     AlertDialog(
@@ -49,9 +57,16 @@ fun RemotePlayDebugDialog(
                     .heightIn(max = 480.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
+                val url = debug?.publicUrl ?: PlayRemoteController.currentUrl()
+                if (url != null) {
+                    RemotePlayClickableUrl(url = url)
+                    Spacer(Modifier.height(12.dp))
+                }
                 val info = debug
                 if (info == null) {
-                    Text(stringResource(R.string.remote_debug_unavailable))
+                    if (url == null) {
+                        Text(stringResource(R.string.remote_debug_unavailable))
+                    }
                 } else {
                     RemotePlayDebugPanel(info = info, onRefresh = { refreshTick++ })
                 }
@@ -71,16 +86,37 @@ fun RemotePlayDebugDialog(
 }
 
 @Composable
+internal fun RemotePlayClickableUrl(
+    url: String,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    Text(
+        text = url,
+        style = MaterialTheme.typography.bodyMedium.copy(
+            color = MaterialTheme.colorScheme.primary,
+            textDecoration = TextDecoration.Underline,
+        ),
+        modifier = modifier.clickable {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        },
+    )
+}
+
+@Composable
 internal fun RemotePlayDebugPanel(
     info: RemotePlayDebugInfo,
     onRefresh: () -> Unit,
 ) {
     val context = LocalContext.current
+    val cloudflare = info.mode == RemotePlayMode.CLOUDFLARE
     Text(
         stringResource(R.string.remote_debug_heading),
         style = MaterialTheme.typography.titleSmall,
     )
-    info.warnings.forEach { warning ->
+    info.warnings
+        .filter { warning -> cloudflare || !warningLooksCloudflareSpecific(warning) }
+        .forEach { warning ->
         Text(
             warning,
             modifier = Modifier.padding(top = 8.dp),
@@ -90,27 +126,29 @@ internal fun RemotePlayDebugPanel(
     }
     Spacer(Modifier.height(8.dp))
     ProbeLine(stringResource(R.string.remote_debug_local), info.localProbe)
-    info.tunnelProbe?.let { ProbeLine(stringResource(R.string.remote_debug_tunnel), it) }
-    Text(
-        stringResource(
-            R.string.remote_debug_cloudflared,
-            if (info.tunnelProcessAlive) {
-                stringResource(R.string.remote_debug_running)
-            } else {
-                stringResource(
-                    R.string.remote_debug_stopped,
-                    info.tunnelExitCode?.toString() ?: "?",
-                )
-            },
-        ),
-        modifier = Modifier.padding(top = 4.dp),
-        style = MaterialTheme.typography.bodySmall,
-    )
+    if (cloudflare) {
+        info.tunnelProbe?.let { ProbeLine(stringResource(R.string.remote_debug_tunnel), it) }
+        Text(
+            stringResource(
+                R.string.remote_debug_cloudflared,
+                if (info.tunnelProcessAlive) {
+                    stringResource(R.string.remote_debug_running)
+                } else {
+                    stringResource(
+                        R.string.remote_debug_stopped,
+                        info.tunnelExitCode?.toString() ?: "?",
+                    )
+                },
+            ),
+            modifier = Modifier.padding(top = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
     Text(
         stringResource(R.string.remote_debug_server, if (info.serverAlive) "up" else "down"),
         style = MaterialTheme.typography.bodySmall,
     )
-    if (info.cloudflaredLog.isNotBlank()) {
+    if (cloudflare && info.cloudflaredLog.isNotBlank()) {
         Spacer(Modifier.height(8.dp))
         Text(
             stringResource(R.string.remote_debug_log),
@@ -142,4 +180,11 @@ private fun ProbeLine(label: String, probe: RemotePlayHealth.ProbeResult) {
             MaterialTheme.colorScheme.error
         },
     )
+}
+
+private fun warningLooksCloudflareSpecific(warning: String): Boolean {
+    val lower = warning.lowercase()
+    return lower.contains("cloudflared") ||
+        lower.contains("tunnel not reachable") ||
+        lower.contains("tunnel url")
 }

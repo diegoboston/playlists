@@ -61,7 +61,26 @@ class SongRepository(private val songDao: SongDao) {
         return true
     }
 
-    suspend fun delete(id: Long) = songDao.markDeleted(id, System.currentTimeMillis())
+    suspend fun getAllIncludingDeleted(): List<Song> = songDao.getAllIncludingDeleted()
+
+    suspend fun isFileSharedWithOtherSongs(songId: Long): Boolean {
+        val song = songDao.getById(songId) ?: return false
+        return songDao.getAllIncludingDeleted()
+            .any { it.id != songId && it.filePath == song.filePath }
+    }
+
+    suspend fun delete(id: Long, deleteFile: Boolean = false) {
+        val song = songDao.getById(id) ?: return
+        songDao.markDeleted(id, System.currentTimeMillis())
+        if (!deleteFile) return
+        val file = File(song.filePath)
+        if (!file.isFile) return
+        val stillReferenced = songDao.getAllIncludingDeleted()
+            .any { it.id != id && it.filePath == song.filePath }
+        if (!stillReferenced) {
+            file.delete()
+        }
+    }
 
     suspend fun reorder(idsInOrder: List<Long>) = songDao.replaceOrder(idsInOrder)
 
@@ -188,6 +207,9 @@ class PlaylistRepository(
     }
 
     suspend fun removeSong(entryId: Long) = playlistSongDao.deleteById(entryId)
+
+    suspend fun playlistNamesForSong(songId: Long): List<String> =
+        playlistSongDao.playlistNamesForSong(songId)
 
     suspend fun reorder(playlistId: Long, entryIdsInOrder: List<Long>) {
         playlistSongDao.replaceOrder(playlistId, entryIdsInOrder)
