@@ -3,6 +3,7 @@ package com.playlists.app.util
 import com.playlists.app.data.Song
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -57,13 +58,60 @@ class SongPathRepairTest {
         )
     }
 
-    private fun song(id: Long, filePath: String) = Song(
+    @Test
+    fun repairAll_linksPlaceholderUuidFileWhenDbPathIsWrong() {
+        val root = createTempDir(prefix = "repair-placeholder")
+        val songsDir = File(root, "songs").apply { mkdirs() }
+        val uuidFile = File(songsDir, "550e8400-e29b-41d4-a716-446655440000.png").apply { writeText("x") }
+        val song = song(
+            id = 30,
+            filePath = "Music/StageManager/songs/Se_Telefonando--30.png",
+            isPlaceholder = true,
+            fileType = "IMAGE",
+        )
+
+        val updates = SongPathRepair.repairAll(listOf(song), songsDir)
+
+        assertEquals(
+            "Music/StageManager/songs/${uuidFile.name}",
+            updates[30],
+        )
+    }
+
+    @Test
+    fun repairAll_doesNotTreatLinkedPlaceholderAsOrphan() {
+        val root = createTempDir(prefix = "repair-orphan")
+        val songsDir = File(root, "songs").apply { mkdirs() }
+        val uuidFile = File(songsDir, "550e8400-e29b-41d4-a716-446655440000.png").apply { writeText("x") }
+        File(songsDir, "real-orphan.pdf").writeText("y")
+        val song = song(
+            id = 30,
+            filePath = "Music/StageManager/songs/Se_Telefonando--30.png",
+            isPlaceholder = true,
+            fileType = "IMAGE",
+        )
+        val updates = SongPathRepair.repairAll(listOf(song), songsDir)
+        val referenced = listOf(updates[30]!!)
+
+        val orphans = OrphanSongFiles.findOrphans(songsDir, referenced)
+
+        assertEquals(listOf("real-orphan.pdf"), orphans.map { it.name })
+        assertTrue(orphans.none { it.name == uuidFile.name })
+    }
+
+    private fun song(
+        id: Long,
+        filePath: String,
+        isPlaceholder: Boolean = false,
+        fileType: String = "PDF",
+    ) = Song(
         id = id,
         title = "Title",
         keySignature = "",
         notes = "",
         filePath = filePath,
-        fileType = "PDF",
-        mimeType = "application/pdf",
+        fileType = fileType,
+        mimeType = if (fileType == "PDF") "application/pdf" else "image/png",
+        isPlaceholder = isPlaceholder,
     )
 }

@@ -23,15 +23,12 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun repairAllFilePaths(songsDir: File): Int {
         val songs = songDao.getAll()
-        var count = 0
-        for (song in songs.sortedBy { it.id }) {
-            val repaired = SongPathRepair.repairPath(song, songsDir)
-                ?: SongPathRepair.normalizeIfNeeded(song.filePath)
-            if (repaired == null) continue
-            songDao.update(song.copy(filePath = repaired))
-            count++
+        val updates = SongPathRepair.repairAll(songs, songsDir)
+        for ((id, path) in updates) {
+            val song = songDao.getById(id) ?: continue
+            songDao.update(song.copy(filePath = path))
         }
-        return count
+        return updates.size
     }
 
     suspend fun delete(id: Long) {
@@ -88,7 +85,7 @@ class SongRepository(private val songDao: SongDao) {
         val trimmedTitle = title.trim().ifBlank { "Untitled" }
         val bytes = PlaceholderImageGenerator.render(trimmedTitle)
         val stored = FileStorage.storeBytes(context, bytes, "png")
-        return insert(
+        val id = insert(
             Song(
                 title = trimmedTitle,
                 keySignature = keySignature.trim(),
@@ -99,6 +96,19 @@ class SongRepository(private val songDao: SongDao) {
                 isPlaceholder = true,
             ),
         )
+        renamePlaceholderFile(id)
+        return id
+    }
+
+    private suspend fun renamePlaceholderFile(songId: Long) {
+        val song = songDao.getById(songId) ?: return
+        if (!song.isPlaceholder) return
+        val current = SongStoragePaths.resolve(song.filePath)
+        if (!current.isFile) return
+        val target = File(current.parentFile, "placeholder-$songId.png")
+        if (target.exists() && target.absolutePath != current.absolutePath) return
+        if (!current.renameTo(target)) return
+        songDao.update(song.copy(filePath = SongStoragePaths.toStoredPath(target)))
     }
 }
 

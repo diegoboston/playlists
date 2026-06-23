@@ -25,6 +25,7 @@ object OrphanSongFilesMigration {
     ): List<File>? {
         if (!StageManagerStorage.hasAccess(context)) return null
         if (hasBeenPrompted()) return null
+        songRepository.repairAllFilePaths(StageManagerStorage.songsDir())
         val referenced = songRepository.getAll().map { it.filePath }
         val orphans = OrphanSongFiles.findOrphans(StageManagerStorage.songsDir(), referenced)
         return orphans.ifEmpty {
