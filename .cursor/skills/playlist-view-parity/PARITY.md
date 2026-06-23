@@ -71,6 +71,7 @@ app/src/main/java/com/playlists/app/
   remote/PlayRemoteController.kt       # bridge to repos + tunnel
 
 app/src/main/assets/remote/
+  index.html                           # remote playlist picker
   play.html                            # remote playback
   edit.html                            # remote playlist editor
   pin.html                             # Cloudflare PIN gate

@@ -46,6 +46,8 @@
     <string name="remote_mode_message">How should other devices reach this phone?</string>
     <string name="remote_mode_cloudflare">Cloudflare tunnel (internet)</string>
     <string name="remote_mode_lan">LAN only (same Wi‑Fi)</string>
+    <string name="remote_starting_cloudflare">Starting Cloudflare tunnel… This can take up to a minute.</string>
+    <string name="remote_starting_lan">Starting local server…</string>
     <string name="remote_open_playlist">Open a playlist to start remote play.</string>
     <string name="remote_no_last_playlist">Open a playlist first — remote uses your last opened playlist.</string>
     <string name="remote_playlist_gone">That playlist was deleted.</string>
@@ -65,6 +67,18 @@
     <string name="remote_notification_channel_desc">Shows while remote play is active</string>
     <string name="remote_notification_title">Remote: %1$s</string>
     <string name="remote_notification_body">Active — tap Stop here or the Wi‑Fi icon in the app to end</string>
+    <string name="remote_debug_title">Remote play status</string>
+    <string name="remote_debug_heading">Connection checks</string>
+    <string name="remote_debug_local">Local server</string>
+    <string name="remote_debug_tunnel">Tunnel URL</string>
+    <string name="remote_debug_cloudflared">cloudflared: %1$s</string>
+    <string name="remote_debug_running">running</string>
+    <string name="remote_debug_stopped">stopped (exit %1$s)</string>
+    <string name="remote_debug_server">HTTP server: %1$s</string>
+    <string name="remote_debug_log">cloudflared log</string>
+    <string name="remote_debug_refresh">Refresh</string>
+    <string name="remote_debug_copy">Copy debug info</string>
+    <string name="remote_debug_unavailable">Remote play is not active.</string>
     <string name="remove">Remove</string>
     <string name="empty_playlist">Tap + above to add songs.</string>
     <string name="quickstart">Quickstart playlist</string>

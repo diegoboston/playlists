@@ -31,12 +31,37 @@ object CloudflareTunnel {
     private var process: Process? = null
     private var outputThread: Thread? = null
     private var waitThread: Thread? = null
+    private val logLines = Collections.synchronizedList(mutableListOf<String>())
+    private var lastExitCode: Int? = null
+
+    private const val MAX_LOG_LINES = 80
+
+    fun isRunning(): Boolean = process?.isAlive == true
+
+    fun lastExitCode(): Int? = lastExitCode
+
+    fun recentLogs(): String = synchronized(logLines) {
+        logLines.takeLast(40).joinToString("\n")
+    }
+
+    internal fun clearLogs() {
+        synchronized(logLines) { logLines.clear() }
+        lastExitCode = null
+    }
+
+    private fun appendLog(line: String) {
+        logLines.add(line)
+        while (logLines.size > MAX_LOG_LINES) {
+            logLines.removeAt(0)
+        }
+    }
 
     fun binaryPath(context: Context): File =
         File(context.applicationInfo.nativeLibraryDir, CLOUDFLARED_LIB_NAME)
 
     fun start(context: Context, localPort: Int, timeoutSeconds: Long = 60): Result<String> {
         stop()
+        clearLogs()
         val binaryResult = ensureBinary(context)
         if (binaryResult.isFailure) {
             return Result.failure(
@@ -66,6 +91,7 @@ object CloudflareTunnel {
                 proc.inputStream.bufferedReader().useLines { lines ->
                     for (line in lines) {
                         outputLines.add(line)
+                        appendLog(line)
                         if (urlRef.get() == null) {
                             extractPublicTunnelUrl(line)?.let { url ->
                                 urlRef.set(url)
@@ -76,7 +102,9 @@ object CloudflareTunnel {
                 }
             }, "cloudflared-output").apply { isDaemon = true; start() }
             waitThread = Thread({
-                exitCode.set(proc.waitFor())
+                val code = proc.waitFor()
+                exitCode.set(code)
+                lastExitCode = code
                 if (urlRef.get() == null) {
                     latch.countDown()
                 }
@@ -107,14 +135,26 @@ object CloudflareTunnel {
     }
 
     fun stop() {
-        outputThread?.interrupt()
-        outputThread = null
-        waitThread?.interrupt()
-        waitThread = null
-        process?.destroy()
-        process?.waitFor(3, TimeUnit.SECONDS)
-        process?.destroyForcibly()
+        val proc = process
         process = null
+        val outThread = outputThread
+        val waitThr = waitThread
+        outputThread = null
+        waitThread = null
+        outThread?.interrupt()
+        waitThr?.interrupt()
+        if (proc == null) return
+        proc.destroy()
+        Thread({
+            try {
+                if (!proc.waitFor(3, TimeUnit.SECONDS)) {
+                    proc.destroyForcibly()
+                }
+            } catch (_: InterruptedException) {
+                proc.destroyForcibly()
+                Thread.currentThread().interrupt()
+            }
+        }, "cloudflared-stop").apply { isDaemon = true; start() }
     }
 
     private fun ensureBinary(context: Context): Result<File> {

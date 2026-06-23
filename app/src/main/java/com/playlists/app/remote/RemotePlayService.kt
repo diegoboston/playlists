@@ -11,7 +11,7 @@ class RemotePlayService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                PlayRemoteController.stop()
+                PlayRemoteController.teardownResources()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
@@ -23,10 +23,16 @@ class RemotePlayService : Service() {
                 return START_STICKY
             }
             else -> {
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
+    }
+
+    override fun onDestroy() {
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        super.onDestroy()
     }
 
     companion object {
@@ -42,8 +48,11 @@ class RemotePlayService : Service() {
             context.startForegroundService(intent)
         }
 
-        fun stop(context: Context) {
-            context.stopService(Intent(context, RemotePlayService::class.java))
+        fun requestStop(context: Context) {
+            val intent = Intent(context, RemotePlayService::class.java).apply {
+                action = ACTION_STOP
+            }
+            context.startService(intent)
         }
     }
 }

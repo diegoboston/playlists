@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stage Manager Remote</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; background: #000; color: #fff; font-family: system-ui, sans-serif; }
+    #header { padding: 20px 16px 12px; text-align: center; }
+    #header h1 { font-size: 22px; margin-bottom: 6px; }
+    #header p { opacity: .7; font-size: 14px; }
+    #content { padding: 8px 16px 32px; max-width: 640px; margin: 0 auto; }
+    #error { color: #ff8a80; font-size: 14px; margin-bottom: 12px; min-height: 1.2em; text-align: center; }
+    #empty { text-align: center; opacity: .75; padding: 32px 16px; }
+    #list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .row { display: flex; align-items: center; gap: 12px; border-radius: 12px; padding: 14px 16px; min-height: 64px; }
+    .info { flex: 1; min-width: 0; }
+    .name { font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .count { font-size: 13px; opacity: .85; margin-top: 2px; }
+    .actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .btn { border: none; border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; line-height: 1.2; }
+    .btn-play { background: rgba(0,0,0,.25); color: inherit; border: 1px solid rgba(255,255,255,.35); }
+    .btn-play:disabled { opacity: .45; cursor: default; }
+    .btn-edit { background: rgba(0,0,0,.15); color: inherit; border: 1px solid rgba(255,255,255,.2); font-weight: 500; }
+    #content.busy { opacity: .6; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <h1>Playlists</h1>
+    <p>Choose a playlist to play on this device.</p>
+  </div>
+  <div id="content">
+    <div id="error"></div>
+    <ul id="list"></ul>
+    <div id="empty" hidden>No playlists yet. Create one in the app.</div>
+  </div>
+  <script>
+    const PALETTE = [
+      0xE57373, 0xFFB74D, 0xFFF176, 0xAED581, 0x4DD0E1,
+      0x64B5F6, 0x9575CD, 0xF06292, 0x90A4AE, 0x8D6E63,
+    ];
+
+    const listEl = document.getElementById('list');
+    const emptyEl = document.getElementById('empty');
+    const errorEl = document.getElementById('error');
+    const contentEl = document.getElementById('content');
+
+    function argbToCss(argb) {
+      if (argb == null) return null;
+      const n = argb >>> 0;
+      const r = (n >> 16) & 0xff;
+      const g = (n >> 8) & 0xff;
+      const b = n & 0xff;
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function textOn(bgRgb) {
+      const m = bgRgb.match(/\d+/g);
+      if (!m) return '#fff';
+      const lum = (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]) / 255;
+      return lum > 0.5 ? '#000' : '#fff';
+    }
+
+    function songCountLabel(n) {
+      return n === 1 ? '1 song' : `${n} songs`;
+    }
+
+    async function load() {
+      contentEl.classList.add('busy');
+      errorEl.textContent = '';
+      try {
+        const res = await fetch('/api/playlists');
+        if (!res.ok) throw new Error('Could not load playlists');
+        const data = await res.json();
+        const playlists = data.playlists || [];
+        listEl.innerHTML = '';
+        if (!playlists.length) {
+          emptyEl.hidden = false;
+          return;
+        }
+        emptyEl.hidden = true;
+        playlists.forEach((pl, index) => {
+          const bg = argbToCss(pl.color) || argbToCss(PALETTE[index % PALETTE.length]);
+          const fg = textOn(bg);
+          const li = document.createElement('li');
+          li.className = 'row';
+          li.style.background = bg;
+          li.style.color = fg;
+          const canPlay = pl.songCount > 0;
+          li.innerHTML = `
+            <div class="info">
+              <div class="name"></div>
+              <div class="count"></div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-play" type="button"${canPlay ? '' : ' disabled'}>Play</button>
+              <a class="btn btn-edit" href="/edit?playlist=${pl.id}">Edit</a>
+            </div>
+          `;
+          li.querySelector('.name').textContent = pl.name;
+          li.querySelector('.count').textContent = songCountLabel(pl.songCount);
+          const playBtn = li.querySelector('.btn-play');
+          if (canPlay) {
+            playBtn.addEventListener('click', () => {
+              window.location.href = `/play?playlist=${pl.id}`;
+            });
+          }
+          listEl.appendChild(li);
+        });
+      } catch (err) {
+        errorEl.textContent = err.message || 'Could not load playlists';
+      } finally {
+        contentEl.classList.remove('busy');
+      }
+    }
+
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>

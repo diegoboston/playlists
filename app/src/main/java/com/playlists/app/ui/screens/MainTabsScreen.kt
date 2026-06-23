@@ -9,11 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -36,14 +34,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
 import com.playlists.app.remote.PlayRemoteController
+import com.playlists.app.remote.RemotePlayDebugDialog
 import com.playlists.app.remote.RemotePlayErrorDialog
 import com.playlists.app.remote.RemotePlayErrors
+import com.playlists.app.remote.RemotePlayFlowDialog
+import com.playlists.app.remote.RemotePlayFlowState
 import com.playlists.app.remote.RemotePlayMode
-import com.playlists.app.remote.RemotePlayModeDialog
-import com.playlists.app.remote.RemotePlayStartedDialog
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.components.RemotePlayIconButton
 import com.playlists.app.util.AppPrefs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,10 +61,10 @@ fun MainTabsScreen(
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var remoteError by remember { mutableStateOf<String?>(null) }
-    var showRemoteModeDialog by remember { mutableStateOf(false) }
+    var remoteFlow by remember { mutableStateOf<RemotePlayFlowState?>(null) }
     var pendingRemotePlaylistId by remember { mutableStateOf<Long?>(null) }
-    var remoteStartedUrl by remember { mutableStateOf<String?>(null) }
-    var remoteStartedMode by remember { mutableStateOf<RemotePlayMode?>(null) }
+    var remoteStartGeneration by remember { mutableIntStateOf(0) }
+    var showRemoteDebug by remember { mutableStateOf(false) }
 
     val activePlaylistId = if (remoteRunning) PlayRemoteController.activePlaylistId else null
     val entries by viewModel.observePlaylistSongs(activePlaylistId ?: 0L)
@@ -75,21 +77,36 @@ fun MainTabsScreen(
         }
     }
 
+    fun dismissRemoteFlow() {
+        remoteStartGeneration++
+        remoteFlow = null
+        pendingRemotePlaylistId = null
+        scope.launch(Dispatchers.IO) { PlayRemoteController.stop() }
+    }
+
     fun startRemote(playlistId: Long?, mode: RemotePlayMode) {
+        val generation = remoteStartGeneration + 1
+        remoteStartGeneration = generation
+        remoteFlow = RemotePlayFlowState.Starting(mode)
         scope.launch {
             val playlist = playlistId?.let { viewModel.getPlaylist(it) }
             if (playlistId != null && playlist == null) {
-                Toast.makeText(context, R.string.remote_playlist_gone, Toast.LENGTH_LONG).show()
+                if (generation == remoteStartGeneration) {
+                    remoteFlow = null
+                    Toast.makeText(context, R.string.remote_playlist_gone, Toast.LENGTH_LONG).show()
+                }
                 return@launch
             }
             val list = if (playlistId != null) viewModel.getPlaylistSongs(playlistId) else emptyList()
             val name = playlist?.name ?: context.getString(R.string.app_name)
-            PlayRemoteController.start(context, playlistId, name, list, mode)
-                .onSuccess { url ->
-                    remoteStartedUrl = url
-                    remoteStartedMode = mode
-                }
+            val result = withContext(Dispatchers.IO) {
+                PlayRemoteController.start(context, playlistId, name, list, mode)
+            }
+            if (generation != remoteStartGeneration) return@launch
+            result
+                .onSuccess { url -> remoteFlow = RemotePlayFlowState.Started(url, mode) }
                 .onFailure { error ->
+                    remoteFlow = null
                     remoteError = RemotePlayErrors.format(error)
                 }
         }
@@ -106,7 +123,8 @@ fun MainTabsScreen(
                     ) {
                         Text(stringResource(R.string.app_name))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
+                            RemotePlayIconButton(
+                                active = remoteRunning,
                                 onClick = {
                                     if (remoteRunning) {
                                         PlayRemoteController.stop()
@@ -115,22 +133,17 @@ fun MainTabsScreen(
                                             R.string.remote_stopped,
                                             Toast.LENGTH_SHORT,
                                         ).show()
-                                        return@IconButton
+                                        return@RemotePlayIconButton
                                     }
                                     pendingRemotePlaylistId = AppPrefs.getLastPlaylistId(context)
-                                    showRemoteModeDialog = true
+                                    remoteFlow = RemotePlayFlowState.ChooseMode
                                 },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Wifi,
-                                    contentDescription = stringResource(R.string.remote_play),
-                                    tint = if (remoteRunning) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                    },
-                                )
-                            }
+                                onLongClick = if (remoteRunning) {
+                                    { showRemoteDebug = true }
+                                } else {
+                                    null
+                                },
+                            )
                             IconButton(onClick = onSettings) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
@@ -171,28 +184,17 @@ fun MainTabsScreen(
         RemotePlayErrorDialog(message = message, onDismiss = { remoteError = null })
     }
 
-    if (showRemoteModeDialog) {
-        RemotePlayModeDialog(
-            onDismiss = {
-                showRemoteModeDialog = false
-                pendingRemotePlaylistId = null
-            },
-            onSelect = { mode ->
-                showRemoteModeDialog = false
+    remoteFlow?.let { flow ->
+        RemotePlayFlowDialog(
+            state = flow,
+            onDismiss = { dismissRemoteFlow() },
+            onSelectMode = { mode ->
                 pendingRemotePlaylistId?.let { startRemote(it, mode) }
-                pendingRemotePlaylistId = null
             },
         )
     }
 
-    remoteStartedUrl?.let { url ->
-        RemotePlayStartedDialog(
-            url = url,
-            mode = remoteStartedMode ?: RemotePlayMode.CLOUDFLARE,
-            onDismiss = {
-                remoteStartedUrl = null
-                remoteStartedMode = null
-            },
-        )
+    if (showRemoteDebug) {
+        RemotePlayDebugDialog(onDismiss = { showRemoteDebug = false })
     }
 }

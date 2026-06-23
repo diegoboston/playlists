@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,21 +55,25 @@ import com.playlists.app.R
 import com.playlists.app.data.Playlist
 import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.remote.PlayRemoteController
+import com.playlists.app.remote.RemotePlayDebugDialog
 import com.playlists.app.remote.RemotePlayErrorDialog
 import com.playlists.app.remote.RemotePlayErrors
+import com.playlists.app.remote.RemotePlayFlowDialog
+import com.playlists.app.remote.RemotePlayFlowState
 import com.playlists.app.remote.RemotePlayMode
-import com.playlists.app.remote.RemotePlayModeDialog
-import com.playlists.app.remote.RemotePlayStartedDialog
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.components.PlaylistColorDialog
+import com.playlists.app.ui.components.RemotePlayIconButton
 import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
 import com.playlists.app.util.AppPrefs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,9 +98,9 @@ fun PlaylistDetailScreen(
     var showDelete by remember { mutableStateOf(false) }
     var showAddSong by remember { mutableStateOf(false) }
     var remoteError by remember { mutableStateOf<String?>(null) }
-    var showRemoteModeDialog by remember { mutableStateOf(false) }
-    var remoteStartedUrl by remember { mutableStateOf<String?>(null) }
-    var remoteStartedMode by remember { mutableStateOf<RemotePlayMode?>(null) }
+    var remoteFlow by remember { mutableStateOf<RemotePlayFlowState?>(null) }
+    var remoteStartGeneration by remember { mutableIntStateOf(0) }
+    var showRemoteDebug by remember { mutableStateOf(false) }
 
     LaunchedEffect(playlistId) {
         playlist = viewModel.getPlaylist(playlistId)
@@ -116,20 +120,34 @@ fun PlaylistDetailScreen(
         }
     }
 
+    fun dismissRemoteFlow() {
+        remoteStartGeneration++
+        remoteFlow = null
+        scope.launch(Dispatchers.IO) { PlayRemoteController.stop() }
+    }
+
     fun startRemote(mode: RemotePlayMode) {
+        val generation = remoteStartGeneration + 1
+        remoteStartGeneration = generation
+        remoteFlow = RemotePlayFlowState.Starting(mode)
         scope.launch {
             val list = viewModel.getPlaylistSongs(playlistId)
             if (list.isEmpty()) {
-                Toast.makeText(context, R.string.remote_empty, Toast.LENGTH_LONG).show()
+                if (generation == remoteStartGeneration) {
+                    remoteFlow = null
+                    Toast.makeText(context, R.string.remote_empty, Toast.LENGTH_LONG).show()
+                }
                 return@launch
             }
             val name = playlist?.name.orEmpty()
-            PlayRemoteController.start(context, playlistId, name, list, mode)
-                .onSuccess { url ->
-                    remoteStartedUrl = url
-                    remoteStartedMode = mode
-                }
+            val result = withContext(Dispatchers.IO) {
+                PlayRemoteController.start(context, playlistId, name, list, mode)
+            }
+            if (generation != remoteStartGeneration) return@launch
+            result
+                .onSuccess { url -> remoteFlow = RemotePlayFlowState.Started(url, mode) }
                 .onFailure { error ->
+                    remoteFlow = null
                     remoteError = RemotePlayErrors.format(error)
                 }
         }
@@ -181,24 +199,22 @@ fun PlaylistDetailScreen(
                         IconButton(onClick = { onPlay(playlistId) }) {
                             Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.play))
                         }
-                        IconButton(onClick = {
-                            if (remoteActiveHere) {
-                                PlayRemoteController.stop()
-                                Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
-                            } else {
-                                showRemoteModeDialog = true
-                            }
-                        }) {
-                            Icon(
-                                Icons.Default.Wifi,
-                                contentDescription = stringResource(R.string.remote_play),
-                                tint = if (remoteActiveHere) {
-                                    MaterialTheme.colorScheme.primary
+                        RemotePlayIconButton(
+                            active = remoteActiveHere,
+                            onClick = {
+                                if (remoteActiveHere) {
+                                    PlayRemoteController.stop()
+                                    Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                },
-                            )
-                        }
+                                    remoteFlow = RemotePlayFlowState.ChooseMode
+                                }
+                            },
+                            onLongClick = if (remoteActiveHere) {
+                                { showRemoteDebug = true }
+                            } else {
+                                null
+                            },
+                        )
                         IconButton(onClick = { showRename = true }) {
                             Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.rename_playlist))
                         }
@@ -351,25 +367,16 @@ fun PlaylistDetailScreen(
         RemotePlayErrorDialog(message = message, onDismiss = { remoteError = null })
     }
 
-    if (showRemoteModeDialog) {
-        RemotePlayModeDialog(
-            onDismiss = { showRemoteModeDialog = false },
-            onSelect = { mode ->
-                showRemoteModeDialog = false
-                startRemote(mode)
-            },
+    remoteFlow?.let { flow ->
+        RemotePlayFlowDialog(
+            state = flow,
+            onDismiss = { dismissRemoteFlow() },
+            onSelectMode = { mode -> startRemote(mode) },
         )
     }
 
-    remoteStartedUrl?.let { url ->
-        RemotePlayStartedDialog(
-            url = url,
-            mode = remoteStartedMode ?: RemotePlayMode.CLOUDFLARE,
-            onDismiss = {
-                remoteStartedUrl = null
-                remoteStartedMode = null
-            },
-        )
+    if (showRemoteDebug) {
+        RemotePlayDebugDialog(onDismiss = { showRemoteDebug = false })
     }
 }
 

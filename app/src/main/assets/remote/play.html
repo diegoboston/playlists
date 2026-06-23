@@ -9,7 +9,7 @@
     html, body { height: 100%; background: #000; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
     #bar { background: rgba(0,0,0,.8); padding: 10px 12px; text-align: center; font-size: 14px; line-height: 1.4; }
     #barTop { display: flex; align-items: center; justify-content: center; gap: 10px; }
-    #title { font-weight: 700; }
+    #title { font-weight: 700; color: inherit; text-decoration: none; }
     #editBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; }
     #editBtn:disabled { opacity: .35; cursor: default; }
     #editBtn svg { width: 22px; height: 22px; fill: currentColor; }
@@ -44,7 +44,7 @@
 <body>
   <div id="bar">
     <div id="barTop">
-      <div id="title">Stage Manager</div>
+      <a id="title" href="/">Stage Manager</a>
       <button id="uploadBtn" type="button" aria-label="Upload song" title="Upload song">+</button>
       <button id="editBtn" type="button" aria-label="Edit playlist" title="Edit playlist">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>
@@ -319,12 +319,7 @@
 
     async function refresh() {
       if (!playlistApi) {
-        zoomWrap.hidden = true;
-        emptyEl.hidden = false;
-        emptyEl.textContent = 'Add ?playlist={id} to the URL (see GET /api/playlists).';
-        metaEl.textContent = '';
-        uploadBtn.disabled = true;
-        editBtn.disabled = true;
+        window.location.replace('/');
         return;
       }
       uploadBtn.disabled = false;

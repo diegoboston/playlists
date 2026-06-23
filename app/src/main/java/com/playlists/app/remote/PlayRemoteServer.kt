@@ -19,7 +19,8 @@ class PlayRemoteServer(
     port: Int,
     private val pin: String,
     private val requirePin: Boolean = true,
-    private val html: String,
+    private val playHtml: String,
+    private val indexHtml: String,
     private val editHtml: String,
     private val pinHtml: String,
     private val onLoadPlaylist: ((playlistId: Long) -> PlaylistLoad?)? = null,
@@ -98,8 +99,7 @@ class PlayRemoteServer(
         }
         if (requirePin && !isAuthorized(session)) {
             return when {
-                uri == "/" || uri == "/index.html" || uri == "/edit" || uri == "/edit.html" ->
-                    htmlResponse(pinHtml)
+                isHtmlPageRoute(uri) -> htmlResponse(pinHtml)
                 uri.startsWith("/api/") -> jsonUnauthorized()
                 else -> notFound()
             }
@@ -123,7 +123,8 @@ class PlayRemoteServer(
             }
         }
         return when {
-            uri == "/" || uri == "/index.html" -> htmlResponse(html)
+            isPlayPageRoute(uri, session) -> htmlResponse(playHtml)
+            uri == "/" || uri == "/index.html" -> htmlResponse(indexHtml)
             uri == "/edit" || uri == "/edit.html" -> htmlResponse(editHtml)
             uri == "/api/songs" && session.method == Method.GET -> handleListSongs()
             uri == "/api/songs/update" && session.method == Method.POST -> handleUpdateSong(session)
@@ -138,6 +139,20 @@ class PlayRemoteServer(
 
     private fun notFound(): Response =
         newFixedLengthResponse(Response.Status.NOT_FOUND, NanoHTTPD.MIME_PLAINTEXT, "Not found")
+
+    private fun isHtmlPageRoute(uri: String): Boolean =
+        uri == "/" || uri == "/index.html" ||
+            uri == "/play" || uri == "/play.html" ||
+            uri == "/edit" || uri == "/edit.html"
+
+    private fun isPlayPageRoute(uri: String, session: IHTTPSession): Boolean =
+        uri == "/play" || uri == "/play.html" ||
+            ((uri == "/" || uri == "/index.html") && hasPlaylistQuery(session))
+
+    private fun hasPlaylistQuery(session: IHTTPSession): Boolean {
+        val id = session.parameters["playlist"]?.firstOrNull() ?: return false
+        return id.matches(Regex("\\d+"))
+    }
 
     private fun matchPlaylistRoute(uri: String): Pair<Long, String>? {
         val match = Regex("""^/api/playlists/(\d+)(/.*)?$""").matchEntire(uri) ?: return null

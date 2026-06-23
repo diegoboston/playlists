@@ -99,7 +99,8 @@ When adding or changing playlist/playback behaviour, update **both**:
 | In-app **Play** button (local fullscreen Compose) | Browser fullscreen via URL |
 | — | **Upload song** overlay on play view (`/api/upload`) |
 | — | Cloudflare PIN gate (`pin.html`, `/api/auth`) when tunnel mode |
-| — | **Done** on edit view returns to `/` (play), not Android back stack |
+| — | **Done** on edit view returns to `/play`, not Android back stack |
+| — | Root `/` shows playlist picker (`index.html`) before playback |
 
 New features should land on **both** management/playback pairs unless explicitly scoped to one column above.
 

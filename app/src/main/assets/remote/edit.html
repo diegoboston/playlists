@@ -292,7 +292,9 @@
       } catch (_) {}
     }
 
-    doneBtn.addEventListener('click', () => { window.location.href = '/' + playlistQuery(); });
+    doneBtn.addEventListener('click', () => {
+      window.location.href = playlistId ? `/play?playlist=${playlistId}` : '/';
+    });
 
     searchInput.addEventListener('input', () => {
       clearTimeout(searchTimer);

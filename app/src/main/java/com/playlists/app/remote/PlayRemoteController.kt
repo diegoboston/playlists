@@ -19,8 +19,18 @@ object PlayRemoteController {
     private var server: PlayRemoteServer? = null
     private var publicUrl: String? = null
     private var appContext: Context? = null
+    private val stopLock = Any()
+    private var session: RemotePlaySession? = null
     var activePlaylistId: Long? = null
         private set
+
+    private data class RemotePlaySession(
+        val mode: RemotePlayMode,
+        val localPort: Int,
+        val tunnelBaseUrl: String?,
+        val publicUrl: String,
+        val startWarnings: List<String>,
+    )
 
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
@@ -32,6 +42,46 @@ object PlayRemoteController {
 
     fun currentUrl(): String? = if (isRunning()) publicUrl else null
 
+    fun collectDebugInfo(): RemotePlayDebugInfo? {
+        val active = session ?: return null
+        val localUrl = "http://127.0.0.1:${active.localPort}/"
+        val localProbe = RemotePlayHealth.probeGet(localUrl, timeoutMs = 4_000)
+        val tunnelProbe = active.tunnelBaseUrl?.let {
+            RemotePlayHealth.probeTunnelWithRetries(it, attempts = 3, pauseMs = 1_000, timeoutMs = 5_000)
+        }
+        val warnings = active.startWarnings.toMutableList()
+        if (active.mode == RemotePlayMode.CLOUDFLARE && !CloudflareTunnel.isRunning()) {
+            warnings.add("cloudflared is not running — the public URL will not work.")
+            CloudflareTunnel.lastExitCode()?.let { code ->
+                warnings.add("cloudflared last exit code: $code")
+            }
+        }
+        if (tunnelProbe != null && !tunnelProbe.ok) {
+            warnings.add(
+                "Tunnel URL did not respond (${tunnelProbe.detail}). " +
+                    "Browser “unreachable” usually means the tunnel died or is still starting.",
+            )
+        }
+        if (!localProbe.ok) {
+            warnings.add("Local HTTP server did not respond (${localProbe.detail}).")
+        }
+        return RemotePlayDebugInfo(
+            mode = active.mode,
+            localPort = active.localPort,
+            localUrl = localUrl,
+            tunnelBaseUrl = active.tunnelBaseUrl,
+            publicUrl = active.publicUrl,
+            serverAlive = server?.isAlive == true,
+            tunnelProcessAlive = CloudflareTunnel.isRunning(),
+            tunnelExitCode = CloudflareTunnel.lastExitCode(),
+            localProbe = localProbe,
+            tunnelProbe = tunnelProbe,
+            cloudflaredLog = CloudflareTunnel.recentLogs(),
+            warnings = warnings,
+            checkedAtMs = System.currentTimeMillis(),
+        )
+    }
+
     fun start(
         context: Context,
         playlistId: Long?,
@@ -41,7 +91,8 @@ object PlayRemoteController {
     ): Result<String> {
         stop()
         appContext = context.applicationContext
-        val html = context.assets.open("remote/play.html").bufferedReader().readText()
+        val playHtml = context.assets.open("remote/play.html").bufferedReader().readText()
+        val indexHtml = context.assets.open("remote/index.html").bufferedReader().readText()
         val editHtml = context.assets.open("remote/edit.html").bufferedReader().readText()
         val pinHtml = context.assets.open("remote/pin.html").bufferedReader().readText()
         val port = AppPrefs.getRemoteCode(context)
@@ -51,7 +102,8 @@ object PlayRemoteController {
             port = port,
             pin = pin,
             requirePin = mode == RemotePlayMode.CLOUDFLARE,
-            html = html,
+            playHtml = playHtml,
+            indexHtml = indexHtml,
             editHtml = editHtml,
             pinHtml = pinHtml,
             onLoadPlaylist = { id ->
@@ -134,16 +186,34 @@ object PlayRemoteController {
                     "http://$ip:$listeningPort"
                 }
             }
-            server = remote
-            activePlaylistId = playlistId
-            publicUrl = if (playlistId != null) {
+            val startWarnings = mutableListOf<String>()
+            if (mode == RemotePlayMode.CLOUDFLARE) {
+                val tunnelProbe = RemotePlayHealth.probeTunnelWithRetries(tunnelUrl)
+                if (!tunnelProbe.ok) {
+                    startWarnings.add(
+                        "Tunnel not reachable yet (${tunnelProbe.detail}). " +
+                            "Wait a few seconds, tap Refresh in the dialog, then open the URL.",
+                    )
+                }
+            }
+            val resolvedPublicUrl = if (playlistId != null) {
                 "$tunnelUrl/?playlist=$playlistId"
             } else {
                 "$tunnelUrl/"
             }
+            server = remote
+            activePlaylistId = playlistId
+            publicUrl = resolvedPublicUrl
+            session = RemotePlaySession(
+                mode = mode,
+                localPort = listeningPort,
+                tunnelBaseUrl = if (mode == RemotePlayMode.CLOUDFLARE) tunnelUrl else null,
+                publicUrl = resolvedPublicUrl,
+                startWarnings = startWarnings,
+            )
             _running.value = true
             RemotePlayService.start(context.applicationContext, playlistName)
-            Result.success(publicUrl!!)
+            Result.success(resolvedPublicUrl)
         } catch (e: Exception) {
             CloudflareTunnel.stop()
             remote.stop()
@@ -157,18 +227,31 @@ object PlayRemoteController {
     }
 
     fun stop() {
-        if (!_running.value && server == null) return
-        try {
-            appContext?.let { RemotePlayService.stop(it) }
-            CloudflareTunnel.stop()
-            server?.stop()
-        } catch (_: Exception) {
-        } finally {
+        val serviceContext: Context?
+        synchronized(stopLock) {
+            if (!_running.value && server == null) return
+            serviceContext = appContext
+        }
+        teardownResources()
+        serviceContext?.let { RemotePlayService.requestStop(it) }
+    }
+
+    internal fun teardownResources() {
+        val remote: PlayRemoteServer?
+        synchronized(stopLock) {
+            if (!_running.value && server == null) return
+            remote = server
             server = null
             publicUrl = null
             activePlaylistId = null
             appContext = null
+            session = null
             _running.value = false
+        }
+        try {
+            CloudflareTunnel.stop()
+            remote?.stop()
+        } catch (_: Exception) {
         }
     }
 
