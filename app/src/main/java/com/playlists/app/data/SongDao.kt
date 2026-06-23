@@ -15,6 +15,9 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE deletedAt IS NULL ORDER BY sortOrder ASC, id ASC")
     suspend fun getAll(): List<Song>
 
+    @Query("SELECT * FROM songs ORDER BY id ASC")
+    suspend fun getAllIncludingDeleted(): List<Song>
+
     @Query("SELECT * FROM songs WHERE id = :id")
     suspend fun getById(id: Long): Song?
 

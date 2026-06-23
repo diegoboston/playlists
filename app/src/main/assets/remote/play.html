@@ -90,6 +90,15 @@
       MAX_ZOOM: 5,
     };
 
+    const playlistId = new URLSearchParams(window.location.search).get('playlist');
+    const playlistApi = playlistId && /^\d+$/.test(playlistId)
+      ? `/api/playlists/${playlistId}`
+      : null;
+
+    function playlistQuery() {
+      return playlistId ? `?playlist=${playlistId}` : '';
+    }
+
     const zoomWrap = document.getElementById('zoomWrap');
     const media = document.getElementById('media');
     const metaEl = document.getElementById('meta');
@@ -185,7 +194,7 @@
     }
 
     function openUpload() {
-      if (busy) return;
+      if (busy || !playlistApi) return;
       uploadError.textContent = '';
       uploadTitle.value = '';
       uploadKey.value = '';
@@ -201,8 +210,8 @@
 
     uploadBtn.addEventListener('click', openUpload);
     editBtn.addEventListener('click', () => {
-      if (busy) return;
-      window.location.href = '/edit';
+      if (busy || !playlistApi) return;
+      window.location.href = '/edit' + playlistQuery();
     });
     uploadCancel.addEventListener('click', closeUpload);
 
@@ -257,7 +266,7 @@
         formData.append('filename', file.name);
         formData.append('mime', file.type || 'application/octet-stream');
         formData.append('file', file);
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const res = await fetch(`${playlistApi}/upload`, { method: 'POST', body: formData });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || 'Upload failed');
@@ -309,8 +318,19 @@
     }
 
     async function refresh() {
+      if (!playlistApi) {
+        zoomWrap.hidden = true;
+        emptyEl.hidden = false;
+        emptyEl.textContent = 'Add ?playlist={id} to the URL (see GET /api/playlists).';
+        metaEl.textContent = '';
+        uploadBtn.disabled = true;
+        editBtn.disabled = true;
+        return;
+      }
+      uploadBtn.disabled = false;
+      editBtn.disabled = false;
       try {
-        const res = await fetch('/api/state');
+        const res = await fetch(`${playlistApi}/state`);
         if (!res.ok) throw new Error('state unavailable');
         const s = await res.json();
         connectionLost = false;
@@ -335,7 +355,7 @@
           resetZoom();
           lastSongIndex = s.songIndex;
           lastPageIndex = s.pageIndex;
-          media.src = `/api/media?song=${s.songIndex}&page=${s.pageIndex}`;
+          media.src = `${playlistApi}/media?song=${s.songIndex}&page=${s.pageIndex}`;
         }
       } catch (_) {
         showConnectionLost();
@@ -346,7 +366,7 @@
       if (busy || scale > NAV.ZOOM_NAV_MAX) return;
       busy = true;
       try {
-        await fetch('/api/navigate', {
+        await fetch(`${playlistApi}/navigate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ direction }),

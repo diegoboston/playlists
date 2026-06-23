@@ -12,6 +12,9 @@ interface PlaylistDao {
     @Query("SELECT * FROM playlists ORDER BY sortOrder ASC, id ASC")
     fun observeAll(): Flow<List<Playlist>>
 
+    @Query("SELECT * FROM playlists ORDER BY sortOrder ASC, id ASC")
+    suspend fun getAll(): List<Playlist>
+
     @Query("SELECT * FROM playlists WHERE id = :id")
     suspend fun getById(id: Long): Playlist?
 

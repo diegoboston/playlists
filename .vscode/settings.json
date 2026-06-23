@@ -1,0 +1,26 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.import.gradle.enabled": true,
+  "java.import.gradle.wrapper.enabled": true,
+  "java.import.gradle.java.home": "${env:HOME}/tmp/android-build/jdk-17",
+  "java.jdt.ls.java.home": "${env:HOME}/tmp/android-build/jdk-17",
+  "java.import.gradle.env": {
+    "ANDROID_HOME": "${env:HOME}/tmp/android-build/android-sdk",
+    "ANDROID_SDK_ROOT": "${env:HOME}/tmp/android-build/android-sdk",
+    "JAVA_HOME": "${env:HOME}/tmp/android-build/jdk-17",
+    "GRADLE_USER_HOME": "${env:HOME}/tmp/android-build/gradle-home"
+  },
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-17",
+      "path": "${env:HOME}/tmp/android-build/jdk-17",
+      "default": true
+    }
+  ],
+  "terminal.integrated.env.linux": {
+    "JAVA_HOME": "${env:HOME}/tmp/android-build/jdk-17",
+    "ANDROID_HOME": "${env:HOME}/tmp/android-build/android-sdk",
+    "ANDROID_SDK_ROOT": "${env:HOME}/tmp/android-build/android-sdk",
+    "GRADLE_USER_HOME": "${env:HOME}/tmp/android-build/gradle-home"
+  }
+}

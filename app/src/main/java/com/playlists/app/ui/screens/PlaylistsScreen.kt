@@ -2,7 +2,6 @@ package com.playlists.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,11 +12,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -35,7 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.pluralStringResource
@@ -245,24 +242,12 @@ private fun PlaylistBlock(
                 )
             }
             IconButton(onClick = onColor) {
-                if (playlist.colorArgb != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.35f))
-                            .padding(2.dp)
-                            .clip(CircleShape)
-                            .background(Color(playlist.colorArgb)),
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.ColorLens,
-                        contentDescription = stringResource(R.string.playlist_color),
-                        tint = onBg,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+                Icon(
+                    Icons.Default.Palette,
+                    contentDescription = stringResource(R.string.playlist_color),
+                    tint = onBg,
+                    modifier = Modifier.size(20.dp),
+                )
             }
             IconButton(onClick = onDelete) {
                 Icon(

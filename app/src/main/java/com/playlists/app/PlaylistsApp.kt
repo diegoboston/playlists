@@ -6,11 +6,13 @@ import com.playlists.app.data.AppDatabase
 import com.playlists.app.data.PlaylistRepository
 import com.playlists.app.data.SongRepository
 import com.playlists.app.util.AppUpdate
+import com.playlists.app.util.SongFilenameMigration
 import com.playlists.app.util.StorageMigration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class PlaylistsApp : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -47,6 +49,9 @@ class PlaylistsApp : Application() {
             val db = AppDatabase.get(this)
             songRepository = SongRepository(db.songDao())
             playlistRepository = PlaylistRepository(db.playlistDao(), db.playlistSongDao())
+            runBlocking {
+                SongFilenameMigration.runIfNeeded(this@PlaylistsApp, songRepository)
+            }
             dataInitialized = true
         }
     }

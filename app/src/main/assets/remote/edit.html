@@ -61,6 +61,15 @@
     const searchResults = document.getElementById('searchResults');
     const contentEl = document.getElementById('content');
 
+    const playlistId = new URLSearchParams(window.location.search).get('playlist');
+    const playlistApi = playlistId && /^\d+$/.test(playlistId)
+      ? `/api/playlists/${playlistId}`
+      : null;
+
+    function playlistQuery() {
+      return playlistId ? `?playlist=${playlistId}` : '';
+    }
+
     let entries = [];
     let busy = false;
     let dragFrom = -1;
@@ -146,10 +155,14 @@
     }
 
     async function loadPlaylist() {
+      if (!playlistApi) {
+        errorEl.textContent = 'Add ?playlist={id} to the URL (see GET /api/playlists).';
+        return;
+      }
       setBusy(true);
       errorEl.textContent = '';
       try {
-        const res = await fetch('/api/playlist');
+        const res = await fetch(`${playlistApi}/entries`);
         if (!res.ok) throw new Error('Could not load playlist');
         const data = await res.json();
         titleEl.textContent = data.playlistName || 'Playlist';
@@ -166,7 +179,7 @@
       setBusy(true);
       errorEl.textContent = '';
       try {
-        const res = await fetch('/api/reorder', {
+        const res = await fetch(`${playlistApi}/reorder`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ entryIds }),
@@ -188,7 +201,7 @@
       setBusy(true);
       errorEl.textContent = '';
       try {
-        const res = await fetch('/api/remove', {
+        const res = await fetch(`${playlistApi}/remove`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ entryId }),
@@ -210,7 +223,7 @@
       setBusy(true);
       errorEl.textContent = '';
       try {
-        const res = await fetch('/api/add-placeholder', {
+        const res = await fetch(`${playlistApi}/add-placeholder`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title }),
@@ -233,7 +246,7 @@
       setBusy(true);
       errorEl.textContent = '';
       try {
-        const res = await fetch('/api/add', {
+        const res = await fetch(`${playlistApi}/add`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ songId }),
@@ -279,7 +292,7 @@
       } catch (_) {}
     }
 
-    doneBtn.addEventListener('click', () => { window.location.href = '/'; });
+    doneBtn.addEventListener('click', () => { window.location.href = '/' + playlistQuery(); });
 
     searchInput.addEventListener('input', () => {
       clearTimeout(searchTimer);

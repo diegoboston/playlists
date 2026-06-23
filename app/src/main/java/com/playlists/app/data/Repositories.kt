@@ -3,6 +3,8 @@ package com.playlists.app.data
 import android.content.Context
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.PlaceholderImageGenerator
+import com.playlists.app.util.SongFileNaming
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 
 class SongRepository(private val songDao: SongDao) {
@@ -12,9 +14,52 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun getById(id: Long): Song? = songDao.getById(id)
 
-    suspend fun insert(song: Song): Long = songDao.insertAtTop(song)
+    suspend fun insert(song: Song): Long {
+        val id = songDao.insertAtTop(song)
+        val saved = songDao.getById(id) ?: return id
+        applyCanonicalFilename(saved)
+        return id
+    }
 
-    suspend fun update(song: Song) = songDao.update(song)
+    suspend fun update(song: Song) {
+        songDao.update(song)
+        songDao.getById(song.id)?.let { applyCanonicalFilename(it) }
+    }
+
+    suspend fun migrateAllFilenames(): Int {
+        val songs = songDao.getAllIncludingDeleted()
+        var count = 0
+        for (song in songs.sortedBy { it.id }) {
+            if (applyCanonicalFilename(song)) count++
+        }
+        return count
+    }
+
+    suspend fun applyCanonicalFilename(song: Song): Boolean {
+        val file = File(song.filePath)
+        if (!file.isFile) return false
+        if (SongFileNaming.matches(song.title, song.keySignature, song.id, file)) return false
+
+        val target = SongFileNaming.resolveTargetFile(file, song.title, song.keySignature, song.id)
+        val sharedWithOthers = songDao.getAllIncludingDeleted()
+            .any { it.id != song.id && it.filePath == song.filePath }
+
+        val moved = if (sharedWithOthers) {
+            file.copyTo(target, overwrite = false)
+            target.isFile
+        } else {
+            file.renameTo(target) || run {
+                file.copyTo(target, overwrite = true)
+                file.delete()
+                target.isFile
+            }
+        }
+        if (!moved) return false
+
+        val updated = song.copy(filePath = target.absolutePath)
+        songDao.update(updated)
+        return true
+    }
 
     suspend fun delete(id: Long) = songDao.markDeleted(id, System.currentTimeMillis())
 
@@ -79,6 +124,8 @@ class PlaylistRepository(
     private val playlistSongDao: PlaylistSongDao,
 ) {
     fun observeAll(): Flow<List<Playlist>> = playlistDao.observeAll()
+
+    suspend fun getAll(): List<Playlist> = playlistDao.getAll()
 
     suspend fun getById(id: Long): Playlist? = playlistDao.getById(id)
 

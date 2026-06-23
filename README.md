@@ -29,15 +29,15 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 
 ### Playlists
 
-- **Create / rename** — New playlists get an editable name. The **Playlists** tab shows each playlist as a **colorful block** (NoTube-style folder colors) with inline **pencil** (rename), **color**, and **delete**.
+- **Create / rename** — New playlists get an editable name. The **Playlists** tab shows each playlist as a **colorful block** (NoTube-style folder colors) with inline **pencil** (rename), **palette** (color), and **delete**.
 - **Ordered sequences** — A playlist is an ordered list of songs from the archive.
 - **Add songs** — Search dialog with full-text match across title, key, and notes. If a title is not in the archive, tap **Add placeholder page** to create a synthetic sheet with just the title (stored in the archive with a ⚠ marker).
 - **Drag reorder** — Long-press and drag rows in the Songs tab, Playlists tab, or playlist detail screen. Uses the same center-vs-center swap logic as NoTube (`DraggableItem` + `ReorderLogic`).
 - **Duplicate playlist** — Copies name (with “(copy)”) and full song order.
-- **Playlist detail** — Two-line header: **back + title** (playlist accent color) on line 1; **tools** on line 2 (+ add, play, remote, rename, duplicate, color, delete). Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. Tap the highlighted **Wi‑Fi** icon again to stop remote play (or use the system notification).
+- **Playlist detail** — Two-line header: **back + title** on a **colored background** (playlist accent color) on line 1; **tools** on line 2 (+ add, play, remote, rename, duplicate, palette color, delete). Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. Tap the highlighted **Wi‑Fi** icon again to stop remote play (or use the system notification).
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs).
 - **Settings** — **Gear** icon on the main tabs opens **Settings**: under **Remote play**, set one **5-digit code** used as the Cloudflare PIN and the LAN port. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Shows the **installed app version** and a **Check for updates** button (same GitHub Release flow as the launch snackbar).
-- **Remote play** — Tap the **Wi‑Fi** icon and choose **Cloudflare tunnel (internet)** or **LAN only (same Wi‑Fi)**. Both start the same local HTTP server on the phone; Cloudflare adds a public `*.trycloudflare.com` URL (enter the code from Settings — no port in the link), while LAN serves `http://<phone-ip>:code/` on your Wi‑Fi with no code prompt. On start, a dialog shows the URL with a clickable link and **Open in browser** (the app does not navigate there automatically). Open the URL on another device (tablet, laptop) for a fullscreen browser view. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. While active, a **foreground notification** (default priority) shows a generic “remote play active” message and a **Stop** action — it does **not** show the public URL or code. Tap the highlighted **Wi‑Fi** icon again to stop remote play. The main-tab **Wi‑Fi** shortcut uses the last-opened playlist when remote is off; the playlist detail screen starts remote for that playlist. The Wi‑Fi icon is highlighted when active, gray when off. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen).
+- **Remote play** — Tap the **Wi‑Fi** icon and choose **Cloudflare tunnel (internet)** or **LAN only (same Wi‑Fi)**. Both start the same local HTTP server on the phone; Cloudflare adds a public `*.trycloudflare.com` URL (enter the code from Settings — no port in the link), while LAN serves `http://<phone-ip>:code/` on your Wi‑Fi with no code prompt. You can start remote from the **main tabs** (uses the last-opened playlist for playback when one exists, or starts in archive-only mode for HTTP API access) or from a **playlist detail** screen (that playlist). On start, a dialog shows the URL with a clickable link and **Open in browser** (the app does not navigate there automatically). Open the URL on another device (tablet, laptop) for a fullscreen browser view. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. While active, a **foreground notification** (default priority) shows a generic “remote play active” message and a **Stop** action — it does **not** show the public URL or code. Tap the highlighted **Wi‑Fi** icon again to stop remote play. The Wi‑Fi icon is highlighted when active, gray when off. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen). The HTTP API also exposes the full song archive and playlist list for scripting (see **HTTP API** below).
 - **In-app updates** — On cold start, checks GitHub Releases for a newer signed APK; snackbar prompt, download progress banner, then system installer (requires **Install unknown apps** permission for this package).
 
 ### Quickstart playlist
@@ -86,9 +86,9 @@ Sketch of the main flows (not to scale):
                  │
                  ▼
 ┌─────────────────────────────────────┐
-│ ← Sunday set                        │  ← line 1: back + title (accent color)
+│ ← Sunday set                        │  ← line 1: back + title on accent-color background
 ├─────────────────────────────────────┤
-│  +   ▶   📶   ✎   ⧉   ○   🗑   │  ← line 2: tools (Wi‑Fi gray when off)
+│  +   ▶   📶   ✎   ⧉   🎨   🗑   │  ← line 2: tools (palette = color; Wi‑Fi gray when off)
 ├─────────────────────────────────────┤
 │  Amazing Grace (G)              🗑  │
 │  intro notes                        │
@@ -102,10 +102,10 @@ PLAYLISTS TAB
 │ [ New playlist ]  [ Quickstart ]    │
 ├─────────────────────────────────────┤
 │ ┌─────────────────────────────────┐ │
-│ │ Sunday set            ✎  ○  🗑 │ │  ← colorful block; tap to open
+│ │ Sunday set            ✎  🎨  🗑 │ │  ← colorful block; tap to open
 │ └─────────────────────────────────┘ │
 │ ┌─────────────────────────────────┐ │
-│ │ Rehearsal             ✎  ○  🗑 │ │
+│ │ Rehearsal             ✎  🎨  🗑 │ │
 │ └─────────────────────────────────┘ │
 └─────────────────────────────────────┘
 
@@ -139,7 +139,7 @@ REMOTE PLAY ACTIVE (notification shade)
 4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (⚠) to add a title-only stand-in sheet.
 5. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 6. **Play** — Open a playlist → **Play** → swipe between songs.
-7. **Remote play** — Open a playlist → **Wi‑Fi** (or main-tab **Wi‑Fi** for the last-opened playlist). Pick Cloudflare (enter the 5-digit code) or LAN (code is the port in the URL). Tap **Wi‑Fi** again to stop. **Stop** also works from the system notification (or when deleting the playlist).
+7. **Remote play** — Main tabs or playlist detail → **Wi‑Fi**. Pick Cloudflare (enter the 5-digit code) or LAN (code is the port in the URL). Main-tab start works without opening a playlist first (playback uses the last-opened playlist when available). Tap **Wi‑Fi** again to stop. **Stop** also works from the system notification (or when deleting the playlist).
 8. **Settings** — Main tabs → **gear** → set the remote code → **Save**. **Check for updates** anytime from the same screen.
 9. **Quickstart** — **Playlists** tab → **Quickstart playlist** → paste text → **Match songs** → **Create** (matched only) or **Create with placeholders** (full order).
 10. **Update** — If a newer GitHub Release exists, a snackbar offers **Update now**; allow installs from this app when prompted.
@@ -254,6 +254,64 @@ Control playback from a **second screen** over the internet (e.g. iPad on a musi
 
 Requires **internet** on the phone for Cloudflare mode (Wi‑Fi or cellular). LAN mode needs both devices on the same network; the URL uses the phone’s Wi‑Fi IPv4 address. Cloudflare tunnel URLs change each session. On Android 13+, the app requests notification permission so the remote-play foreground notification can appear. CI bundles `cloudflared` via `scripts/fetch-cloudflared.sh` on every release build. Implementation: `PlayRemoteController.kt`, `CloudflareTunnel.kt`, `NetworkAddresses.kt`, `RemotePlayModeDialog.kt`, `RemotePlayStartedDialog.kt`, `RemotePlayService.kt`, `RemotePlayNotification.kt`, `PlayRemoteServer.kt`, `SettingsScreen.kt`, `assets/remote/play.html`, `assets/remote/edit.html`, `assets/remote/pin.html`.
 
+### HTTP API
+
+While remote play is active, the phone serves JSON over HTTP. Cloudflare mode requires PIN auth first (`POST /api/auth` with `{"pin":"12345"}`); LAN mode has no PIN. All requests use `Content-Type: application/json` for POST bodies unless noted.
+
+**Auth**
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| `POST` | `/api/auth` | `{"pin":"12345"}` | `{"ok":true}` + `Set-Cookie: remote_auth=…` |
+
+**Song archive**
+
+| Method | Path | Body / query | Response |
+|--------|------|------------|----------|
+| `GET` | `/api/songs` | — | `{"songs":[{"id", "title", "key", "notes", "fileType", "isDeleted", "isPlaceholder"}, …]}` |
+| `POST` | `/api/songs/update` | `{"songId", "title", "key", "notes"}` | Updated `{"songs":[…]}` |
+| `GET` | `/api/songs/search` | `?q=…` | `{"songs":[{"id", "title", "key", "notes", "isPlaceholder"}, …]}` (archive search) |
+| `GET` | `/api/parse-filename` | `?raw=…` | `{"title", "key", "notes"}` (filename parse hint) |
+
+**Playlists (library)**
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| `GET` | `/api/playlists` | — | `{"playlists":[{"id", "name", "color", "songCount"}, …]}` (`color` is ARGB int or `null`) |
+| `POST` | `/api/playlists/create` | `{"name"}` | `{"id", "name"}` |
+| `POST` | `/api/playlists/reorder` | `{"playlistIds":[…]}` | Updated `{"playlists":[…]}` |
+| `POST` | `/api/playlists/{playlistId}/rename` | `{"name"}` | Updated `{"playlists":[…]}` |
+| `POST` | `/api/playlists/{playlistId}/color` | `{"color"}` (`color`: ARGB int or `null` to clear) | Updated `{"playlists":[…]}` |
+| `POST` | `/api/playlists/{playlistId}/delete` | — | Updated `{"playlists":[…]}` |
+
+**Per-playlist (playback + editor)**
+
+All routes below require the playlist id in the path. Playback position (`songIndex`, `pageIndex`) is tracked per playlist id on the server. Responses include `"playlistId"` and `"playlistName"`.
+
+| Method | Path | Body / query | Response |
+|--------|------|------------|----------|
+| `GET` | `/api/playlists/{playlistId}/state` | — | Playback position + song list for `play.html` |
+| `GET` | `/api/playlists/{playlistId}/entries` | — | Full entries for `edit.html` |
+| `POST` | `/api/playlists/{playlistId}/navigate` | `{"direction":"next"\|"prev"}` | Updated state JSON |
+| `GET` | `/api/playlists/{playlistId}/media` | `?song=&page=` | Image/PDF bytes for a page |
+| `POST` | `/api/playlists/{playlistId}/reorder` | `{"entryIds":[…]}` | Updated entries JSON (song order **in** playlist) |
+| `POST` | `/api/playlists/{playlistId}/remove` | `{"entryId"}` | Updated entries JSON |
+| `POST` | `/api/playlists/{playlistId}/add` | `{"songId"}` | Updated entries JSON |
+| `POST` | `/api/playlists/{playlistId}/add-placeholder` | `{"title", "key", "notes"}` | Updated entries JSON |
+| `POST` | `/api/playlists/{playlistId}/upload` | `multipart/form-data` (`file`, `title`, `key`, `notes`, …) | Updated state JSON |
+
+**HTML pages**
+
+| Path | Purpose |
+|------|---------|
+| `/?playlist={id}` | Playback view (`play.html`) for that playlist |
+| `/edit?playlist={id}` | Playlist editor (`edit.html`) |
+| `/` (unauthenticated, Cloudflare) | PIN gate (`pin.html`) |
+
+When remote play starts from a playlist, the app appends `?playlist={id}` to the shared URL. API clients must pass the same id in every per-playlist path — there is no implicit “current playlist” on the server.
+
+Errors return HTTP 400/401 with `{"error":"message"}`.
+
 ## update.sh
 
 Interactive script to pull sources from a remote machine (via rsync), review changes, commit, and push to `origin main`:
@@ -291,7 +349,7 @@ Files and app state live on shared storage under **`Music/StageManager/`** (typi
 
 | Path | Contents |
 |------|----------|
-| `songs/` | PDF and image sheet music |
+| `songs/` | PDF and image sheet music, named `{Title_With_Underscores}-{Key}-{songId}.{ext}` (e.g. `Amazing_Grace-G-42.pdf`) |
 | `playlists.db` | Room database (songs, playlists, order) |
 | `state.json` | Remote-play code and last-opened playlist |
 

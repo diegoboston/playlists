@@ -75,19 +75,16 @@ fun MainTabsScreen(
         }
     }
 
-    fun startRemote(playlistId: Long, mode: RemotePlayMode) {
+    fun startRemote(playlistId: Long?, mode: RemotePlayMode) {
         scope.launch {
-            val playlist = viewModel.getPlaylist(playlistId)
-            if (playlist == null) {
+            val playlist = playlistId?.let { viewModel.getPlaylist(it) }
+            if (playlistId != null && playlist == null) {
                 Toast.makeText(context, R.string.remote_playlist_gone, Toast.LENGTH_LONG).show()
                 return@launch
             }
-            val list = viewModel.getPlaylistSongs(playlistId)
-            if (list.isEmpty()) {
-                Toast.makeText(context, R.string.remote_empty, Toast.LENGTH_LONG).show()
-                return@launch
-            }
-            PlayRemoteController.start(context, playlistId, playlist.name, list, mode)
+            val list = if (playlistId != null) viewModel.getPlaylistSongs(playlistId) else emptyList()
+            val name = playlist?.name ?: context.getString(R.string.app_name)
+            PlayRemoteController.start(context, playlistId, name, list, mode)
                 .onSuccess { url ->
                     remoteStartedUrl = url
                     remoteStartedMode = mode
@@ -120,16 +117,7 @@ fun MainTabsScreen(
                                         ).show()
                                         return@IconButton
                                     }
-                                    val playlistId = AppPrefs.getLastPlaylistId(context)
-                                    if (playlistId == null) {
-                                        Toast.makeText(
-                                            context,
-                                            R.string.remote_no_last_playlist,
-                                            Toast.LENGTH_LONG,
-                                        ).show()
-                                        return@IconButton
-                                    }
-                                    pendingRemotePlaylistId = playlistId
+                                    pendingRemotePlaylistId = AppPrefs.getLastPlaylistId(context)
                                     showRemoteModeDialog = true
                                 },
                             ) {

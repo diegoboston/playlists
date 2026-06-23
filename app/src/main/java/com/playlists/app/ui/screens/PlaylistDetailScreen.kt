@@ -14,14 +14,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Wifi
@@ -45,8 +44,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -138,19 +137,33 @@ fun PlaylistDetailScreen(
 
     Scaffold(
         topBar = {
+            val accentColor = playlist?.colorArgb?.let { Color(it) }
+            val titleBg = accentColor ?: MaterialTheme.colorScheme.surface
+            val onTitleBg = when {
+                accentColor != null && accentColor.luminance() > 0.5f -> Color.Black
+                accentColor != null -> Color.White
+                else -> MaterialTheme.colorScheme.onSurface
+            }
             Surface(shadowElevation = 3.dp) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(titleBg)
+                            .padding(end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = null,
+                                tint = onTitleBg,
+                            )
                         }
                         Text(
                             text = playlist?.name.orEmpty(),
                             style = MaterialTheme.typography.titleLarge,
-                            color = playlist?.colorArgb?.let { Color(it) } ?: Color.Unspecified,
+                            color = onTitleBg,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
@@ -193,20 +206,10 @@ fun PlaylistDetailScreen(
                             Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.duplicate))
                         }
                         IconButton(onClick = { showColor = true }) {
-                            if (playlist?.colorArgb != null) {
-                                androidx.compose.foundation.layout.Box(
-                                    modifier = Modifier
-                                        .padding(10.dp)
-                                        .size(20.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(playlist!!.colorArgb!!)),
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Default.ColorLens,
-                                    contentDescription = stringResource(R.string.playlist_color),
-                                )
-                            }
+                            Icon(
+                                Icons.Default.Palette,
+                                contentDescription = stringResource(R.string.playlist_color),
+                            )
                         }
                         IconButton(onClick = { showDelete = true }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_playlist))

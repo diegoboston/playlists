@@ -99,6 +99,7 @@ def authenticate(base_url: str, pin: str, opener: urllib.request.OpenerDirector)
 
 def upload_song(
     base_url: str,
+    playlist_id: int,
     item: dict,
     opener: urllib.request.OpenerDirector,
 ) -> dict:
@@ -126,7 +127,7 @@ def upload_song(
     body = b"".join(part if isinstance(part, bytes) else part.encode() for part in parts)
 
     req = urllib.request.Request(
-        f"{base_url.rstrip('/')}/api/upload",
+        f"{base_url.rstrip('/')}/api/playlists/{playlist_id}/upload",
         data=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
         method="POST",
@@ -153,6 +154,12 @@ def parse_args() -> argparse.Namespace:
         "--pin",
         default=None,
         help=f"5-digit remote PIN (default: $STAGE_MANAGER_PIN or {DEFAULT_PIN})",
+    )
+    parser.add_argument(
+        "--playlist",
+        type=int,
+        required=True,
+        help="Playlist id to add uploaded songs to (see GET /api/playlists)",
     )
     parser.add_argument(
         "--out-dir",
@@ -219,7 +226,7 @@ def main() -> int:
     failures: list[tuple[dict, str]] = []
     for item in manifest:
         try:
-            result = upload_song(args.url, item, opener)
+            result = upload_song(args.url, args.playlist, item, opener)
             song_count = len(result.get("songs", []))
             print(f"Uploaded {item['page']:2d}: {item['title']!r} (playlist now {song_count} songs)")
             ok += 1
