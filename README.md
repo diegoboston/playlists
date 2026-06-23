@@ -24,20 +24,20 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores and dashes → spaces, extension dropped, trailing key → Key, trailing instrument → Notes).
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
-- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. Placeholder songs (no real sheet yet) show a ⚠ after the title. **A–Z**, **Recently added** (import date), and **Recently viewed** buttons sort the archive (persists order). Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
+- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. Placeholder songs (no real sheet yet) show a 🚧 after the title. **A–Z**, **Recently added** (import date), and **Recently viewed** buttons sort the archive (persists order). Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
 - **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages.
 
 ### Playlists
 
 - **Create / rename** — New playlists get an editable name. The **Playlists** tab shows each playlist as a **colorful block** (NoTube-style folder colors) with inline **pencil** (rename), **palette** (color), and **delete**.
 - **Ordered sequences** — A playlist is an ordered list of songs from the archive.
-- **Add songs** — Search dialog with full-text match across title, key, and notes. If a title is not in the archive, tap **Add placeholder page** to create a synthetic sheet with just the title (stored in the archive with a ⚠ marker).
+- **Add songs** — Search dialog with full-text match across title, key, and notes. If a title is not in the archive, tap **Add placeholder page** to create a synthetic sheet with just the title (stored in the archive with a 🚧 marker).
 - **Drag reorder** — Long-press and drag rows in the Songs tab, Playlists tab, or playlist detail screen. Uses the same center-vs-center swap logic as NoTube (`DraggableItem` + `ReorderLogic`).
 - **Duplicate playlist** — Copies name (with “(copy)”) and full song order.
 - **Playlist detail** — Two-line header: **back + title** on a **colored background** (playlist accent color) on line 1; **tools** on line 2 (+ add, play, remote, rename, duplicate, palette color, delete). Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. Tap the highlighted **Wi‑Fi** icon again to stop remote play (a pulsing green dot shows while it is active), **long-press** it for connection status and debug info, or use the system notification.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs).
 - **Settings** — **Gear** icon on the main tabs opens **Settings**: under **Remote play**, set one **5-digit code** used as the Cloudflare PIN and the LAN port. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Shows the **installed app version** and a **Check for updates** button (same GitHub Release flow as the launch snackbar).
-- **Remote play** — Tap the **Wi‑Fi** icon and choose **Cloudflare tunnel (internet)** or **LAN only (same Wi‑Fi)**. Both start the same local HTTP server on the phone; Cloudflare adds a public `*.trycloudflare.com` URL (enter the code from Settings — no port in the link), while LAN serves `http://<phone-ip>:code/` on your Wi‑Fi with no code prompt. You can start remote from the **main tabs** (uses the last-opened playlist for playback when one exists, or starts in archive-only mode for HTTP API access) or from a **playlist detail** screen (that playlist). On start, a dialog shows the URL with a clickable link, **Open in browser**, and live **connection checks** (local server, tunnel reachability, cloudflared log). Tap **Refresh** or **Copy debug info** if the browser says the site is unreachable. **Long-press** the Wi‑Fi icon while remote is active to reopen status. Open the URL on another device (tablet, laptop) for a fullscreen browser view: after the PIN (Cloudflare only), the home page lists your playlists with **Play** and **Edit**; tap **Play** to open the slideshow for that playlist. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. While active, a **foreground notification** (default priority) shows a generic “remote play active” message and a **Stop** action — it does **not** show the public URL or code. Tap the highlighted **Wi‑Fi** icon again to stop remote play. The Wi‑Fi icon is highlighted when active, gray when off, with a pulsing green dot beside it while remote play is running. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen). The HTTP API also exposes the full song archive and playlist list for scripting (see **HTTP API** below).
+- **Remote play** — Tap the **Wi‑Fi** icon and choose **Cloudflare tunnel (internet)** or **LAN only (same Wi‑Fi)**. Both start the same local HTTP server on the phone; Cloudflare adds a public `*.trycloudflare.com` URL (enter the code from Settings — no port in the link), while LAN serves `http://<phone-ip>:code/` on your Wi‑Fi with no code prompt. You can start remote from the **main tabs** (uses the last-opened playlist for playback when one exists, or starts in archive-only mode for HTTP API access) or from a **playlist detail** screen (that playlist). On start, a dialog shows the URL with a clickable link and **Open in browser**. If Cloudflare setup hits a problem, the same dialog adds **connection checks** (local server, tunnel reachability, cloudflared log). Tap **Refresh** or **Copy debug info** if the browser says the site is unreachable. **Long-press** the Wi‑Fi icon while remote is active to reopen status. Open the URL on another device (tablet, laptop) for a fullscreen browser view: after the PIN (Cloudflare only), the home page lists your playlists with **Play** and **Edit**; tap **Play** to open the slideshow for that playlist. Swipe or arrow keys advance songs/pages while the phone keeps serving the playlist. While active, a **foreground notification** (default priority) shows a generic “remote play active” message and a **Stop** action — it does **not** show the public URL or code. Tap the highlighted **Wi‑Fi** icon again to stop remote play. The Wi‑Fi icon is highlighted when active, gray when off, with a pulsing green dot beside it while remote play is running. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen). The HTTP API also exposes the full song archive and playlist list for scripting (see **HTTP API** below).
 - **In-app updates** — On cold start, checks GitHub Releases for a newer signed APK; snackbar prompt, download progress banner, then system installer (requires **Install unknown apps** permission for this package).
 
 ### Quickstart playlist
@@ -137,7 +137,7 @@ REMOTE PLAY ACTIVE (notification shade)
 1. **Import a song** — Gallery or browser → Share → Stage Manager → fill Title, Key, Notes → Save.
 2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **A–Z**, **Recently added**, or **Recently viewed** to sort.
 3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete from the colorful blocks on the list.
-4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (⚠) to add a title-only stand-in sheet.
+4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (🚧) to add a title-only stand-in sheet.
 5. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 6. **Play** — Open a playlist → **Play** → swipe between songs.
 7. **Remote play** — Main tabs or playlist detail → **Wi‑Fi**. Pick Cloudflare (enter the 5-digit code) or LAN (code is the port in the URL). Main-tab start works without opening a playlist first (playback uses the last-opened playlist when available). Tap **Wi‑Fi** again to stop; **long-press** it while remote is active to reopen connection status and **Copy debug info**. **Stop** also works from the system notification (or when deleting the playlist).
@@ -161,7 +161,7 @@ playlists/
 │   └── src/main/
 │       ├── assets/
 │       │   ├── jniLibs/arm64-v8a/libcloudflared.so  # Bundled tunnel binary (gitignored; built by script)
-│       │   └── remote/             # index.html, play.html, edit.html, pin.html
+│       │   └── remote/             # index.html, play.html, edit.html, pin.html, song-display.js
 │       └── java/com/playlists/app/
 │           ├── data/               # Room: Song, Playlist, PlaylistSong
 │           ├── remote/             # HTTP server, tunnel, foreground service, notification
@@ -173,7 +173,7 @@ playlists/
 │           │   ├── components/     # Media viewer, dialogs, update banner
 │           │   ├── reorder/        # DraggableItem + list drag handler
 │           │   └── theme/          # Material 3 theme
-│           └── util/               # Share import, storage migration, AppUpdate, AppPrefs
+│           └── util/               # Share import, storage paths, AppUpdate, AppPrefs
 └── gradle/wrapper/
 ```
 
@@ -252,7 +252,7 @@ Control playback from a **second screen** over the internet (e.g. iPad on a musi
 5. **Navigate** — Swipe left/right (or laptop arrow keys) for next/previous song; multi-page PDFs advance page before moving to the next song.
 6. **Edit playlist** — On `/edit`, drag rows to reorder, tap **Remove**, or search the archive to add. **Done** returns to the stage view. Changes sync to the phone database immediately.
 7. **Stop** — Tap the highlighted **Wi‑Fi** icon again, **Stop** on the system notification, or delete the active playlist.
-8. **Status / debug** — While remote is active, **long-press** the **Wi‑Fi** icon (main tabs or playlist detail) to reopen connection checks, cloudflared log, and **Copy debug info** — useful if the browser says the URL is unreachable.
+8. **Status / debug** — While remote is active, **long-press** the **Wi‑Fi** icon (main tabs or playlist detail) to reopen the URL; connection checks and cloudflared log appear only when something looks wrong. **Copy debug info** is available from that panel when checks are shown — useful if the browser says the URL is unreachable.
 
 Requires **internet** on the phone for Cloudflare mode (Wi‑Fi or cellular). LAN mode needs both devices on the same network; the URL uses the phone’s Wi‑Fi IPv4 address. Cloudflare tunnel URLs change each session. On Android 13+, the app requests notification permission so the remote-play foreground notification can appear. CI bundles `cloudflared` via `scripts/fetch-cloudflared.sh` on every release build. Implementation: `PlayRemoteController.kt`, `CloudflareTunnel.kt`, `NetworkAddresses.kt`, `RemotePlayFlowDialog.kt`, `RemotePlayStartedDialog.kt`, `RemotePlayService.kt`, `RemotePlayNotification.kt`, `PlayRemoteServer.kt`, `SettingsScreen.kt`, `assets/remote/play.html`, `assets/remote/edit.html`, `assets/remote/pin.html`, `assets/remote/index.html`.
 
@@ -357,7 +357,7 @@ Files and app state live on shared storage under **`Music/StageManager/`** (typi
 | `playlists.db` | Room database (songs, playlists, order) |
 | `state.json` | Remote-play code and last-opened playlist |
 
-On first launch after install or upgrade, the app requests **All files access** so it can use this folder. Existing data in app-internal storage is migrated automatically. After migration, uninstalling and reinstalling the app restores your library from `Music/StageManager`. On upgrade, absolute paths in the database are converted to `Music/StageManager/songs/…` form (so `/sdcard/…` and `/storage/emulated/0/…` never matter), missing files are reconciled, and the orphan scan reruns. Once per install, if `songs/` contains a file whose name is not referenced by any archive entry, the app lists it and asks whether to delete it.
+On first launch the app shows a **storage access** screen and does not open the library until **All files access** is granted for `Music/StageManager/`. Uninstalling and reinstalling the app restores your library from that folder as long as it is intact. Song paths in the database are stored as `Music/StageManager/songs/{filename}`.
 
 ## Tech stack
 

@@ -67,7 +67,7 @@ fun RemotePlayDebugDialog(
                     if (url == null) {
                         Text(stringResource(R.string.remote_debug_unavailable))
                     }
-                } else {
+                } else if (info.hasIssues()) {
                     RemotePlayDebugPanel(info = info, onRefresh = { refreshTick++ })
                 }
             }

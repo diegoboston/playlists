@@ -30,7 +30,6 @@
     .searchRow { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 12px; cursor: pointer; }
     .searchRow:active { background: #252525; }
     .searchRow.placeholder { border-color: #665500; }
-    .placeholder-warn { color: #ffb74d; margin-left: 6px; }
     #error { color: #ff8a80; font-size: 14px; margin: 12px 0; min-height: 1.2em; }
     #content.busy { opacity: .6; pointer-events: none; }
   </style>
@@ -50,6 +49,7 @@
       <div id="searchResults"></div>
     </div>
   </div>
+  <script src="/song-display.js"></script>
   <script>
     const titleEl = document.getElementById('title');
     const doneBtn = document.getElementById('doneBtn');
@@ -81,19 +81,11 @@
     }
 
     function metaLine(entry) {
+      const note = SongDisplay.notesLine(entry.notes);
       const parts = [];
       if (entry.key) parts.push(entry.key);
-      if (entry.notes) parts.push(entry.notes);
+      if (note) parts.push(note);
       return parts.join(' · ');
-    }
-
-    function titleWithKey(title, key) {
-      const k = (key || '').trim();
-      return k ? `${title} (${k})` : title;
-    }
-
-    function titleWithMarker(title, key, isPlaceholder) {
-      return titleWithKey(title, key) + (isPlaceholder ? ' ⚠' : '');
     }
 
     function renderList() {
@@ -116,7 +108,8 @@
           </div>
           <button class="removeBtn" type="button">Remove</button>
         `;
-        li.querySelector('.song-title').textContent = titleWithMarker(entry.title, entry.key, entry.isPlaceholder);
+        li.querySelector('.song-title').textContent =
+          SongDisplay.adjustedSongTitle(entry.title, entry.key, entry.isPlaceholder);
         const meta = metaLine(entry);
         const metaEl = li.querySelector('.song-meta');
         if (meta) metaEl.textContent = meta;
@@ -274,16 +267,17 @@
           const row = document.createElement('div');
           row.className = 'searchRow placeholder';
           row.innerHTML = '<div class="song-title"></div>';
-          row.querySelector('.song-title').textContent = `Add placeholder page: “${trimmed}” ⚠`;
+          row.querySelector('.song-title').textContent = SongDisplay.addPlaceholderPrompt(trimmed);
           row.addEventListener('click', () => addPlaceholder(trimmed));
           searchResults.appendChild(row);
         }
         (data.songs || []).forEach((song) => {
           const row = document.createElement('div');
           row.className = 'searchRow';
-          const meta = [song.key, song.notes].filter(Boolean).join(' · ');
+          const meta = [song.key, SongDisplay.notesLine(song.notes)].filter(Boolean).join(' · ');
           row.innerHTML = `<div class="song-title"></div>${meta ? '<div class="song-meta"></div>' : ''}`;
-          row.querySelector('.song-title').textContent = titleWithMarker(song.title, song.key, song.isPlaceholder);
+          row.querySelector('.song-title').textContent =
+            SongDisplay.adjustedSongTitle(song.title, song.key, song.isPlaceholder);
           if (meta) row.querySelector('.song-meta').textContent = meta;
           row.addEventListener('click', () => addSong(song.id));
           searchResults.appendChild(row);

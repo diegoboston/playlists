@@ -163,7 +163,7 @@ private fun formatQuickstartSummary(
     return (matched + unmatched).joinToString("\n") { result ->
         val song = result.song
         val target = if (song != null) {
-            com.playlists.app.ui.SongDisplay.titleWithKey(
+            com.playlists.app.ui.SongDisplay.adjustedSongTitle(
                 song.title,
                 song.keySignature,
                 song.isPlaceholder,

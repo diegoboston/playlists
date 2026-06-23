@@ -1,9 +1,7 @@
 package com.playlists.app.data
 
-import android.content.Context
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.PlaceholderImageGenerator
-import com.playlists.app.util.SongPathRepair
 import com.playlists.app.util.SongStoragePaths
 import java.io.File
 import kotlinx.coroutines.flow.Flow
@@ -19,16 +17,6 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun update(song: Song) {
         songDao.update(song)
-    }
-
-    suspend fun repairAllFilePaths(songsDir: File): Int {
-        val songs = songDao.getAll()
-        val updates = SongPathRepair.repairAll(songs, songsDir)
-        for ((id, path) in updates) {
-            val song = songDao.getById(id) ?: continue
-            songDao.update(song.copy(filePath = path))
-        }
-        return updates.size
     }
 
     suspend fun delete(id: Long) {
@@ -77,14 +65,13 @@ class SongRepository(private val songDao: SongDao) {
     }
 
     suspend fun createPlaceholder(
-        context: Context,
         title: String,
         keySignature: String = "",
         notes: String = "",
     ): Long {
         val trimmedTitle = title.trim().ifBlank { "Untitled" }
         val bytes = PlaceholderImageGenerator.render(trimmedTitle)
-        val stored = FileStorage.storeBytes(context, bytes, "png")
+        val stored = FileStorage.storeBytes(bytes, "png")
         val id = insert(
             Song(
                 title = trimmedTitle,

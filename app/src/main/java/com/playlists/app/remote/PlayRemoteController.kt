@@ -99,6 +99,7 @@ object PlayRemoteController {
         val indexHtml = context.assets.open("remote/index.html").bufferedReader().readText()
         val editHtml = context.assets.open("remote/edit.html").bufferedReader().readText()
         val pinHtml = context.assets.open("remote/pin.html").bufferedReader().readText()
+        val songDisplayJs = context.assets.open("remote/song-display.js").bufferedReader().readText()
         val port = AppPrefs.getRemoteCode(context)
         val pin = AppPrefs.getRemotePin(context)
         val remote = PlayRemoteServer(
@@ -110,6 +111,7 @@ object PlayRemoteController {
             indexHtml = indexHtml,
             editHtml = editHtml,
             pinHtml = pinHtml,
+            songDisplayJs = songDisplayJs,
             onLoadPlaylist = { id ->
                 runBlocking { loadPlaylist(id) }
             },
@@ -451,7 +453,6 @@ object PlayRemoteController {
                 existingNotes = notes,
             )
             val songId = app.songRepository.createPlaceholder(
-                context = ctx,
                 title = parsed.title,
                 keySignature = parsed.keySignature,
                 notes = parsed.notes,
@@ -479,7 +480,7 @@ object PlayRemoteController {
         val app = PlaylistsApp.from(ctx as android.app.Application)
         return try {
             val ext = FileStorage.extensionForMime(mimeType)
-            val stored = FileStorage.storeBytes(ctx, tempFile.readBytes(), ext)
+            val stored = FileStorage.storeBytes(tempFile.readBytes(), ext)
             val fileType = if (mimeType.contains("pdf")) FileType.PDF else FileType.IMAGE
             val songId = app.songRepository.insert(
                 Song(

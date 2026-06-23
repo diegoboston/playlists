@@ -15,7 +15,6 @@ object StageManagerStorage {
     const val SONGS_DIR_NAME = "songs"
     const val DB_FILE_NAME = "playlists.db"
     const val STATE_FILE_NAME = "state.json"
-    const val MIGRATION_MARKER = ".storage_migrated"
 
     fun root(): File =
         File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), ROOT_DIR_NAME)
@@ -25,12 +24,6 @@ object StageManagerStorage {
     fun dbFile(): File = File(root(), DB_FILE_NAME)
 
     fun stateFile(): File = File(root(), STATE_FILE_NAME)
-
-    fun migrationMarker(): File = File(root(), MIGRATION_MARKER)
-
-    fun legacyInternalSongsDir(context: Context): File = File(context.filesDir, SONGS_DIR_NAME)
-
-    fun legacyInternalDbFile(context: Context): File = context.getDatabasePath(DB_FILE_NAME)
 
     fun hasAccess(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

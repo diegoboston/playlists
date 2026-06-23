@@ -54,7 +54,7 @@ object ShareImporter {
         val resolver = context.contentResolver
         val ext = FileStorage.extensionForMime(mimeType)
         val file = resolver.openInputStream(uri)?.use { stream ->
-            FileStorage.storeStream(context, stream, ext)
+            FileStorage.storeStream(stream, ext)
         } ?: return null
         val fileType = if (mimeType.contains("pdf")) FileType.PDF else FileType.IMAGE
         val rawTitle = rawTitleFromUri(resolver, uri, file)
@@ -64,7 +64,7 @@ object ShareImporter {
     private fun importFromUrl(context: Context, url: String): PendingImport? {
         val (bytes, mime) = FileStorage.downloadUrl(url) ?: return null
         val ext = FileStorage.extensionForMime(mime)
-        val file = FileStorage.storeBytes(context, bytes, ext)
+        val file = FileStorage.storeBytes(bytes, ext)
         val fileType = if (mime.contains("pdf")) FileType.PDF else FileType.IMAGE
         val rawTitle = url.substringAfterLast('/').substringBefore('?').ifBlank { "Shared link" }
         return PendingImport.fromRawTitle(file, fileType, mime, rawTitle)

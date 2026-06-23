@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.playlists.app.PlaylistsApp
 import com.playlists.app.R
 import com.playlists.app.ui.navigation.AppNavigation
@@ -36,7 +35,6 @@ class MainActivity : ComponentActivity() {
     private var pendingApkInstall: File? = null
     private var installPermissionRequestPending = false
     private var storageReady by mutableStateOf(false)
-    private var storageSettingsPending = false
 
     private val installPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -56,33 +54,14 @@ class MainActivity : ComponentActivity() {
 
     private val legacyStoragePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) {
-            onStorageAccessGranted()
-        }
-    }
+    ) { granted -> if (granted) tryEnableStorage() }
 
     private val storageSettingsLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
-    ) {
-        storageSettingsPending = false
-        onStorageAccessGranted()
-    }
-
-    private val lifecycleObserver = LifecycleEventObserver { _, event ->
-        if (event == Lifecycle.Event.ON_RESUME) {
-            if (storageSettingsPending) {
-                onStorageAccessGranted()
-            } else if (!storageReady && StageManagerStorage.hasAccess(this@MainActivity)) {
-                onStorageAccessGranted()
-            }
-            tryLaunchPendingInstall()
-        }
-    }
+    ) { tryEnableStorage() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        lifecycle.addObserver(lifecycleObserver)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
@@ -90,12 +69,7 @@ class MainActivity : ComponentActivity() {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
-        storageReady = StageManagerStorage.hasAccess(this)
-        if (storageReady) {
-            (application as PlaylistsApp).ensureDataInitialized()
-        }
-        handleShareIntent(intent)
-
+        tryEnableStorage()
         setContent {
             PlaylistsTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -113,9 +87,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        lifecycle.removeObserver(lifecycleObserver)
-        super.onDestroy()
+    override fun onResume() {
+        super.onResume()
+        tryEnableStorage()
+        tryLaunchPendingInstall()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -124,26 +99,22 @@ class MainActivity : ComponentActivity() {
         handleShareIntent(intent)
     }
 
-    private fun onStorageAccessGranted() {
-        if (!StageManagerStorage.hasAccess(this)) return
-        val wasReady = storageReady
-        (application as PlaylistsApp).reinitializeAfterStorageMigration()
+    private fun tryEnableStorage() {
+        if (!StageManagerStorage.hasAccess(this) || storageReady) return
+        (application as PlaylistsApp).initialize()
         storageReady = true
-        if (!wasReady) {
-            recreate()
-        }
+        handleShareIntent(intent)
     }
 
     private fun requestStorageAccess() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            storageSettingsPending = true
             storageSettingsLauncher.launch(StageManagerStorage.manageStorageIntent(this))
             return
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
             == PackageManager.PERMISSION_GRANTED
         ) {
-            onStorageAccessGranted()
+            tryEnableStorage()
             return
         }
         legacyStoragePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)

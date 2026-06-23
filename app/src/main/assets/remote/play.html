@@ -81,6 +81,7 @@
       </div>
     </form>
   </div>
+  <script src="/song-display.js"></script>
   <script>
     // Keep in sync with PlaybackNav.kt
     const NAV = {
@@ -308,15 +309,6 @@
       return Math.hypot(dx, dy);
     }
 
-    function titleWithKey(title, key) {
-      const k = (key || '').trim();
-      return k ? `${title} (${k})` : title;
-    }
-
-    function titleWithMarker(title, key, isPlaceholder) {
-      return titleWithKey(title, key) + (isPlaceholder ? ' ⚠' : '');
-    }
-
     async function refresh() {
       if (!playlistApi) {
         window.location.replace('/');
@@ -343,7 +335,7 @@
         const song = s.songs[s.songIndex];
         const pageCount = song.pageCount || 1;
         const pageLabel = pageCount > 1 ? ` · page ${s.pageIndex + 1}/${pageCount}` : '';
-        metaEl.textContent = `${s.playlistName || 'Playlist'} · ${s.songIndex + 1}/${s.songs.length}: ${titleWithMarker(song.title, song.key, song.isPlaceholder)}${pageLabel}`;
+        metaEl.textContent = `${s.playlistName || 'Playlist'} · ${s.songIndex + 1}/${s.songs.length}: ${SongDisplay.adjustedSongTitle(song.title, song.key, song.isPlaceholder)}${pageLabel}`;
 
         const contentChanged = s.songIndex !== lastSongIndex || s.pageIndex !== lastPageIndex;
         if (contentChanged) {

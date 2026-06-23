@@ -126,16 +126,12 @@ fun RemotePlayStartedDialog(
     var debug by remember { mutableStateOf<RemotePlayDebugInfo?>(null) }
     var refreshTick by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(refreshTick) {
+    LaunchedEffect(mode, refreshTick) {
         if (mode != RemotePlayMode.CLOUDFLARE) return@LaunchedEffect
         val info = withContext(Dispatchers.IO) { PlayRemoteController.collectDebugInfo() }
-        if (isActive) {
-            debug = info
-        }
-    }
-    LaunchedEffect(mode) {
-        if (mode != RemotePlayMode.CLOUDFLARE) return@LaunchedEffect
-        while (true) {
+        if (!isActive) return@LaunchedEffect
+        debug = info
+        if (info?.hasIssues() != false) {
             // Quick tunnels need DNS propagation; polling every few seconds can negative-cache NXDOMAIN.
             delay(15_000)
             refreshTick++
@@ -197,7 +193,7 @@ internal fun RemotePlayStartedDialogContent(
             modifier = Modifier.padding(top = 12.dp),
         )
         if (mode == RemotePlayMode.CLOUDFLARE) {
-            debug?.let { info ->
+            debug?.takeIf { it.hasIssues() }?.let { info ->
                 Spacer(Modifier.height(16.dp))
                 RemotePlayDebugPanel(
                     info = info,

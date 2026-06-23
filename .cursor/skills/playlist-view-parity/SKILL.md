@@ -37,10 +37,9 @@ if the user only asked to change one.
 
 ### Song title + key
 
-Kotlin: `SongDisplay.titleWithKey(title, keySignature)` in `SongDisplay.kt`.
+Kotlin: `SongDisplay` in `SongDisplay.kt`.
 
-Remote HTML must mirror the same format: append ` (key)` only when key is non-blank.
-Prefer a local `titleWithKey(title, key)` helper in each HTML file (as in `play.html`).
+Remote: `assets/remote/song-display.js` (served at `/song-display.js`). Import in HTML with `<script src="/song-display.js"></script>` before page scripts. Keep JS in sync with Kotlin.
 
 **Apply in:** playlist rows, search results, playback title/meta — local and remote.
 
@@ -52,7 +51,7 @@ Remote: match that truncation in meta/subtitle lines (do not show full notes in 
 
 ### Placeholder songs
 
-Append ⚠ after title when `isPlaceholder` is true (local and remote).
+Append 🚧 after title when `isPlaceholder` is true (local and remote). Use `SongDisplay.adjustedSongTitle` in Kotlin and `SongDisplay.adjustedSongTitle()` in remote JS.
 
 ### Playback navigation
 

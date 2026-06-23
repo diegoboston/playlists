@@ -82,7 +82,7 @@ fun PlaylistPlaybackScreen(
                 R.string.playback_song_indicator,
                 frame.songIndex + 1,
                 songCount,
-                SongDisplay.titleWithKey(
+                SongDisplay.adjustedSongTitle(
                     frame.entry.title,
                     frame.entry.keySignature,
                     frame.entry.isPlaceholder,

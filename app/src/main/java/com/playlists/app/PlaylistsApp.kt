@@ -6,13 +6,12 @@ import com.playlists.app.data.AppDatabase
 import com.playlists.app.data.PlaylistRepository
 import com.playlists.app.data.SongRepository
 import com.playlists.app.util.AppUpdate
-import com.playlists.app.util.SongPathRepairMigration
-import com.playlists.app.util.StorageMigration
+import com.playlists.app.util.StageManagerState
+import com.playlists.app.util.StageManagerStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 class PlaylistsApp : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -22,12 +21,10 @@ class PlaylistsApp : Application() {
     lateinit var playlistRepository: PlaylistRepository
         private set
 
-    private var dataInitialized = false
+    private var initialized = false
 
     override fun onCreate() {
         super.onCreate()
-        ensureDataInitialized()
-
         applicationScope.launch {
             runCatching {
                 val installed = AppUpdate.installedVersionCode(this@PlaylistsApp)
@@ -41,27 +38,18 @@ class PlaylistsApp : Application() {
         }
     }
 
-    fun ensureDataInitialized() {
-        if (dataInitialized) return
+    fun initialize() {
+        check(StageManagerStorage.hasAccess(this)) { "All files access required" }
+        if (initialized) return
         synchronized(this) {
-            if (dataInitialized) return
-            StorageMigration.runIfNeeded(this)
+            if (initialized) return
+            StageManagerStorage.ensureDirectories()
+            StageManagerState.exportFromSharedPreferences(this)
             val db = AppDatabase.get(this)
             songRepository = SongRepository(db.songDao())
             playlistRepository = PlaylistRepository(db.playlistDao(), db.playlistSongDao())
-            runBlocking {
-                SongPathRepairMigration.runIfNeeded(this@PlaylistsApp, songRepository)
-            }
-            dataInitialized = true
+            initialized = true
         }
-    }
-
-    fun reinitializeAfterStorageMigration() {
-        synchronized(this) {
-            AppDatabase.closeAndReset()
-            dataInitialized = false
-        }
-        ensureDataInitialized()
     }
 
     companion object {

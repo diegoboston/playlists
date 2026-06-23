@@ -9,8 +9,6 @@ import com.playlists.app.data.Playlist
 import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.data.Song
 import com.playlists.app.util.AppUpdate
-import com.playlists.app.util.OrphanSongFiles
-import com.playlists.app.util.OrphanSongFilesMigration
 import com.playlists.app.util.PendingImport
 import com.playlists.app.util.QuickstartMatcher
 import com.playlists.app.util.ShareImporter
@@ -42,9 +40,6 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _appUpdateState = MutableStateFlow<AppUpdateUiState?>(null)
     val appUpdateState: StateFlow<AppUpdateUiState?> = _appUpdateState.asStateFlow()
-
-    private val _orphanSongFiles = MutableStateFlow<List<File>?>(null)
-    val orphanSongFiles: StateFlow<List<File>?> = _orphanSongFiles.asStateFlow()
 
     private var launchUpdatePromptHandled = false
 
@@ -78,23 +73,6 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteSong(id: Long) = viewModelScope.launch { songRepo.delete(id) }
-
-    fun scanOrphanSongFiles() = viewModelScope.launch(Dispatchers.IO) {
-        if (_orphanSongFiles.value != null) return@launch
-        val orphans = OrphanSongFilesMigration.findOrphansIfNeeded(getApplication(), songRepo)
-        if (orphans != null) {
-            _orphanSongFiles.value = orphans
-        }
-    }
-
-    fun dismissOrphanSongFiles(keepFiles: Boolean) = viewModelScope.launch(Dispatchers.IO) {
-        val orphans = _orphanSongFiles.value ?: return@launch
-        if (!keepFiles) {
-            OrphanSongFiles.deleteFiles(orphans)
-        }
-        OrphanSongFilesMigration.markPrompted()
-        _orphanSongFiles.value = null
-    }
 
     fun updateSong(id: Long, title: String, keySignature: String, notes: String) =
         viewModelScope.launch {
@@ -153,7 +131,6 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     ) = viewModelScope.launch {
         val parsed = com.playlists.app.util.SongTitleMigration.parse(title)
         val songId = songRepo.createPlaceholder(
-            context = getApplication(),
             title = parsed.title,
             keySignature = parsed.keySignature,
             notes = parsed.notes,
@@ -205,7 +182,6 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
             result.song?.id ?: run {
                 val parsed = SongTitleMigration.parse(result.line)
                 songRepo.createPlaceholder(
-                    context = getApplication(),
                     title = parsed.title,
                     keySignature = parsed.keySignature,
                     notes = parsed.notes,

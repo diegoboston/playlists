@@ -15,6 +15,17 @@ data class RemotePlayDebugInfo(
     val warnings: List<String>,
     val checkedAtMs: Long,
 ) {
+    /** True when something looks wrong — used to decide whether to show checks/logs in the UI. */
+    fun hasIssues(): Boolean {
+        if (warnings.isNotEmpty()) return true
+        if (!serverAlive || !localProbe.ok) return true
+        if (mode == RemotePlayMode.CLOUDFLARE) {
+            if (!tunnelProcessAlive) return true
+            if (tunnelProbe?.ok == false) return true
+        }
+        return false
+    }
+
     fun formatForCopy(): String = buildString {
         appendLine("Stage Manager — remote play debug")
         appendLine("Checked: ${java.text.SimpleDateFormat.getDateTimeInstance().format(java.util.Date(checkedAtMs))}")

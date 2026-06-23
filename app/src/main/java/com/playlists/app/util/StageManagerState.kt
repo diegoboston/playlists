@@ -32,7 +32,7 @@ object StageManagerState {
         val json = readFromFile() ?: JSONObject()
         json.put(KEY_REMOTE_CODE, code)
         json.remove(KEY_REMOTE_PORT)
-        writeToFile(context, json)
+        writeToFile(json)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putInt(KEY_REMOTE_CODE, code)
@@ -55,7 +55,7 @@ object StageManagerState {
     fun writeLastPlaylistId(context: Context, playlistId: Long) {
         val json = readFromFile() ?: JSONObject()
         json.put(KEY_LAST_PLAYLIST_ID, playlistId)
-        writeToFile(context, json)
+        writeToFile(json)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putLong(KEY_LAST_PLAYLIST_ID, playlistId)
@@ -64,7 +64,6 @@ object StageManagerState {
 
     fun exportFromSharedPreferences(context: Context) {
         if (StageManagerStorage.stateFile().exists()) return
-        if (!StageManagerStorage.hasAccess(context)) return
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val json = JSONObject()
         if (prefs.contains(KEY_REMOTE_CODE)) {
@@ -79,7 +78,7 @@ object StageManagerState {
             json.put(KEY_LAST_PLAYLIST_ID, prefs.getLong(KEY_LAST_PLAYLIST_ID, -1L))
         }
         if (json.length() > 0) {
-            writeToFile(context, json)
+            writeToFile(json)
         }
     }
 
@@ -91,8 +90,7 @@ object StageManagerState {
         }.getOrNull()
     }
 
-    private fun writeToFile(context: Context, json: JSONObject) {
-        if (!StageManagerStorage.hasAccess(context)) return
+    private fun writeToFile(json: JSONObject) {
         StageManagerStorage.ensureDirectories()
         StageManagerStorage.stateFile().writeText(json.toString())
     }

@@ -144,27 +144,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        fun databasePath(context: Context): String {
-            return if (StageManagerStorage.hasAccess(context)) {
-                StageManagerStorage.dbFile().absolutePath
-            } else {
-                "playlists.db"
-            }
-        }
-
-        fun closeAndReset() {
-            synchronized(this) {
-                instance?.close()
-                instance = null
-            }
-        }
-
         fun get(context: Context): AppDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    databasePath(context),
+                    StageManagerStorage.dbFile().absolutePath,
                 )
                     .addMigrations(
                         MIGRATION_1_2,

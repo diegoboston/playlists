@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -470,26 +469,15 @@ private fun AddSongDialog(
                 ) {
                     if (showPlaceholder) {
                         item(key = "placeholder") {
-                            Row(
+                            Text(
+                                text = stringResource(R.string.add_placeholder, trimmedQuery) +
+                                    SongDisplay.PLACEHOLDER_MARKER,
+                                style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { onAddPlaceholder(trimmedQuery) }
                                     .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier
-                                        .padding(end = 8.dp)
-                                        .size(18.dp),
-                                )
-                                Text(
-                                    text = stringResource(R.string.add_placeholder, trimmedQuery),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
+                            )
                         }
                     }
                     items(results, key = { it.id }) { song ->

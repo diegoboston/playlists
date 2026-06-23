@@ -31,7 +31,6 @@ import com.playlists.app.R
 import com.playlists.app.ui.AppUpdateUiState
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.components.AppUpdateBanner
-import com.playlists.app.ui.components.OrphanSongFilesDialog
 import com.playlists.app.ui.screens.ImportSongScreen
 import com.playlists.app.ui.screens.MainTabsScreen
 import com.playlists.app.ui.screens.PlaylistDetailScreen
@@ -101,11 +100,6 @@ fun AppNavigation(
     val context = LocalContext.current
     val updateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
     val pendingImport by viewModel.pendingImport.collectAsStateWithLifecycle()
-    val orphanSongFiles by viewModel.orphanSongFiles.collectAsStateWithLifecycle()
-
-    LaunchedEffect(Unit) {
-        viewModel.scanOrphanSongFiles()
-    }
 
     LaunchedEffect(pendingImport) {
         if (pendingImport != null && navController.currentDestination?.route != Routes.IMPORT) {
@@ -247,14 +241,6 @@ fun AppNavigation(
                     state = state,
                     onDismiss = { viewModel.clearAppUpdateState() },
                     onInstall = { apk -> retryInstallApk(apk) },
-                )
-            }
-
-            orphanSongFiles?.let { files ->
-                OrphanSongFilesDialog(
-                    files = files,
-                    onDelete = { viewModel.dismissOrphanSongFiles(keepFiles = false) },
-                    onKeep = { viewModel.dismissOrphanSongFiles(keepFiles = true) },
                 )
             }
         }

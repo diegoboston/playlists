@@ -24,6 +24,7 @@ class PlayRemoteServer(
     private val indexHtml: String,
     private val editHtml: String,
     private val pinHtml: String,
+    private val songDisplayJs: String,
     private val onLoadPlaylist: ((playlistId: Long) -> PlaylistLoad?)? = null,
     private val onUpload: ((playlistId: Long, title: String, key: String, notes: String, tempFile: File, mimeType: String) -> Result<Unit>)? = null,
     private val onReorder: ((playlistId: Long, entryIds: List<Long>) -> Result<Unit>)? = null,
@@ -125,6 +126,7 @@ class PlayRemoteServer(
             isPlayPageRoute(uri, session) -> htmlResponse(playHtml)
             uri == "/" || uri == "/index.html" -> htmlResponse(indexHtml)
             uri == "/edit" || uri == "/edit.html" -> htmlResponse(editHtml)
+            uri == "/song-display.js" -> jsResponse(songDisplayJs)
             uri == "/api/songs" && session.method == Method.GET -> handleListSongs()
             uri == "/api/songs/update" && session.method == Method.POST -> handleUpdateSong(session)
             uri == "/api/playlists" && session.method == Method.GET -> handleListPlaylists()
@@ -653,6 +655,9 @@ class PlayRemoteServer(
 
     private fun htmlResponse(body: String): Response =
         newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", body)
+
+    private fun jsResponse(body: String): Response =
+        newFixedLengthResponse(Response.Status.OK, "application/javascript; charset=utf-8", body)
 
     private fun jsonResponse(body: String): Response =
         newFixedLengthResponse(Response.Status.OK, "application/json", body)
