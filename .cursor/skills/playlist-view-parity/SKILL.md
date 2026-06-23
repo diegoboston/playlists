@@ -50,11 +50,9 @@ Kotlin: `SongDisplay.notesLine(notes)` — trimmed, max 20 chars + `…`.
 
 Remote: match that truncation in meta/subtitle lines (do not show full notes in compact rows).
 
-### Deleted archive songs
+### Placeholder songs
 
-Local: `errorContainer` row background (`entry.isDeleted`).
-
-Remote: `.deleted` row styling in `edit.html`. Keep both visible in the list.
+Append ⚠ after title when `isPlaceholder` is true (local and remote).
 
 ### Playback navigation
 
@@ -89,7 +87,7 @@ When adding or changing playlist/playback behaviour, update **both**:
 
 `/api/state` song objects must expose fields the playback UI needs (e.g. `title`, `key`, `pageCount`).
 
-`/api/playlist` entries must expose fields the editor UI needs (e.g. `entryId`, `title`, `key`, `notes`, `isDeleted`).
+`/api/playlists/{id}/entries` must expose fields the editor UI needs (e.g. `entryId`, `title`, `key`, `notes`, `isPlaceholder`).
 
 ## Intentional differences (do not “fix”)
 

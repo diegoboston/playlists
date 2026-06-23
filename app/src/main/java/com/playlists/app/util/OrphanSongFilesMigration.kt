@@ -15,13 +15,17 @@ object OrphanSongFilesMigration {
         markerFile().writeText("v1")
     }
 
+    fun clearPrompted() {
+        markerFile().delete()
+    }
+
     suspend fun findOrphansIfNeeded(
         context: Context,
         songRepository: SongRepository,
     ): List<File>? {
         if (!StageManagerStorage.hasAccess(context)) return null
         if (hasBeenPrompted()) return null
-        val referenced = songRepository.getAllIncludingDeleted().map { it.filePath }
+        val referenced = songRepository.getAll().map { it.filePath }
         val orphans = OrphanSongFiles.findOrphans(StageManagerStorage.songsDir(), referenced)
         return orphans.ifEmpty {
             markPrompted()

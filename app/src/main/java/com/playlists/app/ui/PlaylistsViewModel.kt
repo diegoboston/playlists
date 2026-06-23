@@ -14,6 +14,7 @@ import com.playlists.app.util.OrphanSongFilesMigration
 import com.playlists.app.util.PendingImport
 import com.playlists.app.util.QuickstartMatcher
 import com.playlists.app.util.ShareImporter
+import com.playlists.app.util.SongStoragePaths
 import com.playlists.app.util.SongTitleMigration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,17 +74,10 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun prepareSongDelete(id: Long): SongDeletePrompt? = withContext(Dispatchers.IO) {
         val song = songRepo.getById(id) ?: return@withContext null
         val playlistNames = playlistRepo.playlistNamesForSong(id)
-        val deleteFileOnConfirm = playlistNames.isEmpty() &&
-            !songRepo.isFileSharedWithOtherSongs(id)
-        SongDeletePrompt(
-            song = song,
-            playlistNames = playlistNames,
-            deleteFileOnConfirm = deleteFileOnConfirm,
-        )
+        SongDeletePrompt(song = song, playlistNames = playlistNames)
     }
 
-    fun deleteSong(id: Long, deleteFile: Boolean = false) =
-        viewModelScope.launch { songRepo.delete(id, deleteFile) }
+    fun deleteSong(id: Long) = viewModelScope.launch { songRepo.delete(id) }
 
     fun scanOrphanSongFiles() = viewModelScope.launch(Dispatchers.IO) {
         if (_orphanSongFiles.value != null) return@launch
@@ -223,7 +217,7 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun pageCount(song: Song): Int {
-        val file = File(song.filePath)
+        val file = SongStoragePaths.resolve(song.filePath)
         val type = runCatching { FileType.valueOf(song.fileType) }.getOrDefault(FileType.IMAGE)
         return PdfHelper.pageCount(file, type)
     }

@@ -30,6 +30,7 @@ import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.components.PlaybackStage
 import com.playlists.app.ui.components.SongMediaViewer
+import com.playlists.app.util.SongStoragePaths
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -124,7 +125,7 @@ fun PlaylistPlaybackScreen(
                 .focusable(),
         ) {
             val item = frame
-            val file = File(item.entry.filePath)
+            val file = SongStoragePaths.resolve(item.entry.filePath)
             if (!file.exists()) return@PlaybackStage
             val fileType = runCatching { FileType.valueOf(item.entry.fileType) }
                 .getOrDefault(FileType.IMAGE)
@@ -142,7 +143,7 @@ fun PlaylistPlaybackScreen(
 private fun buildPlaybackFrames(songs: List<PlaylistSongWithDetails>): List<PlaybackFrame> {
     val frames = mutableListOf<PlaybackFrame>()
     songs.forEachIndexed { songIndex, entry ->
-        val file = File(entry.filePath)
+        val file = SongStoragePaths.resolve(entry.filePath)
         if (!file.exists()) return@forEachIndexed
         val fileType = runCatching { FileType.valueOf(entry.fileType) }.getOrDefault(FileType.IMAGE)
         val pageCount = when (fileType) {

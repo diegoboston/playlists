@@ -174,7 +174,7 @@ fun SongsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.deleteSong(song.id, deleteFile = prompt.deleteFileOnConfirm)
+                    viewModel.deleteSong(song.id)
                     deleteTarget = null
                 }) {
                     Text(stringResource(R.string.delete_song))
@@ -267,11 +267,7 @@ private fun SongRow(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (song.deletedAt != null) {
-                MaterialTheme.colorScheme.errorContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
     ) {
         Row(

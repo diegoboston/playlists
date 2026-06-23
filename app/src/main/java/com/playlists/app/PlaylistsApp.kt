@@ -6,7 +6,7 @@ import com.playlists.app.data.AppDatabase
 import com.playlists.app.data.PlaylistRepository
 import com.playlists.app.data.SongRepository
 import com.playlists.app.util.AppUpdate
-import com.playlists.app.util.SongFilenameMigration
+import com.playlists.app.util.SongPathRepairMigration
 import com.playlists.app.util.StorageMigration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +50,7 @@ class PlaylistsApp : Application() {
             songRepository = SongRepository(db.songDao())
             playlistRepository = PlaylistRepository(db.playlistDao(), db.playlistSongDao())
             runBlocking {
-                SongFilenameMigration.runIfNeeded(this@PlaylistsApp, songRepository)
+                SongPathRepairMigration.runIfNeeded(this@PlaylistsApp, songRepository)
             }
             dataInitialized = true
         }

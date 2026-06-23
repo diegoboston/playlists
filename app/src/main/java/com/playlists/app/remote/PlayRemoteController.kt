@@ -8,6 +8,7 @@ import com.playlists.app.data.Song
 import com.playlists.app.ui.PdfHelper
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.FileStorage
+import com.playlists.app.util.SongStoragePaths
 import fi.iki.elonen.NanoHTTPD
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -258,7 +259,7 @@ object PlayRemoteController {
 
     private fun entriesToRemoteSongs(entries: List<PlaylistSongWithDetails>): List<PlayRemoteServer.RemoteSong> =
         entries.map { entry ->
-            val file = File(entry.filePath)
+            val file = SongStoragePaths.resolve(entry.filePath)
             val fileType = FileType.valueOf(entry.fileType)
             val pageCount = if (file.exists()) {
                 PdfHelper.pageCount(file, fileType)
@@ -274,7 +275,6 @@ object PlayRemoteController {
                 fileType = entry.fileType,
                 filePath = entry.filePath,
                 pageCount = pageCount.coerceAtLeast(1),
-                isDeleted = entry.isDeleted,
                 isPlaceholder = entry.isPlaceholder,
             )
         }
@@ -325,7 +325,6 @@ object PlayRemoteController {
                 keySignature = song.keySignature,
                 notes = song.notes,
                 fileType = song.fileType,
-                isDeleted = song.deletedAt != null,
                 isPlaceholder = song.isPlaceholder,
             )
         }
@@ -491,7 +490,7 @@ object PlayRemoteController {
                     title = title.trim().ifBlank { "Uploaded song" },
                     keySignature = key.trim(),
                     notes = notes.trim(),
-                    filePath = stored.absolutePath,
+                    filePath = SongStoragePaths.toStoredPath(stored),
                     fileType = fileType.name,
                     mimeType = mimeType,
                 ),

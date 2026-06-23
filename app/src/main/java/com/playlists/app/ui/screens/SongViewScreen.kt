@@ -23,7 +23,7 @@ import com.playlists.app.data.Song
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.components.SongMediaViewer
-import java.io.File
+import com.playlists.app.util.SongStoragePaths
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +42,7 @@ fun SongViewScreen(
     val loaded = song
     if (loaded == null) return
 
-    val file = File(loaded.filePath)
+    val file = SongStoragePaths.resolve(loaded.filePath)
     if (!file.exists()) {
         LaunchedEffect(Unit) { onBack() }
         return

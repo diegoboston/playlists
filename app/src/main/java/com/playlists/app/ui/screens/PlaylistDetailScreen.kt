@@ -392,11 +392,7 @@ private fun PlaylistSongRow(
 ) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = if (entry.isDeleted) {
-                MaterialTheme.colorScheme.errorContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {

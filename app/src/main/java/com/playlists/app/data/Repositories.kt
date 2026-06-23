@@ -3,7 +3,8 @@ package com.playlists.app.data
 import android.content.Context
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.PlaceholderImageGenerator
-import com.playlists.app.util.SongFileNaming
+import com.playlists.app.util.SongPathRepair
+import com.playlists.app.util.SongStoragePaths
 import java.io.File
 import kotlinx.coroutines.flow.Flow
 
@@ -14,69 +15,32 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun getById(id: Long): Song? = songDao.getById(id)
 
-    suspend fun insert(song: Song): Long {
-        val id = songDao.insertAtTop(song)
-        val saved = songDao.getById(id) ?: return id
-        applyCanonicalFilename(saved)
-        return id
-    }
+    suspend fun insert(song: Song): Long = songDao.insertAtTop(song)
 
     suspend fun update(song: Song) {
         songDao.update(song)
-        songDao.getById(song.id)?.let { applyCanonicalFilename(it) }
     }
 
-    suspend fun migrateAllFilenames(): Int {
-        val songs = songDao.getAllIncludingDeleted()
+    suspend fun repairAllFilePaths(songsDir: File): Int {
+        val songs = songDao.getAll()
         var count = 0
         for (song in songs.sortedBy { it.id }) {
-            if (applyCanonicalFilename(song)) count++
+            val repaired = SongPathRepair.repairPath(song, songsDir)
+                ?: SongPathRepair.normalizeIfNeeded(song.filePath)
+            if (repaired == null) continue
+            songDao.update(song.copy(filePath = repaired))
+            count++
         }
         return count
     }
 
-    suspend fun applyCanonicalFilename(song: Song): Boolean {
-        val file = File(song.filePath)
-        if (!file.isFile) return false
-        if (SongFileNaming.matches(song.title, song.keySignature, song.id, file)) return false
-
-        val target = SongFileNaming.resolveTargetFile(file, song.title, song.keySignature, song.id)
-        val sharedWithOthers = songDao.getAllIncludingDeleted()
-            .any { it.id != song.id && it.filePath == song.filePath }
-
-        val moved = if (sharedWithOthers) {
-            file.copyTo(target, overwrite = false)
-            target.isFile
-        } else {
-            file.renameTo(target) || run {
-                file.copyTo(target, overwrite = true)
-                file.delete()
-                target.isFile
-            }
-        }
-        if (!moved) return false
-
-        val updated = song.copy(filePath = target.absolutePath)
-        songDao.update(updated)
-        return true
-    }
-
-    suspend fun getAllIncludingDeleted(): List<Song> = songDao.getAllIncludingDeleted()
-
-    suspend fun isFileSharedWithOtherSongs(songId: Long): Boolean {
-        val song = songDao.getById(songId) ?: return false
-        return songDao.getAllIncludingDeleted()
-            .any { it.id != songId && it.filePath == song.filePath }
-    }
-
-    suspend fun delete(id: Long, deleteFile: Boolean = false) {
+    suspend fun delete(id: Long) {
         val song = songDao.getById(id) ?: return
-        songDao.markDeleted(id, System.currentTimeMillis())
-        if (!deleteFile) return
-        val file = File(song.filePath)
+        val storedPath = song.filePath
+        songDao.deleteById(id)
+        val file = SongStoragePaths.resolve(storedPath)
         if (!file.isFile) return
-        val stillReferenced = songDao.getAllIncludingDeleted()
-            .any { it.id != id && it.filePath == song.filePath }
+        val stillReferenced = songDao.getAll().any { it.filePath == storedPath }
         if (!stillReferenced) {
             file.delete()
         }
@@ -129,7 +93,7 @@ class SongRepository(private val songDao: SongDao) {
                 title = trimmedTitle,
                 keySignature = keySignature.trim(),
                 notes = notes.trim(),
-                filePath = stored.absolutePath,
+                filePath = SongStoragePaths.toStoredPath(stored),
                 fileType = FileType.IMAGE.name,
                 mimeType = "image/png",
                 isPlaceholder = true,

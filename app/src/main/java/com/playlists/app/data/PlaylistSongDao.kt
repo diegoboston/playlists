@@ -12,7 +12,6 @@ interface PlaylistSongDao {
         """
         SELECT ps.id, ps.playlistId, ps.songId, ps.position,
                s.title, s.keySignature, s.notes, s.filePath, s.fileType,
-               (s.deletedAt IS NOT NULL) AS isDeleted,
                s.isPlaceholder AS isPlaceholder
         FROM playlist_songs ps
         INNER JOIN songs s ON s.id = ps.songId
@@ -26,7 +25,6 @@ interface PlaylistSongDao {
         """
         SELECT ps.id, ps.playlistId, ps.songId, ps.position,
                s.title, s.keySignature, s.notes, s.filePath, s.fileType,
-               (s.deletedAt IS NOT NULL) AS isDeleted,
                s.isPlaceholder AS isPlaceholder
         FROM playlist_songs ps
         INNER JOIN songs s ON s.id = ps.songId
@@ -44,6 +42,9 @@ interface PlaylistSongDao {
 
     @Query("DELETE FROM playlist_songs WHERE playlistId = :playlistId")
     suspend fun deleteAllForPlaylist(playlistId: Long)
+
+    @Query("DELETE FROM playlist_songs WHERE songId = :songId")
+    suspend fun deleteAllForSong(songId: Long)
 
     @Query("SELECT COALESCE(MAX(position), -1) FROM playlist_songs WHERE playlistId = :playlistId")
     suspend fun maxPosition(playlistId: Long): Int

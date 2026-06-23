@@ -10,13 +10,44 @@ class OrphanSongFilesTest {
     fun findOrphans_listsFilesNotReferencedByAnySong() {
         val root = createTempDir(prefix = "orphan-test")
         val songsDir = File(root, "songs").apply { mkdirs() }
-        val linked = File(songsDir, "linked.pdf").apply { writeText("x") }
+        File(songsDir, "linked.pdf").apply { writeText("x") }
         File(songsDir, "orphan.pdf").writeText("y")
         File(songsDir, "other.pdf").writeText("z")
 
-        val orphans = OrphanSongFiles.findOrphans(songsDir, listOf(linked.absolutePath))
+        val orphans = OrphanSongFiles.findOrphans(
+            songsDir,
+            listOf("Music/StageManager/songs/linked.pdf"),
+        )
 
         assertEquals(listOf("orphan.pdf", "other.pdf"), orphans.map { it.name })
+    }
+
+    @Test
+    fun findOrphans_treatsSdcardAndEmulatedDbPathsAsSameFile() {
+        val root = createTempDir(prefix = "orphan-alias")
+        val songsDir = File(root, "songs").apply { mkdirs() }
+        File(songsDir, "linked.pdf").apply { writeText("x") }
+        File(songsDir, "orphan.pdf").writeText("y")
+
+        val orphans = OrphanSongFiles.findOrphans(
+            songsDir,
+            listOf("/sdcard/Music/StageManager/songs/linked.pdf"),
+        )
+
+        assertEquals(listOf("orphan.pdf"), orphans.map { it.name })
+    }
+
+    @Test
+    fun findOrphans_matchesReferencedFilesByBasenameFromStaleAbsolutePath() {
+        val root = createTempDir(prefix = "orphan-basename")
+        val songsDir = File(root, "songs").apply { mkdirs() }
+        File(songsDir, "linked.pdf").apply { writeText("x") }
+        File(songsDir, "orphan.pdf").writeText("y")
+        val staleDbPath = "/data/user/0/app/files/songs/linked.pdf"
+
+        val orphans = OrphanSongFiles.findOrphans(songsDir, listOf(staleDbPath))
+
+        assertEquals(listOf("orphan.pdf"), orphans.map { it.name })
     }
 
     @Test

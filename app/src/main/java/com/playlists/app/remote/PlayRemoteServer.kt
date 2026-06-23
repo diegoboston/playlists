@@ -3,6 +3,7 @@ package com.playlists.app.remote
 import android.graphics.Bitmap
 import com.playlists.app.ui.PdfHelper
 import com.playlists.app.util.SongTitleMigration
+import com.playlists.app.util.SongStoragePaths
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.NanoHTTPD.IHTTPSession
 import fi.iki.elonen.NanoHTTPD.Method
@@ -52,7 +53,6 @@ class PlayRemoteServer(
         val fileType: String,
         val filePath: String,
         val pageCount: Int,
-        val isDeleted: Boolean,
         val isPlaceholder: Boolean,
     )
 
@@ -76,7 +76,6 @@ class PlayRemoteServer(
         val keySignature: String,
         val notes: String,
         val fileType: String,
-        val isDeleted: Boolean,
         val isPlaceholder: Boolean,
     )
 
@@ -292,7 +291,7 @@ class PlayRemoteServer(
         songs.forEachIndexed { i, song ->
             if (i > 0) sb.append(',')
             sb.append(
-                """{"id":${song.id},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"isDeleted":${song.isDeleted},"isPlaceholder":${song.isPlaceholder}}""",
+                """{"id":${song.id},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"isPlaceholder":${song.isPlaceholder}}""",
             )
         }
         sb.append("]}")
@@ -546,7 +545,7 @@ class PlayRemoteServer(
             ?: state.songIndex
         val pIdx = params["page"]?.firstOrNull()?.toIntOrNull() ?: state.pageIndex
         val song = songs[sIdx]
-        val file = File(song.filePath)
+        val file = SongStoragePaths.resolve(song.filePath)
         if (!file.exists()) {
             return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "File missing")
         }
@@ -615,7 +614,7 @@ class PlayRemoteServer(
         loaded.songs.forEachIndexed { i, song ->
             if (i > 0) sb.append(',')
             sb.append(
-                """{"entryId":${song.entryId},"songId":${song.songId},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount},"isDeleted":${song.isDeleted},"isPlaceholder":${song.isPlaceholder}}""",
+                """{"entryId":${song.entryId},"songId":${song.songId},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount},"isPlaceholder":${song.isPlaceholder}}""",
             )
         }
         sb.append("]}")

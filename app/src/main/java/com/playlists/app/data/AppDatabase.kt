@@ -11,7 +11,7 @@ import com.playlists.app.util.StageManagerStorage
 
 @Database(
     entities = [Song::class, Playlist::class, PlaylistSong::class],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -74,6 +74,49 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    DELETE FROM playlist_songs
+                    WHERE songId IN (SELECT id FROM songs WHERE deletedAt IS NOT NULL)
+                    """.trimIndent(),
+                )
+                db.execSQL("DELETE FROM songs WHERE deletedAt IS NOT NULL")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS songs_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        title TEXT NOT NULL,
+                        keySignature TEXT NOT NULL,
+                        notes TEXT NOT NULL,
+                        filePath TEXT NOT NULL,
+                        fileType TEXT NOT NULL,
+                        mimeType TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        sortOrder INTEGER NOT NULL,
+                        lastViewedAt INTEGER,
+                        isPlaceholder INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO songs_new (
+                        id, title, keySignature, notes, filePath, fileType, mimeType,
+                        createdAt, sortOrder, lastViewedAt, isPlaceholder
+                    )
+                    SELECT
+                        id, title, keySignature, notes, filePath, fileType, mimeType,
+                        createdAt, sortOrder, lastViewedAt, isPlaceholder
+                    FROM songs
+                    """.trimIndent(),
+                )
+                db.execSQL("DROP TABLE songs")
+                db.execSQL("ALTER TABLE songs_new RENAME TO songs")
+            }
+        }
+
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.query("SELECT id, title, keySignature, notes FROM songs").use { cursor ->
@@ -130,6 +173,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_4_5,
                         MIGRATION_5_6,
                         MIGRATION_6_7,
+                        MIGRATION_7_8,
                     )
                     .build().also { instance = it }
             }

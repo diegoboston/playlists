@@ -24,7 +24,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores and dashes → spaces, extension dropped, trailing key → Key, trailing instrument → Notes).
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
-- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. Placeholder songs (no real sheet yet) show a ⚠ after the title. **A–Z**, **Recently added** (import date), and **Recently viewed** buttons sort the archive (persists order). Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. Deleting checks whether the song is used in any playlist: if so, the dialog lists those playlist names and keeps the file on disk (the song disappears from the archive but still plays in playlists, shown in red); if not, the confirmation also removes the file from `Music/StageManager/songs`.
+- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. Placeholder songs (no real sheet yet) show a ⚠ after the title. **A–Z**, **Recently added** (import date), and **Recently viewed** buttons sort the archive (persists order). Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
 - **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages.
 
 ### Playlists
@@ -270,7 +270,7 @@ While remote play is active, the phone serves JSON over HTTP. Cloudflare mode re
 
 | Method | Path | Body / query | Response |
 |--------|------|------------|----------|
-| `GET` | `/api/songs` | — | `{"songs":[{"id", "title", "key", "notes", "fileType", "isDeleted", "isPlaceholder"}, …]}` |
+| `GET` | `/api/songs` | — | `{"songs":[{"id", "title", "key", "notes", "fileType", "isPlaceholder"}, …]}` |
 | `POST` | `/api/songs/update` | `{"songId", "title", "key", "notes"}` | Updated `{"songs":[…]}` |
 | `GET` | `/api/songs/search` | `?q=…` | `{"songs":[{"id", "title", "key", "notes", "isPlaceholder"}, …]}` (archive search) |
 | `GET` | `/api/parse-filename` | `?raw=…` | `{"title", "key", "notes"}` (filename parse hint) |
@@ -353,11 +353,11 @@ Files and app state live on shared storage under **`Music/StageManager/`** (typi
 
 | Path | Contents |
 |------|----------|
-| `songs/` | PDF and image sheet music, named `{Title_With_Underscores}-{Key}-{songId}.{ext}` (e.g. `Amazing_Grace-G-42.pdf`) |
+| `songs/` | PDF and image sheet music (paths in the DB are stored as `Music/StageManager/songs/{filename}`) |
 | `playlists.db` | Room database (songs, playlists, order) |
 | `state.json` | Remote-play code and last-opened playlist |
 
-On first launch after install or upgrade, the app requests **All files access** so it can use this folder. Existing data in app-internal storage is migrated automatically. After migration, uninstalling and reinstalling the app restores your library from `Music/StageManager`. Once per install, if `songs/` contains files not linked to any archive entry, the app lists them and asks whether to delete those orphans.
+On first launch after install or upgrade, the app requests **All files access** so it can use this folder. Existing data in app-internal storage is migrated automatically. After migration, uninstalling and reinstalling the app restores your library from `Music/StageManager`. On upgrade, absolute paths in the database are converted to `Music/StageManager/songs/…` form (so `/sdcard/…` and `/storage/emulated/0/…` never matter), missing files are reconciled, and the orphan scan reruns. Once per install, if `songs/` contains a file whose name is not referenced by any archive entry, the app lists it and asks whether to delete it.
 
 ## Tech stack
 

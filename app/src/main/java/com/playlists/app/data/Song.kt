@@ -13,7 +13,6 @@ data class Song(
     val fileType: String,
     val mimeType: String,
     val createdAt: Long = System.currentTimeMillis(),
-    val deletedAt: Long? = null,
     val sortOrder: Int = 0,
     val lastViewedAt: Long? = null,
     val isPlaceholder: Boolean = false,

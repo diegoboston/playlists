@@ -53,7 +53,7 @@ object StorageMigration {
             if (!dest.exists()) {
                 source.copyTo(dest)
             }
-            pathMap[source.absolutePath] = dest.absolutePath
+            pathMap[source.absolutePath] = SongStoragePaths.toStoredPath(dest)
         }
         return pathMap
     }
@@ -87,15 +87,19 @@ object StorageMigration {
     }
 
     fun remapPath(oldPath: String, internalSongsRoot: String, externalSongsRoot: String): String? {
-        if (oldPath.startsWith(externalSongsRoot)) return null
+        if (SongStoragePaths.isRelativeSongPath(oldPath)) return null
+        if (oldPath.startsWith(externalSongsRoot)) {
+            return SongStoragePaths.toStoredPath(File(oldPath))
+        }
         if (oldPath.startsWith(internalSongsRoot)) {
             val relative = oldPath.removePrefix(internalSongsRoot).trimStart('/')
-            return File(externalSongsRoot, relative).absolutePath
+            if (relative.isBlank()) return null
+            return "${SongStoragePaths.SONGS_RELATIVE_DIR}/$relative"
         }
         val name = File(oldPath).name
         if (name.isBlank()) return null
         val candidate = File(externalSongsRoot, name)
-        return if (candidate.isFile) candidate.absolutePath else null
+        return if (candidate.isFile) SongStoragePaths.toStoredPath(candidate) else null
     }
 
     private fun migrateDatabase(

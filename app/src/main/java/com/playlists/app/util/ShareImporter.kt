@@ -89,7 +89,7 @@ object ShareImporter {
                 title = title.trim().ifBlank { pending.suggestedTitle },
                 keySignature = keySignature.trim().ifBlank { pending.suggestedKey },
                 notes = notes.trim().ifBlank { pending.suggestedNotes },
-                filePath = pending.file.absolutePath,
+                filePath = SongStoragePaths.toStoredPath(pending.file),
                 fileType = pending.fileType.name,
                 mimeType = pending.mimeType,
             )

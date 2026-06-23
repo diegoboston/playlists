@@ -9,14 +9,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SongDao {
-    @Query("SELECT * FROM songs WHERE deletedAt IS NULL ORDER BY sortOrder ASC, id ASC")
+    @Query("SELECT * FROM songs ORDER BY sortOrder ASC, id ASC")
     fun observeAll(): Flow<List<Song>>
 
-    @Query("SELECT * FROM songs WHERE deletedAt IS NULL ORDER BY sortOrder ASC, id ASC")
+    @Query("SELECT * FROM songs ORDER BY sortOrder ASC, id ASC")
     suspend fun getAll(): List<Song>
-
-    @Query("SELECT * FROM songs ORDER BY id ASC")
-    suspend fun getAllIncludingDeleted(): List<Song>
 
     @Query("SELECT * FROM songs WHERE id = :id")
     suspend fun getById(id: Long): Song?
@@ -27,8 +24,8 @@ interface SongDao {
     @Update
     suspend fun update(song: Song)
 
-    @Query("UPDATE songs SET deletedAt = :deletedAt WHERE id = :id")
-    suspend fun markDeleted(id: Long, deletedAt: Long)
+    @Query("DELETE FROM songs WHERE id = :id")
+    suspend fun deleteById(id: Long)
 
     @Query("UPDATE songs SET lastViewedAt = :viewedAt WHERE id = :id")
     suspend fun updateLastViewedAt(id: Long, viewedAt: Long)
@@ -36,10 +33,9 @@ interface SongDao {
     @Query(
         """
         SELECT * FROM songs
-        WHERE deletedAt IS NULL
-          AND (title LIKE '%' || :query || '%'
+        WHERE title LIKE '%' || :query || '%'
            OR keySignature LIKE '%' || :query || '%'
-           OR notes LIKE '%' || :query || '%')
+           OR notes LIKE '%' || :query || '%'
         ORDER BY title COLLATE NOCASE ASC
         """
     )
@@ -48,7 +44,7 @@ interface SongDao {
     @Query("UPDATE songs SET sortOrder = :order WHERE id = :id")
     suspend fun updateSortOrder(id: Long, order: Int)
 
-    @Query("UPDATE songs SET sortOrder = sortOrder + 1 WHERE deletedAt IS NULL")
+    @Query("UPDATE songs SET sortOrder = sortOrder + 1")
     suspend fun incrementAllSortOrders()
 
     @Transaction
