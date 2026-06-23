@@ -33,24 +33,44 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun reorder(idsInOrder: List<Long>) = songDao.replaceOrder(idsInOrder)
 
-    suspend fun sortAlpha() {
-        val ids = songDao.getAll().sortedBy { it.title.lowercase() }.map { it.id }
-        songDao.replaceOrder(ids)
-    }
-
-    suspend fun sortByRecentlyAdded() {
+    suspend fun sortAlpha(reverse: Boolean = false) {
         val ids = songDao.getAll()
-            .sortedWith(compareByDescending<Song> { it.createdAt }.thenByDescending { it.id })
+            .sortedWith(
+                if (reverse) {
+                    compareByDescending<Song> { it.title.lowercase() }.thenByDescending { it.id }
+                } else {
+                    compareBy<Song> { it.title.lowercase() }.thenBy { it.id }
+                },
+            )
             .map { it.id }
         songDao.replaceOrder(ids)
     }
 
-    suspend fun sortByRecentlyViewed() {
+    suspend fun sortByRecentlyAdded(reverse: Boolean = false) {
         val ids = songDao.getAll()
             .sortedWith(
-                compareBy<Song> { it.lastViewedAt == null }
-                    .thenByDescending { it.lastViewedAt }
-                    .thenByDescending { it.id },
+                if (reverse) {
+                    compareBy<Song> { it.createdAt }.thenBy { it.id }
+                } else {
+                    compareByDescending<Song> { it.createdAt }.thenByDescending { it.id }
+                },
+            )
+            .map { it.id }
+        songDao.replaceOrder(ids)
+    }
+
+    suspend fun sortByRecentlyViewed(reverse: Boolean = false) {
+        val ids = songDao.getAll()
+            .sortedWith(
+                if (reverse) {
+                    compareBy<Song> { it.lastViewedAt == null }
+                        .thenBy { it.lastViewedAt }
+                        .thenBy { it.id }
+                } else {
+                    compareBy<Song> { it.lastViewedAt == null }
+                        .thenByDescending { it.lastViewedAt }
+                        .thenByDescending { it.id }
+                },
             )
             .map { it.id }
         songDao.replaceOrder(ids)

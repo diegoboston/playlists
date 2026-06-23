@@ -2,8 +2,6 @@ package com.playlists.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +20,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,6 +42,7 @@ import com.playlists.app.R
 import com.playlists.app.data.Song
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDeletePrompt
+import com.playlists.app.ui.SongSortCriterion
 import kotlinx.coroutines.launch
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
@@ -51,13 +50,13 @@ import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SongsScreen(
     viewModel: PlaylistsViewModel,
     onOpenSong: (Long) -> Unit,
 ) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
+    val sortState by viewModel.songSortState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val displayedKeys = remember { mutableStateListOf<String>() }
     val dragState = remember { ReorderDragState() }
@@ -71,22 +70,32 @@ fun SongsScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (songs.isNotEmpty()) {
-            FlowRow(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(onClick = { viewModel.sortSongsAlpha() }) {
-                    Text(stringResource(R.string.sort_songs_alpha))
-                }
-                OutlinedButton(onClick = { viewModel.sortSongsByRecentlyAdded() }) {
-                    Text(stringResource(R.string.sort_songs_recently_added))
-                }
-                OutlinedButton(onClick = { viewModel.sortSongsByRecentlyViewed() }) {
-                    Text(stringResource(R.string.sort_songs_recently_viewed))
-                }
+                Text(
+                    text = stringResource(R.string.sort_label),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+                SongSortChip(
+                    label = stringResource(R.string.sort_songs_alpha),
+                    selected = sortState.criterion == SongSortCriterion.Alpha,
+                    onClick = { viewModel.sortSongs(SongSortCriterion.Alpha) },
+                )
+                SongSortChip(
+                    label = stringResource(R.string.sort_songs_recently_added),
+                    selected = sortState.criterion == SongSortCriterion.Added,
+                    onClick = { viewModel.sortSongs(SongSortCriterion.Added) },
+                )
+                SongSortChip(
+                    label = stringResource(R.string.sort_songs_recently_viewed),
+                    selected = sortState.criterion == SongSortCriterion.Viewed,
+                    onClick = { viewModel.sortSongs(SongSortCriterion.Viewed) },
+                )
             }
         }
 
@@ -184,6 +193,29 @@ fun SongsScreen(
                 TextButton(onClick = { deleteTarget = null }) {
                     Text(stringResource(android.R.string.cancel))
                 }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SongSortChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+    ) {
+        Text(
+            text = "[$label]",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
             },
         )
     }

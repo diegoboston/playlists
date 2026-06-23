@@ -41,6 +41,9 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     private val _appUpdateState = MutableStateFlow<AppUpdateUiState?>(null)
     val appUpdateState: StateFlow<AppUpdateUiState?> = _appUpdateState.asStateFlow()
 
+    private val _songSortState = MutableStateFlow(SongSortState())
+    val songSortState: StateFlow<SongSortState> = _songSortState.asStateFlow()
+
     private var launchUpdatePromptHandled = false
 
     private val playlistSongsFlows = ConcurrentHashMap<Long, StateFlow<List<PlaylistSongWithDetails>>>()
@@ -88,11 +91,16 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reorderSongs(idsInOrder: List<Long>) = viewModelScope.launch { songRepo.reorder(idsInOrder) }
 
-    fun sortSongsAlpha() = viewModelScope.launch { songRepo.sortAlpha() }
-
-    fun sortSongsByRecentlyAdded() = viewModelScope.launch { songRepo.sortByRecentlyAdded() }
-
-    fun sortSongsByRecentlyViewed() = viewModelScope.launch { songRepo.sortByRecentlyViewed() }
+    fun sortSongs(criterion: SongSortCriterion) = viewModelScope.launch {
+        val current = _songSortState.value
+        val reversed = if (current.criterion == criterion) !current.reversed else false
+        _songSortState.value = SongSortState(criterion, reversed)
+        when (criterion) {
+            SongSortCriterion.Alpha -> songRepo.sortAlpha(reversed)
+            SongSortCriterion.Added -> songRepo.sortByRecentlyAdded(reversed)
+            SongSortCriterion.Viewed -> songRepo.sortByRecentlyViewed(reversed)
+        }
+    }
 
     fun recordSongView(id: Long) = viewModelScope.launch { songRepo.markViewed(id) }
 

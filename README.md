@@ -24,7 +24,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores and dashes → spaces, extension dropped, trailing key → Key, trailing instrument → Notes).
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
-- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. Placeholder songs (no real sheet yet) show a 🚧 after the title. **A–Z**, **Recently added** (import date), and **Recently viewed** buttons sort the archive (persists order). Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
+- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. Placeholder songs (no real sheet yet) show a 🚧 after the title. **Sort:** **[A-Z] [Added] [Viewed]** — tap a chip to sort the archive (persists order); tap the same chip again to reverse. Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
 - **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages.
 
 ### Playlists
@@ -135,7 +135,7 @@ REMOTE PLAY ACTIVE (notification shade)
 ## Usage
 
 1. **Import a song** — Gallery or browser → Share → Stage Manager → fill Title, Key, Notes → Save.
-2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **A–Z**, **Recently added**, or **Recently viewed** to sort.
+2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **Sort: [A-Z] [Added] [Viewed]** — tap again on the same chip to reverse order.
 3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete from the colorful blocks on the list.
 4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (🚧) to add a title-only stand-in sheet.
 5. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).

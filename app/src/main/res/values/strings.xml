@@ -4,9 +4,10 @@
     <string name="tab_songs">Songs</string>
     <string name="tab_playlists">Playlists</string>
     <string name="empty_songs">Share a PDF or image to add your first song.</string>
-    <string name="sort_songs_alpha">A–Z</string>
-    <string name="sort_songs_recently_added">Recently added</string>
-    <string name="sort_songs_recently_viewed">Recently viewed</string>
+    <string name="sort_label">Sort:</string>
+    <string name="sort_songs_alpha">A-Z</string>
+    <string name="sort_songs_recently_added">Added</string>
+    <string name="sort_songs_recently_viewed">Viewed</string>
     <string name="empty_playlists">Create a playlist to get started.</string>
     <string name="new_playlist">New playlist</string>
     <plurals name="playlist_with_song_count">
