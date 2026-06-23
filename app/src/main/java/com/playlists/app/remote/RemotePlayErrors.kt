@@ -62,6 +62,9 @@ object RemotePlayErrors {
         }
     }
 
+    fun isTunnelUnreachableWarning(warning: String): Boolean =
+        warning.lowercase().contains("tunnel not reachable")
+
     fun copyToClipboard(context: Context, text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("remote play error", text))

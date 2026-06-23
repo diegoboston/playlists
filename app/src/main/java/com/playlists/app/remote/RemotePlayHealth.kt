@@ -58,4 +58,27 @@ object RemotePlayHealth {
             },
         )
     }
+
+    /**
+     * The app's HttpURLConnection probe often fails while Chrome on the same phone
+     * loads the tunnel fine (DNS timing, carrier cache, etc.). When cloudflared and
+     * the local server are healthy, treat the tunnel as up without a false FAIL.
+     */
+    fun tunnelStatusWhenServing(
+        tunnelBaseUrl: String,
+        cloudflaredRunning: Boolean,
+        localOk: Boolean,
+    ): ProbeResult {
+        val url = tunnelBaseUrl.trimEnd('/') + "/"
+        if (cloudflaredRunning && localOk) {
+            return ProbeResult(
+                label = url,
+                ok = true,
+                detail = "cloudflared running — open the link above in your browser to verify",
+            )
+        }
+        val probe = probeTunnelWithRetries(tunnelBaseUrl, attempts = 2, pauseMs = 2_000, timeoutMs = 6_000)
+        if (probe.ok) return probe
+        return probe
+    }
 }

@@ -47,11 +47,14 @@ object PlayRemoteController {
         val active = session ?: return null
         val localUrl = "http://127.0.0.1:${active.localPort}/"
         val localProbe = RemotePlayHealth.probeGet(localUrl, timeoutMs = 4_000)
+        val cloudflaredRunning = CloudflareTunnel.isRunning()
         val tunnelProbe = active.tunnelBaseUrl?.let {
-            RemotePlayHealth.probeTunnelWithRetries(it, attempts = 2, pauseMs = 2_000, timeoutMs = 6_000)
+            RemotePlayHealth.tunnelStatusWhenServing(it, cloudflaredRunning, localProbe.ok)
         }
-        val warnings = active.startWarnings.toMutableList()
-        if (active.mode == RemotePlayMode.CLOUDFLARE && !CloudflareTunnel.isRunning()) {
+        val warnings = active.startWarnings
+            .filterNot { RemotePlayErrors.isTunnelUnreachableWarning(it) }
+            .toMutableList()
+        if (!cloudflaredRunning) {
             warnings.add("cloudflared is not running — the public URL will not work.")
             CloudflareTunnel.lastExitCode()?.let { code ->
                 warnings.add("cloudflared last exit code: $code")
@@ -73,7 +76,7 @@ object PlayRemoteController {
             tunnelBaseUrl = active.tunnelBaseUrl,
             publicUrl = active.publicUrl,
             serverAlive = server?.isAlive == true,
-            tunnelProcessAlive = CloudflareTunnel.isRunning(),
+            tunnelProcessAlive = cloudflaredRunning,
             tunnelExitCode = CloudflareTunnel.lastExitCode(),
             localProbe = localProbe,
             tunnelProbe = tunnelProbe,
@@ -188,15 +191,8 @@ object PlayRemoteController {
                 }
             }
             val startWarnings = mutableListOf<String>()
-            if (mode == RemotePlayMode.CLOUDFLARE) {
-                // One quick probe — retrying immediately often poisons mobile DNS with NXDOMAIN.
-                val tunnelProbe = RemotePlayHealth.probeGet(
-                    tunnelUrl.trimEnd('/') + "/",
-                    timeoutMs = 5_000,
-                )
-                if (!tunnelProbe.ok) {
-                    startWarnings.add(RemotePlayErrors.tunnelReachabilityWarning(tunnelProbe.detail))
-                }
+            if (mode == RemotePlayMode.CLOUDFLARE && !CloudflareTunnel.isRunning()) {
+                startWarnings.add("cloudflared is not running — the public URL will not work.")
             }
             val resolvedPublicUrl = if (playlistId != null) {
                 "$tunnelUrl/?playlist=$playlistId"
