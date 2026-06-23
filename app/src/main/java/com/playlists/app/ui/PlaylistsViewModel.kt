@@ -12,6 +12,7 @@ import com.playlists.app.util.AppUpdate
 import com.playlists.app.util.PendingImport
 import com.playlists.app.util.QuickstartMatcher
 import com.playlists.app.util.ShareImporter
+import com.playlists.app.util.SongTitleMigration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -165,6 +166,26 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
             playlistRepo.setSongs(playlistId, songIds)
             withContext(Dispatchers.Main.immediate) { onDone() }
         }
+
+    fun applyQuickstartWithPlaceholders(
+        playlistId: Long,
+        results: List<QuickstartMatcher.MatchResult>,
+        onDone: () -> Unit = {},
+    ) = viewModelScope.launch {
+        val ids = results.map { result ->
+            result.song?.id ?: run {
+                val parsed = SongTitleMigration.parse(result.line)
+                songRepo.createPlaceholder(
+                    context = getApplication(),
+                    title = parsed.title,
+                    keySignature = parsed.keySignature,
+                    notes = parsed.notes,
+                )
+            }
+        }
+        playlistRepo.setSongs(playlistId, ids)
+        withContext(Dispatchers.Main.immediate) { onDone() }
+    }
 
     fun pageCount(song: Song): Int {
         val file = File(song.filePath)

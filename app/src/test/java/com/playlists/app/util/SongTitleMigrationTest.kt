@@ -7,6 +7,30 @@ import org.junit.Test
 
 class SongTitleMigrationTest {
     @Test
+    fun parse_dashSeparatorsBetweenTitleKeyAndInstrument() {
+        val result = SongTitleMigration.parse("Amazing Grace - G - electric bass")
+        assertEquals("Amazing Grace", result.title)
+        assertEquals("G", result.keySignature)
+        assertEquals("electric bass", result.notes)
+    }
+
+    @Test
+    fun parse_dashSeparatorsWithoutSpaces() {
+        val result = SongTitleMigration.parse("Amazing Grace-G-voice.pdf")
+        assertEquals("Amazing Grace", result.title)
+        assertEquals("G", result.keySignature)
+        assertEquals("voice", result.notes)
+    }
+
+    @Test
+    fun parse_dashBetweenTitleAndKeyOnly() {
+        val result = SongTitleMigration.parse("Title - Am piano")
+        assertEquals("Title", result.title)
+        assertEquals("Am", result.keySignature)
+        assertEquals("piano", result.notes)
+    }
+
+    @Test
     fun parse_replacesUnderscoresAndStripsExtension() {
         val result = SongTitleMigration.parse("Amazing_Grace.pdf")
         assertEquals("Amazing Grace", result.title)

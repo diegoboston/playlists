@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -28,7 +29,13 @@ import androidx.compose.ui.unit.dp
 import com.playlists.app.R
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.components.TextInputDialog
+import com.playlists.app.util.QuickstartMatcher
 import kotlinx.coroutines.launch
+
+private enum class QuickstartCreateMode {
+    MatchedOnly,
+    WithPlaceholders,
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,9 +46,13 @@ fun QuickstartScreen(
 ) {
     var input by remember { mutableStateOf("") }
     var summary by remember { mutableStateOf("") }
-    var matchedIds by remember { mutableStateOf<List<Long>>(emptyList()) }
-    var showCreate by remember { mutableStateOf(false) }
+    var matchResults by remember { mutableStateOf<List<QuickstartMatcher.MatchResult>>(emptyList()) }
+    var createMode by remember { mutableStateOf<QuickstartCreateMode?>(null) }
     val scope = rememberCoroutineScope()
+    val noMatchLabel = stringResource(R.string.quickstart_no_match)
+
+    val matchedResults = remember(matchResults) { matchResults.filter { it.song != null } }
+    val unmatchedResults = remember(matchResults) { matchResults.filter { it.song == null } }
 
     Scaffold(
         topBar = {
@@ -74,21 +85,9 @@ fun QuickstartScreen(
             Button(
                 onClick = {
                     scope.launch {
-                        val (results, ids) = viewModel.matchQuickstartLines(input)
-                        matchedIds = ids
-                        summary = results.joinToString("\n") { result ->
-                            val song = result.song
-                            val target = if (song != null) {
-                                com.playlists.app.ui.SongDisplay.titleWithKey(
-                                    song.title,
-                                    song.keySignature,
-                                    song.isPlaceholder,
-                                )
-                            } else {
-                                "(no match)"
-                            }
-                            "• ${result.line} → $target"
-                        }
+                        val (results, _) = viewModel.matchQuickstartLines(input)
+                        matchResults = results
+                        summary = formatQuickstartSummary(results, noMatchLabel)
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -103,9 +102,9 @@ fun QuickstartScreen(
                         .padding(top = 16.dp),
                 )
             }
-            if (matchedIds.isNotEmpty()) {
+            if (matchedResults.isNotEmpty()) {
                 Button(
-                    onClick = { showCreate = true },
+                    onClick = { createMode = QuickstartCreateMode.MatchedOnly },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 12.dp),
@@ -113,23 +112,65 @@ fun QuickstartScreen(
                     Text(stringResource(R.string.create))
                 }
             }
+            if (unmatchedResults.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = { createMode = QuickstartCreateMode.WithPlaceholders },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = if (matchedResults.isNotEmpty()) 8.dp else 12.dp),
+                ) {
+                    Text(stringResource(R.string.create_with_placeholders))
+                }
+            }
         }
     }
 
-    if (showCreate) {
+    if (createMode != null) {
         TextInputDialog(
             title = stringResource(R.string.new_playlist),
             initialValue = stringResource(R.string.quickstart_default_name),
             confirmLabel = stringResource(R.string.create),
-            onDismiss = { showCreate = false },
+            onDismiss = { createMode = null },
             onConfirm = { name ->
-                showCreate = false
+                val mode = createMode
+                createMode = null
                 viewModel.createPlaylist(name) { id ->
-                    viewModel.applyQuickstart(id, matchedIds) {
-                        onOpenPlaylist(id)
+                    when (mode) {
+                        QuickstartCreateMode.MatchedOnly -> {
+                            val ids = QuickstartMatcher.matchedSongIds(matchResults)
+                            viewModel.applyQuickstart(id, ids) {
+                                onOpenPlaylist(id)
+                            }
+                        }
+                        QuickstartCreateMode.WithPlaceholders -> {
+                            viewModel.applyQuickstartWithPlaceholders(id, matchResults) {
+                                onOpenPlaylist(id)
+                            }
+                        }
+                        null -> Unit
                     }
                 }
             },
         )
+    }
+}
+
+private fun formatQuickstartSummary(
+    results: List<QuickstartMatcher.MatchResult>,
+    noMatchLabel: String,
+): String {
+    val (matched, unmatched) = results.partition { it.song != null }
+    return (matched + unmatched).joinToString("\n") { result ->
+        val song = result.song
+        val target = if (song != null) {
+            com.playlists.app.ui.SongDisplay.titleWithKey(
+                song.title,
+                song.keySignature,
+                song.isPlaceholder,
+            )
+        } else {
+            noMatchLabel
+        }
+        "• ${result.line} → $target"
     }
 }

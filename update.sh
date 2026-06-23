@@ -21,6 +21,7 @@ cd "$(dirname "$0")"
 RSYNC_EXCLUDES=(
     --exclude='.gradle/'
     --exclude='.kotlin/'
+    --exclude='.tmp/'
     --exclude='build/'
     --exclude='local.properties'
     --exclude='.DS_Store'
@@ -37,6 +38,7 @@ clean_artifacts() {
     rm -rf \
         .gradle \
         .kotlin \
+        .tmp \
         build \
         app/build \
         .idea \

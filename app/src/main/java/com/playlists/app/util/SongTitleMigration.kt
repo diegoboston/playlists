@@ -1,7 +1,7 @@
 package com.playlists.app.util
 
 /**
- * Parses song titles imported from filenames (underscores, extensions, trailing key/instrument).
+ * Parses song titles imported from filenames (underscores, dashes, extensions, trailing key/instrument).
  * Used by the v5→v6 DB migration, share/import, and [SongTitles.fromFilename].
  */
 object SongTitleMigration {
@@ -12,6 +12,9 @@ object SongTitleMigration {
     )
 
     private val FILE_EXTENSIONS = Regex("""\.(pdf|png|jpe?g|webp|gif)$""", RegexOption.IGNORE_CASE)
+
+    /** Dashes often separate title, key, and instrument (e.g. "Song - G - piano"). */
+    private val DASH_SEPARATORS = Regex("""\s*[-–—]\s*""")
 
     /** Longest suffix first — "electric bass" before "bass". */
     private val INSTRUMENTS = listOf(
@@ -44,6 +47,7 @@ object SongTitleMigration {
 
     fun parse(title: String, existingKey: String = "", existingNotes: String = ""): Result {
         var working = title.replace('_', ' ').trim()
+        working = DASH_SEPARATORS.replace(working, " ").trim()
         working = FILE_EXTENSIONS.replace(working, "").trim()
 
         val tokens = working.split(Regex("""\s+""")).filter { it.isNotBlank() }.toMutableList()

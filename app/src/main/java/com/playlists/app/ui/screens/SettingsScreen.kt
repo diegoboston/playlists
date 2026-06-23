@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,8 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
@@ -53,7 +49,6 @@ fun SettingsScreen(
     var codeText by remember {
         mutableStateOf(AppPrefs.getRemoteCode(context).toString())
     }
-    var codeVisible by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -91,31 +86,7 @@ fun SettingsScreen(
                 onValueChange = { codeText = it.filter { ch -> ch.isDigit() }.take(5) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                visualTransformation = if (codeVisible) {
-                    VisualTransformation.None
-                } else {
-                    PasswordVisualTransformation()
-                },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                placeholder = { Text(AppPrefs.DEFAULT_REMOTE_CODE.toString()) },
-                trailingIcon = {
-                    IconButton(onClick = { codeVisible = !codeVisible }) {
-                        Icon(
-                            imageVector = if (codeVisible) {
-                                Icons.Filled.VisibilityOff
-                            } else {
-                                Icons.Filled.Visibility
-                            },
-                            contentDescription = stringResource(
-                                if (codeVisible) {
-                                    R.string.settings_remote_code_hide
-                                } else {
-                                    R.string.settings_remote_code_show
-                                },
-                            ),
-                        )
-                    }
-                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
             Text(
                 text = stringResource(R.string.settings_remote_code_hint),

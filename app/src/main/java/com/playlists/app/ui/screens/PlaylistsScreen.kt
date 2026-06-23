@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -108,6 +109,8 @@ fun PlaylistsScreen(
                     val playlistId = key.removePrefix("p:").toLongOrNull() ?: return@items
                     val playlist = playlists.find { it.id == playlistId } ?: return@items
                     val paletteIndex = playlists.indexOfFirst { it.id == playlistId }.coerceAtLeast(0)
+                    val playlistSongs by viewModel.observePlaylistSongs(playlist.id)
+                        .collectAsStateWithLifecycle()
                     DraggableItem(
                         isDragging = dragState.draggingKey == key,
                         dragOffset = dragState.currentDragOffset(listState),
@@ -124,6 +127,7 @@ fun PlaylistsScreen(
                     ) {
                         PlaylistBlock(
                             playlist = playlist,
+                            songCount = playlistSongs.size,
                             fallbackColor = PlaylistAccentColors.palette[paletteIndex % PlaylistAccentColors.palette.size],
                             onRename = { renameTarget = playlist },
                             onColor = { colorTarget = playlist },
@@ -198,6 +202,7 @@ fun PlaylistsScreen(
 @Composable
 private fun PlaylistBlock(
     playlist: Playlist,
+    songCount: Int,
     fallbackColor: Int,
     onRename: () -> Unit,
     onColor: () -> Unit,
@@ -217,7 +222,12 @@ private fun PlaylistBlock(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = playlist.name,
+                text = pluralStringResource(
+                    R.plurals.playlist_with_song_count,
+                    songCount,
+                    playlist.name,
+                    songCount,
+                ),
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.SemiBold,
                     color = onBg,
