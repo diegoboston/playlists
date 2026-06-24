@@ -88,6 +88,11 @@ fun MainTabsScreen(
         remoteFlow = null
     }
 
+    fun stopRemoteFlow() {
+        cancelRemoteFlow()
+        Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
+    }
+
     fun startRemote(playlistId: Long?, mode: RemotePlayMode) {
         val generation = remoteStartGeneration + 1
         remoteStartGeneration = generation
@@ -193,6 +198,7 @@ fun MainTabsScreen(
             state = flow,
             onCancel = { cancelRemoteFlow() },
             onCloseStarted = { closeRemoteStartedDialog() },
+            onStopRemote = { stopRemoteFlow() },
             onSelectMode = { mode ->
                 pendingRemotePlaylistId?.let { startRemote(it, mode) }
             },

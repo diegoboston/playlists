@@ -1,7 +1,5 @@
 package com.playlists.app.remote
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.playlists.app.R
+import com.playlists.app.util.AppPrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -39,6 +38,7 @@ fun RemotePlayFlowDialog(
     state: RemotePlayFlowState,
     onCancel: () -> Unit,
     onCloseStarted: () -> Unit,
+    onStopRemote: () -> Unit,
     onSelectMode: (RemotePlayMode) -> Unit,
 ) {
     when (state) {
@@ -111,6 +111,7 @@ fun RemotePlayFlowDialog(
                 url = state.url,
                 mode = state.mode,
                 onDismiss = onCloseStarted,
+                onStop = onStopRemote,
             )
         }
     }
@@ -121,10 +122,14 @@ fun RemotePlayStartedDialog(
     url: String,
     mode: RemotePlayMode,
     onDismiss: () -> Unit,
+    onStop: () -> Unit,
 ) {
     val context = LocalContext.current
     var debug by remember { mutableStateOf<RemotePlayDebugInfo?>(null) }
     var refreshTick by remember { mutableIntStateOf(0) }
+    val pin = remember(mode) {
+        if (mode == RemotePlayMode.CLOUDFLARE) AppPrefs.getRemotePin(context) else null
+    }
 
     LaunchedEffect(mode, refreshTick) {
         if (mode != RemotePlayMode.CLOUDFLARE) return@LaunchedEffect
@@ -138,10 +143,6 @@ fun RemotePlayStartedDialog(
         }
     }
 
-    val openBrowser = {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.remote_started)) },
@@ -149,13 +150,14 @@ fun RemotePlayStartedDialog(
             RemotePlayStartedDialogContent(
                 url = url,
                 mode = mode,
+                pin = pin,
                 debug = debug,
                 onRefreshDebug = { refreshTick++ },
             )
         },
         confirmButton = {
-            TextButton(onClick = openBrowser) {
-                Text(stringResource(R.string.remote_open_in_browser))
+            TextButton(onClick = onStop) {
+                Text(stringResource(R.string.remote_stop_action))
             }
         },
         dismissButton = {
@@ -170,6 +172,7 @@ fun RemotePlayStartedDialog(
 internal fun RemotePlayStartedDialogContent(
     url: String,
     mode: RemotePlayMode,
+    pin: String?,
     debug: RemotePlayDebugInfo?,
     onRefreshDebug: () -> Unit,
 ) {
@@ -188,6 +191,13 @@ internal fun RemotePlayStartedDialogContent(
             ),
             style = MaterialTheme.typography.bodyMedium,
         )
+        if (mode == RemotePlayMode.CLOUDFLARE && pin != null) {
+            Text(
+                stringResource(R.string.remote_started_pin, pin),
+                modifier = Modifier.padding(top = 12.dp),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        }
         RemotePlayUrlSection(
             url = url,
             modifier = Modifier.padding(top = 12.dp),

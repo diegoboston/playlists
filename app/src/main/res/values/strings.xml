@@ -37,9 +37,10 @@
     <string name="remote_stop">Stop</string>
     <string name="remote_url_label">Remote: %1$s</string>
     <string name="remote_started">Remote play started</string>
-    <string name="remote_started_message_cloudflare">Share this URL with other devices. Enter the 5-digit code from Settings — no port in the link.</string>
+    <string name="remote_started_message_cloudflare">Share this URL with other devices. Enter this PIN when prompted — no port in the link.</string>
     <string name="remote_started_message_lan">Open on another device on the same Wi‑Fi. No code entry — the same 5 digits appear as the port in the URL.</string>
-    <string name="remote_open_in_browser">Open in browser</string>
+    <string name="remote_started_pin">PIN: %1$s</string>
+    <string name="remote_stop_action">STOP 🛑</string>
     <string name="remote_url_qr_expand">Show QR code for URL</string>
     <string name="remote_url_qr_collapse">Hide QR code for URL</string>
     <string name="remote_url_qr_content_description">QR code for remote play URL</string>
