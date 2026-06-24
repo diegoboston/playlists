@@ -6,10 +6,24 @@ run() {
     "$@"
 }
 
+# git diff uses exit 1 when there are changes (not an error). set -e would abort.
+show_git_diff() {
+    echo "==> git diff"
+    local status=0
+    git diff || status=$?
+    if [ "$status" -gt 1 ]; then
+        exit "$status"
+    fi
+}
+
 confirm() {
     local prompt="$1"
     local reply
-    read -r -p "$prompt (y/n) " reply
+    if ! read -r -p "$prompt (y/n) " reply; then
+        echo
+        echo "Aborted."
+        exit 1
+    fi
     case "$reply" in
         [yY]|[yY][eE][sS]) return 0 ;;
         *) echo "Aborted."; exit 1 ;;
@@ -91,7 +105,7 @@ run git status
 confirm "Proceed?"
 
 echo
-run git diff
+show_git_diff
 confirm "Proceed?"
 
 echo
@@ -104,7 +118,11 @@ confirm "Proceed with commit and push?"
 echo
 run git add .
 
-read -r -p "Commit message: " message
+if ! read -r -p "Commit message: " message; then
+    echo
+    echo "Aborted."
+    exit 1
+fi
 if [ "${#message}" -lt 10 ]; then
     echo "Commit message must be at least 10 characters. Aborted."
     exit 1

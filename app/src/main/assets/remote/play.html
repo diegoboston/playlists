@@ -60,7 +60,7 @@
     <div id="hint">Tap left/right · pinch to zoom · swipe · arrow keys</div>
   </div>
   <div id="uploadOverlay" hidden>
-    <form id="uploadForm">
+    <form id="uploadForm" novalidate>
       <h2>Upload song</h2>
       <label for="uploadTitle">Title</label>
       <input id="uploadTitle" type="text" autocomplete="off" />
@@ -73,7 +73,7 @@
         <span id="dropZoneText">Drop PDF or image here, or tap to choose</span>
         <span id="dropZoneFile" hidden></span>
       </div>
-      <input id="uploadFile" type="file" accept="image/*,application/pdf,.pdf" required hidden />
+      <input id="uploadFile" type="file" accept="image/*,application/pdf,.pdf" hidden />
       <div id="uploadError"></div>
       <div id="uploadActions">
         <button id="uploadCancel" type="button">Cancel</button>
