@@ -22,8 +22,8 @@ object SongDisplay {
         return if (key.isNotEmpty()) " ($key)" else ""
     }
 
-    fun adjustedSongTitle(title: String, keySignature: String, isPlaceholder: Boolean = false): String =
-        title + keySuffix(keySignature) + if (isPlaceholder) PLACEHOLDER_MARKER else ""
+    fun adjustedSongTitle(title: String, keySignature: String): String =
+        title + keySuffix(keySignature)
 
     fun notesLine(notes: String): String = preview(notes)
 
@@ -45,13 +45,12 @@ object SongDisplay {
 fun SongTitleWithKey(
     title: String,
     keySignature: String,
-    isPlaceholder: Boolean,
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyLarge,
     maxLines: Int = 1,
 ) {
     Text(
-        text = SongDisplay.adjustedSongTitle(title, keySignature, isPlaceholder),
+        text = SongDisplay.adjustedSongTitle(title, keySignature),
         style = style,
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,

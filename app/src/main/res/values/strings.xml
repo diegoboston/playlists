@@ -23,6 +23,7 @@
     <string name="notes_hint">Notes</string>
     <string name="add_song">Add song</string>
     <string name="search_songs">Search songs…</string>
+    <string name="no_songs_match_search">No songs match your search.</string>
     <string name="add_placeholder">Add placeholder page: “%1$s”</string>
     <string name="placeholder_song">Placeholder — sheet music not yet added</string>
     <string name="rename_playlist">Rename playlist</string>
@@ -99,6 +100,7 @@
     <string name="deleted_from_archive">Removed from archive</string>
     <string name="playback_song_indicator">%1$d/%2$d: %3$s</string>
     <string name="playback_page_indicator">page %1$d/%2$d</string>
+    <string name="playback_restart">Start over</string>
     <string name="playback_nav_hint">Tap left/right · pinch to zoom · swipe · arrow keys</string>
     <string name="update_app_checking">Checking for updates…</string>
     <string name="update_app_downloading">Downloading update…</string>

@@ -7,6 +7,6 @@ enum class SongSortCriterion {
 }
 
 data class SongSortState(
-    val criterion: SongSortCriterion? = null,
+    val criterion: SongSortCriterion = SongSortCriterion.Alpha,
     val reversed: Boolean = false,
 )

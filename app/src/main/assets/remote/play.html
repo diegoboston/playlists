@@ -4,15 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stage Manager Remote</title>
+  <link rel="stylesheet" href="/upload-panel.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; position: relative; }
     #bar { background: rgba(0,0,0,.8); padding: 10px 12px; text-align: center; font-size: 14px; line-height: 1.4; }
     #barTop { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center; }
     #title { font-weight: 700; color: inherit; text-decoration: none; margin-right: 10px; }
-    #editBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; margin-left: 10px; }
-    #editBtn:disabled { opacity: .35; cursor: default; }
-    #editBtn svg { width: 22px; height: 22px; fill: currentColor; }
+    #editBtn, #restartBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; margin-left: 10px; }
+    #editBtn:disabled, #restartBtn:disabled { opacity: .35; cursor: default; }
+    #editBtn svg, #restartBtn svg { width: 22px; height: 22px; fill: currentColor; }
     #uploadBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; font-size: 22px; font-weight: 700; width: 30px; height: 30px; margin-left: 10px; }
     #uploadBtn:disabled { opacity: .35; cursor: default; }
     #meta { opacity: .85; font-size: 13px; margin-top: 2px; }
@@ -21,24 +22,7 @@
     #media { max-width: 100%; max-height: 100%; object-fit: contain; -webkit-user-select: none; user-select: none; pointer-events: none; }
     #hint { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; opacity: .55; font-size: 12px; pointer-events: none; }
     #empty { padding: 24px; text-align: center; opacity: .8; }
-    #zoomWrap[hidden], #empty[hidden], #uploadOverlay[hidden], #dropZoneFile[hidden] { display: none !important; }
-    #uploadOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.75); display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center; padding: 16px; z-index: 10; }
-    #uploadForm { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; }
-    #uploadForm h2 { font-size: 18px; margin-bottom: 16px; }
-    #uploadForm label { display: block; font-size: 13px; opacity: .8; margin-bottom: 4px; }
-    #uploadForm input[type="text"] { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #444; border-radius: 8px; background: #000; color: #fff; font-size: 16px; }
-    #uploadForm input[type="file"] { width: 100%; margin-bottom: 12px; color: #ccc; font-size: 14px; }
-    #uploadDropZone { border: 2px dashed #555; border-radius: 10px; padding: 28px 16px; margin-bottom: 12px; text-align: center; cursor: pointer; }
-    #uploadDropZone.drag-over { border-color: #7ecbff; background: rgba(126,203,255,.08); }
-    #uploadDropZone.has-file { border-style: solid; border-color: #444; }
-    #dropZoneText { font-size: 14px; opacity: .75; display: block; }
-    #dropZoneFile { font-size: 14px; color: #7ecbff; display: block; margin-top: 4px; }
-    #uploadError { color: #ff8a80; font-size: 13px; margin-bottom: 12px; min-height: 1.2em; }
-    #uploadActions { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-pack: end; -webkit-justify-content: flex-end; justify-content: flex-end; }
-    #uploadActions button { padding: 10px 16px; border-radius: 8px; border: none; font-size: 15px; cursor: pointer; margin-left: 10px; }
-    #uploadCancel { background: #333; color: #fff; }
-    #uploadSubmit { background: #7ecbff; color: #000; font-weight: 600; }
-    #uploadSubmit:disabled { opacity: .5; cursor: default; }
+    #zoomWrap[hidden], #empty[hidden] { display: none !important; }
   </style>
 </head>
 <body>
@@ -46,6 +30,9 @@
     <div id="barTop">
       <a id="title" href="/">Stage Manager</a>
       <button id="uploadBtn" type="button" aria-label="Upload song" title="Upload song">+</button>
+      <button id="restartBtn" type="button" aria-label="Start over" title="Start over">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+      </button>
       <button id="editBtn" type="button" aria-label="Edit playlist" title="Edit playlist">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>
       </button>
@@ -59,30 +46,9 @@
     <div id="empty" hidden>No songs in this playlist.</div>
     <div id="hint">Tap left/right · pinch to zoom · swipe · arrow keys</div>
   </div>
-  <div id="uploadOverlay" hidden>
-    <form id="uploadForm" novalidate>
-      <h2>Upload song</h2>
-      <label for="uploadTitle">Title</label>
-      <input id="uploadTitle" type="text" autocomplete="off" />
-      <label for="uploadKey">Key</label>
-      <input id="uploadKey" type="text" autocomplete="off" />
-      <label for="uploadNotes">Notes</label>
-      <input id="uploadNotes" type="text" autocomplete="off" />
-      <label for="uploadFile">File (PDF or image)</label>
-      <div id="uploadDropZone" role="button" tabindex="0" aria-label="Drop or choose file">
-        <span id="dropZoneText">Drop PDF or image here, or tap to choose</span>
-        <span id="dropZoneFile" hidden></span>
-      </div>
-      <input id="uploadFile" type="file" accept="image/*,application/pdf,.pdf" hidden />
-      <div id="uploadError"></div>
-      <div id="uploadActions">
-        <button id="uploadCancel" type="button">Cancel</button>
-        <button id="uploadSubmit" type="submit">Save</button>
-      </div>
-    </form>
-  </div>
   <script src="/compat.js"></script>
   <script src="/song-display.js"></script>
+  <script src="/upload.js"></script>
   <script>
     // Keep in sync with PlaybackNav.kt
     var NAV = {
@@ -107,19 +73,8 @@
     var emptyEl = document.getElementById('empty');
     var stage = document.getElementById('stage');
     var editBtn = document.getElementById('editBtn');
+    var restartBtn = document.getElementById('restartBtn');
     var uploadBtn = document.getElementById('uploadBtn');
-    var uploadOverlay = document.getElementById('uploadOverlay');
-    var uploadForm = document.getElementById('uploadForm');
-    var uploadTitle = document.getElementById('uploadTitle');
-    var uploadKey = document.getElementById('uploadKey');
-    var uploadNotes = document.getElementById('uploadNotes');
-    var uploadFile = document.getElementById('uploadFile');
-    var uploadError = document.getElementById('uploadError');
-    var uploadSubmit = document.getElementById('uploadSubmit');
-    var uploadCancel = document.getElementById('uploadCancel');
-    var uploadDropZone = document.getElementById('uploadDropZone');
-    var dropZoneText = document.getElementById('dropZoneText');
-    var dropZoneFile = document.getElementById('dropZoneFile');
 
     var touchStartX = 0;
     var touchStartY = 0;
@@ -138,53 +93,17 @@
     var panOffsetStartY = 0;
     var tapMoved = false;
     var lastTouchEnd = 0;
-    var selectedUploadFile = null;
 
-    function isAllowedFile(file) {
-      if (!file) return false;
-      var type = file.type || '';
-      if (type.indexOf('image/') === 0 || type === 'application/pdf') return true;
-      var name = file.name.toLowerCase();
-      return /\.(pdf|png|jpe?g|gif|webp)$/.test(name);
-    }
-
-    function setUploadFile(file) {
-      if (!isAllowedFile(file)) {
-        uploadError.textContent = 'Choose a PDF or image.';
-        return false;
+    RemoteUpload.attach({
+      trigger: uploadBtn,
+      uploadUrl: playlistApi ? playlistApi + '/upload' : '',
+      isBlocked: function() { return busy || !playlistApi; },
+      onSuccess: function() {
+        lastSongIndex = -1;
+        lastPageIndex = -1;
+        refresh();
       }
-      selectedUploadFile = file;
-      uploadDropZone.className = 'has-file';
-      RemoteCompat.setHidden(dropZoneText, true);
-      RemoteCompat.setHidden(dropZoneFile, false);
-      dropZoneFile.textContent = file.name;
-      applyFilenameSuggestions(file.name);
-      uploadError.textContent = '';
-      return true;
-    }
-
-    function applyFilenameSuggestions(filename) {
-      RemoteCompat.get('/api/parse-filename?raw=' + encodeURIComponent(filename), function(ok, parsed) {
-        if (ok && parsed) {
-          uploadTitle.value = parsed.title || '';
-          uploadKey.value = parsed.key || '';
-          uploadNotes.value = parsed.notes || '';
-        } else {
-          uploadTitle.value = filename.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
-          uploadKey.value = '';
-          uploadNotes.value = '';
-        }
-      });
-    }
-
-    function clearUploadFile() {
-      selectedUploadFile = null;
-      uploadFile.value = '';
-      uploadDropZone.className = '';
-      RemoteCompat.setHidden(dropZoneText, false);
-      RemoteCompat.setHidden(dropZoneFile, true);
-      dropZoneFile.textContent = '';
-    }
+    });
 
     function handleSideTap(clientX) {
       if (busy || scale > NAV.ZOOM_NAV_MAX) return;
@@ -194,102 +113,10 @@
       else navigate('prev');
     }
 
-    function openUpload() {
-      if (busy || !playlistApi) return;
-      uploadError.textContent = '';
-      uploadTitle.value = '';
-      uploadKey.value = '';
-      uploadNotes.value = '';
-      clearUploadFile();
-      RemoteCompat.setHidden(uploadOverlay, false);
-    }
-
-    function closeUpload() {
-      RemoteCompat.setHidden(uploadOverlay, true);
-      uploadError.textContent = '';
-    }
-
-    uploadBtn.addEventListener('click', openUpload);
+    restartBtn.addEventListener('click', restart);
     editBtn.addEventListener('click', function() {
       if (busy || !playlistApi) return;
       window.location.href = '/edit' + playlistQuery();
-    });
-    uploadCancel.addEventListener('click', closeUpload);
-
-    uploadDropZone.addEventListener('click', function() {
-      uploadFile.click();
-    });
-    uploadDropZone.addEventListener('keydown', function(e) {
-      e = e || window.event;
-      var key = e.key || e.keyCode;
-      if (key === 'Enter' || key === ' ' || key === 32) {
-        if (e.preventDefault) e.preventDefault();
-        uploadFile.click();
-      }
-    });
-
-    function preventDrag(e) {
-      if (e.preventDefault) e.preventDefault();
-      e.returnValue = false;
-    }
-
-    uploadDropZone.addEventListener('dragenter', function(e) {
-      preventDrag(e);
-      uploadDropZone.className = 'drag-over';
-    });
-    uploadDropZone.addEventListener('dragover', function(e) {
-      preventDrag(e);
-      uploadDropZone.className = 'drag-over';
-    });
-    uploadDropZone.addEventListener('dragleave', function(e) {
-      preventDrag(e);
-      uploadDropZone.className = selectedUploadFile ? 'has-file' : '';
-    });
-    uploadDropZone.addEventListener('drop', function(e) {
-      preventDrag(e);
-      uploadDropZone.className = selectedUploadFile ? 'has-file' : '';
-      var dt = e.dataTransfer || (e.originalEvent && e.originalEvent.dataTransfer);
-      var file = dt ? RemoteCompat.firstFile(dt.files) : null;
-      if (file) setUploadFile(file);
-    });
-
-    uploadFile.addEventListener('change', function() {
-      var file = RemoteCompat.firstFile(uploadFile.files);
-      if (file) setUploadFile(file);
-    });
-
-    uploadForm.addEventListener('submit', function(e) {
-      if (e.preventDefault) e.preventDefault();
-      e.returnValue = false;
-      if (busy) return false;
-      var file = selectedUploadFile || RemoteCompat.firstFile(uploadFile.files);
-      if (!file) {
-        uploadError.textContent = 'Choose a PDF or image.';
-        return false;
-      }
-      busy = true;
-      uploadSubmit.disabled = true;
-      uploadError.textContent = '';
-      var formData = new FormData();
-      formData.append('title', uploadTitle.value.replace(/^\s+|\s+$/g, ''));
-      formData.append('key', uploadKey.value.replace(/^\s+|\s+$/g, ''));
-      formData.append('notes', uploadNotes.value.replace(/^\s+|\s+$/g, ''));
-      formData.append('filename', file.name);
-      formData.append('mime', file.type || 'application/octet-stream');
-      formData.append('file', file);
-      RemoteCompat.postForm(playlistApi + '/upload', formData, function(ok, body) {
-        if (ok) {
-          closeUpload();
-          lastSongIndex = -1;
-          lastPageIndex = -1;
-          refresh();
-        } else {
-          uploadError.textContent = (body && body.error) ? body.error : 'Upload failed';
-        }
-        busy = false;
-        uploadSubmit.disabled = false;
-      });
-      return false;
     });
 
     function showConnectionLost() {
@@ -324,6 +151,7 @@
         return;
       }
       uploadBtn.disabled = false;
+      restartBtn.disabled = false;
       editBtn.disabled = false;
       RemoteCompat.get(playlistApi + '/state', function(ok, s) {
         if (!ok || !s) {
@@ -346,7 +174,7 @@
         var pageCount = song.pageCount || 1;
         var pageLabel = pageCount > 1 ? ' \u00b7 page ' + (s.pageIndex + 1) + '/' + pageCount : '';
         metaEl.textContent = (s.playlistName || 'Playlist') + ' \u00b7 ' + (s.songIndex + 1) + '/' + s.songs.length + ': ' +
-          SongDisplay.adjustedSongTitle(song.title, song.key, song.isPlaceholder) + pageLabel;
+          SongDisplay.adjustedSongTitle(song.title, song.key) + pageLabel;
 
         var contentChanged = s.songIndex !== lastSongIndex || s.pageIndex !== lastPageIndex;
         if (contentChanged) {
@@ -362,6 +190,16 @@
       if (busy || scale > NAV.ZOOM_NAV_MAX) return;
       busy = true;
       RemoteCompat.postJson(playlistApi + '/navigate', { direction: direction }, function() {
+        refresh();
+        busy = false;
+      });
+    }
+
+    function restart() {
+      if (busy || !playlistApi) return;
+      busy = true;
+      RemoteCompat.postJson(playlistApi + '/navigate', { direction: 'reset' }, function() {
+        resetZoom();
         refresh();
         busy = false;
       });

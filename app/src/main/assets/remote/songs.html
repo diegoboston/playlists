@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Song archive — Stage Manager</title>
+  <link rel="stylesheet" href="/upload-panel.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; background: #111; color: #fff; font-family: sans-serif; }
+    #header {
+      position: sticky; top: 0; z-index: 5;
+      background: rgba(0,0,0,.92); border-bottom: 1px solid #333;
+      padding: 12px 16px;
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+      -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+    }
+    #headerLeft { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; min-width: 0; }
+    #backLink { color: #7ecbff; text-decoration: none; font-size: 15px; margin-right: 12px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    #title { font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #uploadBtn {
+      background: #7ecbff; color: #000; border: none; border-radius: 8px;
+      padding: 10px 14px; font-size: 14px; font-weight: 600; cursor: pointer;
+      -webkit-flex-shrink: 0; flex-shrink: 0; margin-left: 10px;
+    }
+    #uploadBtn:disabled { opacity: .5; cursor: default; }
+    #content { padding: 12px 16px 32px; max-width: 640px; margin: 0 auto; }
+    #searchInput {
+      width: 100%; padding: 12px; border: 1px solid #444; border-radius: 8px;
+      background: #000; color: #fff; font-size: 16px; margin-bottom: 12px;
+    }
+    #sortRow {
+      display: -webkit-box; display: -webkit-flex; display: flex;
+      -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+      -webkit-flex-wrap: wrap; flex-wrap: wrap;
+      gap: 8px; margin-bottom: 12px;
+    }
+    #sortLabel { font-size: 14px; opacity: .85; margin-right: 4px; }
+    .sortBtn {
+      background: transparent; border: 1px solid #666; color: #fff;
+      border-radius: 8px; padding: 8px 12px; font-size: 14px; cursor: pointer;
+    }
+    .sortBtn.selected { border-color: #7ecbff; background: rgba(126,203,255,.15); font-weight: 600; }
+    .sortBtn:disabled { opacity: .4; cursor: default; }
+    #count { font-size: 13px; opacity: .7; margin-bottom: 10px; }
+    #list { list-style: none; padding: 0; }
+    #list li { margin-bottom: 8px; }
+    .row {
+      background: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 12px;
+    }
+    .song-title { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .song-meta { font-size: 13px; opacity: .75; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .song-meta[hidden] { display: none !important; }
+    #empty { text-align: center; opacity: .75; padding: 32px 16px; }
+    #empty[hidden] { display: none !important; }
+    #error { color: #ff8a80; font-size: 14px; margin-bottom: 12px; min-height: 1.2em; }
+    #content.busy { opacity: .6; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <div id="headerLeft">
+      <a id="backLink" href="/">Playlists</a>
+      <div id="title">Song archive</div>
+    </div>
+    <button id="uploadBtn" type="button">Upload</button>
+  </div>
+  <div id="content">
+    <div id="error"></div>
+    <input id="searchInput" type="search" placeholder="Search songs…" autocomplete="off" />
+    <div id="sortRow" hidden>
+      <span id="sortLabel">Sort:</span>
+      <button class="sortBtn" type="button" data-criterion="alpha">A-Z</button>
+      <button class="sortBtn" type="button" data-criterion="added">Added</button>
+      <button class="sortBtn" type="button" data-criterion="viewed">Viewed</button>
+    </div>
+    <div id="count"></div>
+    <ul id="list"></ul>
+    <div id="empty" hidden>No songs in the archive.</div>
+  </div>
+  <script src="/compat.js"></script>
+  <script src="/song-display.js"></script>
+  <script src="/upload.js"></script>
+  <script>
+    var listEl = document.getElementById('list');
+    var emptyEl = document.getElementById('empty');
+    var errorEl = document.getElementById('error');
+    var countEl = document.getElementById('count');
+    var searchInput = document.getElementById('searchInput');
+    var sortRow = document.getElementById('sortRow');
+    var sortButtons = sortRow.querySelectorAll('.sortBtn');
+    var contentEl = document.getElementById('content');
+    var uploadBtn = document.getElementById('uploadBtn');
+
+    var allSongs = [];
+    var sortState = { criterion: 'alpha', reversed: false };
+    var busy = false;
+
+    function setBusy(on) {
+      busy = on;
+      contentEl.className = on ? 'busy' : '';
+      uploadBtn.disabled = on;
+      for (var i = 0; i < sortButtons.length; i++) sortButtons[i].disabled = on;
+    }
+
+    function normalize(s) {
+      return (s || '').toLowerCase();
+    }
+
+    function matchesQuery(song, q) {
+      if (!q) return true;
+      var hay = normalize(song.title) + ' ' + normalize(song.key) + ' ' + normalize(song.notes);
+      return hay.indexOf(q) >= 0;
+    }
+
+    function filteredSongs() {
+      var q = searchInput.value.replace(/^\s+|\s+$/g, '').toLowerCase();
+      var list = [];
+      for (var i = 0; i < allSongs.length; i++) {
+        if (matchesQuery(allSongs[i], q)) list.push(allSongs[i]);
+      }
+      return list;
+    }
+
+    function updateSortButtons() {
+      for (var i = 0; i < sortButtons.length; i++) {
+        var btn = sortButtons[i];
+        var selected = btn.getAttribute('data-criterion') === sortState.criterion;
+        btn.className = selected ? 'sortBtn selected' : 'sortBtn';
+      }
+    }
+
+    function metaLine(song) {
+      var note = SongDisplay.notesLine(song.notes);
+      var parts = [];
+      if (song.key) parts.push(song.key);
+      if (note) parts.push(note);
+      if (song.fileType) parts.push(song.fileType);
+      return parts.join(' \u00b7 ');
+    }
+
+    function render() {
+      var songs = filteredSongs();
+      listEl.innerHTML = '';
+      countEl.textContent = songs.length === allSongs.length
+        ? (allSongs.length === 1 ? '1 song' : allSongs.length + ' songs')
+        : songs.length + ' of ' + allSongs.length;
+      if (!songs.length) {
+        RemoteCompat.setHidden(emptyEl, false);
+        emptyEl.textContent = allSongs.length ? 'No songs match your search.' : 'No songs in the archive.';
+        return;
+      }
+      RemoteCompat.setHidden(emptyEl, true);
+      for (var i = 0; i < songs.length; i++) {
+        (function(song) {
+          var li = document.createElement('li');
+          li.className = 'row';
+          var meta = metaLine(song);
+          li.innerHTML = '<div class="song-title"></div>' + (meta ? '<div class="song-meta"></div>' : '');
+          li.querySelector('.song-title').textContent =
+            SongDisplay.adjustedSongTitle(song.title, song.key);
+          if (meta) li.querySelector('.song-meta').textContent = meta;
+          listEl.appendChild(li);
+        })(songs[i]);
+      }
+    }
+
+    function applyListData(data) {
+      allSongs = data.songs || [];
+      if (data.sort) {
+        sortState.criterion = data.sort.criterion || 'alpha';
+        sortState.reversed = !!data.sort.reversed;
+      }
+      RemoteCompat.setHidden(sortRow, !allSongs.length);
+      updateSortButtons();
+      render();
+    }
+
+    function loadSongs() {
+      setBusy(true);
+      errorEl.textContent = '';
+      RemoteCompat.get('/api/songs', function(ok, data) {
+        setBusy(false);
+        if (!ok || !data) {
+          errorEl.textContent = 'Could not load songs';
+          return;
+        }
+        applyListData(data);
+      });
+    }
+
+    function sortSongs(criterion) {
+      if (busy) return;
+      setBusy(true);
+      errorEl.textContent = '';
+      RemoteCompat.postJson('/api/songs/sort', { criterion: criterion }, function(ok, data) {
+        setBusy(false);
+        if (!ok || !data) {
+          errorEl.textContent = (data && data.error) ? data.error : 'Sort failed';
+          return;
+        }
+        applyListData(data);
+      });
+    }
+
+    for (var i = 0; i < sortButtons.length; i++) {
+      (function(btn) {
+        btn.addEventListener('click', function() {
+          sortSongs(btn.getAttribute('data-criterion'));
+        });
+      })(sortButtons[i]);
+    }
+
+    RemoteUpload.attach({
+      trigger: uploadBtn,
+      uploadUrl: '/api/songs/upload',
+      isBlocked: function() { return busy; },
+      onSuccess: function(data) { if (data) applyListData(data); else loadSongs(); }
+    });
+
+    searchInput.addEventListener('input', render);
+    loadSongs();
+  </script>
+</body>
+</html>

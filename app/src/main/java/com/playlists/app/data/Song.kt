@@ -11,11 +11,9 @@ data class Song(
     val notes: String,
     val filePath: String,
     val fileType: String,
-    val mimeType: String,
     val createdAt: Long = System.currentTimeMillis(),
     val sortOrder: Int = 0,
     val lastViewedAt: Long? = null,
-    val isPlaceholder: Boolean = false,
 )
 
 enum class FileType {

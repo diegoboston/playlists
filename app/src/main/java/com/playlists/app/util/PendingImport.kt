@@ -9,7 +9,6 @@ import kotlinx.parcelize.Parcelize
 data class PendingImport(
     val filePath: String,
     val fileType: FileType,
-    val mimeType: String,
     val suggestedTitle: String,
     val suggestedKey: String = "",
     val suggestedNotes: String = "",
@@ -17,12 +16,11 @@ data class PendingImport(
     val file: File get() = File(filePath)
 
     companion object {
-        fun fromRawTitle(file: File, fileType: FileType, mimeType: String, rawTitle: String): PendingImport {
+        fun fromRawTitle(file: File, fileType: FileType, rawTitle: String): PendingImport {
             val parsed = SongTitles.parseFilename(rawTitle)
             return PendingImport(
                 filePath = file.absolutePath,
                 fileType = fileType,
-                mimeType = mimeType,
                 suggestedTitle = parsed.title,
                 suggestedKey = parsed.keySignature,
                 suggestedNotes = parsed.notes,

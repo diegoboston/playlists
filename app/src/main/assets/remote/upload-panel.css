@@ -1,0 +1,48 @@
+#remoteUploadOverlay[hidden] { display: none !important; }
+#remoteUploadOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.75);
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  padding: 16px;
+  z-index: 100;
+}
+#remoteUploadForm {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 20px;
+  width: 100%;
+  max-width: 400px;
+}
+#remoteUploadForm h2 { font-size: 18px; margin-bottom: 16px; }
+#remoteUploadForm label { display: block; font-size: 13px; opacity: .8; margin-bottom: 4px; }
+#remoteUploadForm input[type="text"] {
+  width: 100%; padding: 10px; margin-bottom: 12px;
+  border: 1px solid #444; border-radius: 8px;
+  background: #000; color: #fff; font-size: 16px;
+}
+#remoteUploadDropZone {
+  border: 2px dashed #555; border-radius: 10px;
+  padding: 28px 16px; margin-bottom: 12px;
+  text-align: center; cursor: pointer;
+}
+#remoteUploadDropZone.drag-over { border-color: #7ecbff; background: rgba(126,203,255,.08); }
+#remoteUploadDropZone.has-file { border-style: solid; border-color: #444; }
+#remoteUploadDropText { font-size: 14px; opacity: .75; display: block; }
+#remoteUploadDropFile { font-size: 14px; color: #7ecbff; display: block; margin-top: 4px; }
+#remoteUploadDropFile[hidden] { display: none !important; }
+#remoteUploadError { color: #ff8a80; font-size: 13px; margin-bottom: 12px; min-height: 1.2em; }
+#remoteUploadActions {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-pack: end; -webkit-justify-content: flex-end; justify-content: flex-end;
+}
+#remoteUploadActions button {
+  padding: 10px 16px; border-radius: 8px; border: none;
+  font-size: 15px; cursor: pointer; margin-left: 10px;
+}
+#remoteUploadCancel { background: #333; color: #fff; }
+#remoteUploadSubmit { background: #7ecbff; color: #000; font-weight: 600; }
+#remoteUploadSubmit:disabled { opacity: .5; cursor: default; }

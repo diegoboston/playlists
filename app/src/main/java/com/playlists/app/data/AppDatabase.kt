@@ -6,12 +6,13 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.playlists.app.ui.SongDisplay
 import com.playlists.app.util.SongTitleMigration
 import com.playlists.app.util.StageManagerStorage
 
 @Database(
     entities = [Song::class, Playlist::class, PlaylistSong::class],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -117,6 +118,54 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val marker = SongDisplay.PLACEHOLDER_MARKER
+                db.execSQL(
+                    """
+                    UPDATE songs
+                    SET title = title || ?,
+                        notes = CASE
+                            WHEN trim(notes) = '' THEN 'placeholder'
+                            WHEN lower(notes) LIKE '%placeholder%' THEN notes
+                            ELSE notes || ' placeholder'
+                        END
+                    WHERE isPlaceholder = 1
+                    """.trimIndent(),
+                    arrayOf(marker),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS songs_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        title TEXT NOT NULL,
+                        keySignature TEXT NOT NULL,
+                        notes TEXT NOT NULL,
+                        filePath TEXT NOT NULL,
+                        fileType TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        sortOrder INTEGER NOT NULL,
+                        lastViewedAt INTEGER
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO songs_new (
+                        id, title, keySignature, notes, filePath, fileType,
+                        createdAt, sortOrder, lastViewedAt
+                    )
+                    SELECT
+                        id, title, keySignature, notes, filePath, fileType,
+                        createdAt, sortOrder, lastViewedAt
+                    FROM songs
+                    """.trimIndent(),
+                )
+                db.execSQL("DROP TABLE songs")
+                db.execSQL("ALTER TABLE songs_new RENAME TO songs")
+            }
+        }
+
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.query("SELECT id, title, keySignature, notes FROM songs").use { cursor ->
@@ -159,6 +208,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_5_6,
                         MIGRATION_6_7,
                         MIGRATION_7_8,
+                        MIGRATION_8_9,
                     )
                     .build().also { instance = it }
             }

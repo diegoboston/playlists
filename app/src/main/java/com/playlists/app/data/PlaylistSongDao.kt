@@ -11,8 +11,7 @@ interface PlaylistSongDao {
     @Query(
         """
         SELECT ps.id, ps.playlistId, ps.songId, ps.position,
-               s.title, s.keySignature, s.notes, s.filePath, s.fileType,
-               s.isPlaceholder AS isPlaceholder
+               s.title, s.keySignature, s.notes, s.filePath, s.fileType
         FROM playlist_songs ps
         INNER JOIN songs s ON s.id = ps.songId
         WHERE ps.playlistId = :playlistId
@@ -24,8 +23,7 @@ interface PlaylistSongDao {
     @Query(
         """
         SELECT ps.id, ps.playlistId, ps.songId, ps.position,
-               s.title, s.keySignature, s.notes, s.filePath, s.fileType,
-               s.isPlaceholder AS isPlaceholder
+               s.title, s.keySignature, s.notes, s.filePath, s.fileType
         FROM playlist_songs ps
         INNER JOIN songs s ON s.id = ps.songId
         WHERE ps.playlistId = :playlistId

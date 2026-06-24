@@ -44,6 +44,9 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     private val _songSortState = MutableStateFlow(SongSortState())
     val songSortState: StateFlow<SongSortState> = _songSortState.asStateFlow()
 
+    private val _songSortGeneration = MutableStateFlow(0)
+    val songSortGeneration: StateFlow<Int> = _songSortGeneration.asStateFlow()
+
     private var launchUpdatePromptHandled = false
 
     private val playlistSongsFlows = ConcurrentHashMap<Long, StateFlow<List<PlaylistSongWithDetails>>>()
@@ -89,12 +92,23 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
 
-    fun reorderSongs(idsInOrder: List<Long>) = viewModelScope.launch { songRepo.reorder(idsInOrder) }
-
     fun sortSongs(criterion: SongSortCriterion) = viewModelScope.launch {
         val current = _songSortState.value
         val reversed = if (current.criterion == criterion) !current.reversed else false
         _songSortState.value = SongSortState(criterion, reversed)
+        applySongSort(criterion, reversed)
+        _songSortGeneration.value++
+    }
+
+    suspend fun refreshSongListSort(): Boolean {
+        val before = songRepo.getAll().map { it.id }
+        val state = _songSortState.value
+        applySongSort(state.criterion, state.reversed)
+        val after = songRepo.getAll().map { it.id }
+        return before != after
+    }
+
+    private suspend fun applySongSort(criterion: SongSortCriterion, reversed: Boolean) {
         when (criterion) {
             SongSortCriterion.Alpha -> songRepo.sortAlpha(reversed)
             SongSortCriterion.Added -> songRepo.sortByRecentlyAdded(reversed)
@@ -141,7 +155,6 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
         val songId = songRepo.createPlaceholder(
             title = parsed.title,
             keySignature = parsed.keySignature,
-            notes = parsed.notes,
         )
         playlistRepo.addSong(playlistId, songId)
         withContext(Dispatchers.Main.immediate) { onAdded() }
@@ -192,7 +205,6 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
                 songRepo.createPlaceholder(
                     title = parsed.title,
                     keySignature = parsed.keySignature,
-                    notes = parsed.notes,
                 )
             }
         }

@@ -13,8 +13,8 @@ var SongDisplay = (function() {
     return key ? ' (' + key + ')' : '';
   }
 
-  function adjustedSongTitle(title, keySignature, isPlaceholder) {
-    return title + keySuffix(keySignature) + (isPlaceholder ? PLACEHOLDER_MARKER : '');
+  function adjustedSongTitle(title, keySignature) {
+    return title + keySuffix(keySignature);
   }
 
   function notesLine(notes) {

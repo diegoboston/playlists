@@ -1,5 +1,6 @@
 package com.playlists.app.data
 
+import com.playlists.app.ui.SongDisplay
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.PlaceholderImageGenerator
 import com.playlists.app.util.SongStoragePaths
@@ -30,8 +31,6 @@ class SongRepository(private val songDao: SongDao) {
             file.delete()
         }
     }
-
-    suspend fun reorder(idsInOrder: List<Long>) = songDao.replaceOrder(idsInOrder)
 
     suspend fun sortAlpha(reverse: Boolean = false) {
         val ids = songDao.getAll()
@@ -87,20 +86,17 @@ class SongRepository(private val songDao: SongDao) {
     suspend fun createPlaceholder(
         title: String,
         keySignature: String = "",
-        notes: String = "",
     ): Long {
         val trimmedTitle = title.trim().ifBlank { "Untitled" }
         val bytes = PlaceholderImageGenerator.render(trimmedTitle)
         val stored = FileStorage.storeBytes(bytes, "png")
         val id = insert(
             Song(
-                title = trimmedTitle,
+                title = trimmedTitle + SongDisplay.PLACEHOLDER_MARKER,
                 keySignature = keySignature.trim(),
-                notes = notes.trim(),
+                notes = "placeholder",
                 filePath = SongStoragePaths.toStoredPath(stored),
                 fileType = FileType.IMAGE.name,
-                mimeType = "image/png",
-                isPlaceholder = true,
             ),
         )
         renamePlaceholderFile(id)
@@ -109,7 +105,6 @@ class SongRepository(private val songDao: SongDao) {
 
     private suspend fun renamePlaceholderFile(songId: Long) {
         val song = songDao.getById(songId) ?: return
-        if (!song.isPlaceholder) return
         val current = SongStoragePaths.resolve(song.filePath)
         if (!current.isFile) return
         val target = File(current.parentFile, "placeholder-$songId.png")

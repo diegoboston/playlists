@@ -58,7 +58,7 @@ object ShareImporter {
         } ?: return null
         val fileType = if (mimeType.contains("pdf")) FileType.PDF else FileType.IMAGE
         val rawTitle = rawTitleFromUri(resolver, uri, file)
-        return PendingImport.fromRawTitle(file, fileType, mimeType, rawTitle)
+        return PendingImport.fromRawTitle(file, fileType, rawTitle)
     }
 
     private fun importFromUrl(context: Context, url: String): PendingImport? {
@@ -67,7 +67,7 @@ object ShareImporter {
         val file = FileStorage.storeBytes(bytes, ext)
         val fileType = if (mime.contains("pdf")) FileType.PDF else FileType.IMAGE
         val rawTitle = url.substringAfterLast('/').substringBefore('?').ifBlank { "Shared link" }
-        return PendingImport.fromRawTitle(file, fileType, mime, rawTitle)
+        return PendingImport.fromRawTitle(file, fileType, rawTitle)
     }
 
     private fun rawTitleFromUri(resolver: ContentResolver, uri: Uri, file: File): String {
@@ -91,7 +91,6 @@ object ShareImporter {
                 notes = notes.trim().ifBlank { pending.suggestedNotes },
                 filePath = SongStoragePaths.toStoredPath(pending.file),
                 fileType = pending.fileType.name,
-                mimeType = pending.mimeType,
             )
         )
     }

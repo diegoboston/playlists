@@ -52,7 +52,7 @@ Remote: match that truncation in meta/subtitle lines (do not show full notes in 
 
 ### Placeholder songs
 
-Append 🚧 after title when `isPlaceholder` is true (local and remote). Use `SongDisplay.adjustedSongTitle` in Kotlin and `SongDisplay.adjustedSongTitle()` in remote JS.
+Placeholder pages are regular songs: title includes 🚧 (`SongDisplay.PLACEHOLDER_MARKER`) and notes contain `placeholder`. No separate DB flag or API field.
 
 ### Playback navigation
 
@@ -87,7 +87,7 @@ When adding or changing playlist/playback behaviour, update **both**:
 
 `/api/state` song objects must expose fields the playback UI needs (e.g. `title`, `key`, `pageCount`).
 
-`/api/playlists/{id}/entries` must expose fields the editor UI needs (e.g. `entryId`, `title`, `key`, `notes`, `isPlaceholder`).
+`/api/playlists/{id}/entries` must expose fields the editor UI needs (e.g. `entryId`, `title`, `key`, `notes`).
 
 ## Intentional differences (do not “fix”)
 

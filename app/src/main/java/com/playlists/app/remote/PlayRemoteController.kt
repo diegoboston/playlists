@@ -9,6 +9,8 @@ import com.playlists.app.ui.PdfHelper
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.SongStoragePaths
+import com.playlists.app.ui.SongSortCriterion
+import com.playlists.app.ui.SongSortState
 import fi.iki.elonen.NanoHTTPD
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +26,9 @@ object PlayRemoteController {
     private var session: RemotePlaySession? = null
     var activePlaylistId: Long? = null
         private set
+
+    private var songSortState = SongSortState()
+    private var archiveListInitialized = false
 
     private data class RemotePlaySession(
         val mode: RemotePlayMode,
@@ -98,9 +103,12 @@ object PlayRemoteController {
         val playHtml = context.assets.open("remote/play.html").bufferedReader().readText()
         val indexHtml = context.assets.open("remote/index.html").bufferedReader().readText()
         val editHtml = context.assets.open("remote/edit.html").bufferedReader().readText()
+        val songsHtml = context.assets.open("remote/songs.html").bufferedReader().readText()
         val pinHtml = context.assets.open("remote/pin.html").bufferedReader().readText()
         val songDisplayJs = context.assets.open("remote/song-display.js").bufferedReader().readText()
         val compatJs = context.assets.open("remote/compat.js").bufferedReader().readText()
+        val uploadJs = context.assets.open("remote/upload.js").bufferedReader().readText()
+        val uploadPanelCss = context.assets.open("remote/upload-panel.css").bufferedReader().readText()
         val port = AppPrefs.getRemoteCode(context)
         val pin = AppPrefs.getRemotePin(context)
         val remote = PlayRemoteServer(
@@ -111,14 +119,20 @@ object PlayRemoteController {
             playHtml = playHtml,
             indexHtml = indexHtml,
             editHtml = editHtml,
+            songsHtml = songsHtml,
             pinHtml = pinHtml,
             songDisplayJs = songDisplayJs,
             compatJs = compatJs,
+            uploadJs = uploadJs,
+            uploadPanelCss = uploadPanelCss,
             onLoadPlaylist = { id ->
                 runBlocking { loadPlaylist(id) }
             },
+            onUploadSong = { title, key, notes, tempFile, mimeType ->
+                runBlocking { handleCatalogUpload(title, key, notes, tempFile, mimeType) }
+            },
             onUpload = { id, title, key, notes, tempFile, mimeType ->
-                runBlocking { handleUpload(id, title, key, notes, tempFile, mimeType) }
+                runBlocking { handlePlaylistUpload(id, title, key, notes, tempFile, mimeType) }
             },
             onReorder = { id, entryIds ->
                 runBlocking { mutatePlaylist(id) { app -> app.playlistRepository.reorder(id, entryIds) } }
@@ -137,6 +151,12 @@ object PlayRemoteController {
             },
             onListSongs = {
                 runBlocking { listArchiveSongs() }
+            },
+            onGetSongSortState = {
+                songSortStateToJson()
+            },
+            onSortSongs = { criterion ->
+                runBlocking { sortArchiveSongs(criterion) }
             },
             onUpdateSong = { songId, title, key, notes ->
                 runBlocking { updateSongMetadata(songId, title, key, notes) }
@@ -249,6 +269,8 @@ object PlayRemoteController {
             appContext = null
             session = null
             _running.value = false
+            archiveListInitialized = false
+            songSortState = SongSortState()
         }
         try {
             CloudflareTunnel.stop()
@@ -275,7 +297,6 @@ object PlayRemoteController {
                 fileType = entry.fileType,
                 filePath = entry.filePath,
                 pageCount = pageCount.coerceAtLeast(1),
-                isPlaceholder = entry.isPlaceholder,
             )
         }
 
@@ -318,6 +339,10 @@ object PlayRemoteController {
     private suspend fun listArchiveSongs(): List<PlayRemoteServer.ArchiveSong> {
         val ctx = appContext ?: return emptyList()
         val app = PlaylistsApp.from(ctx as android.app.Application)
+        if (!archiveListInitialized) {
+            archiveListInitialized = true
+            applyArchiveSongSort(songSortState.criterion, songSortState.reversed, app)
+        }
         return app.songRepository.getAll().map { song ->
             PlayRemoteServer.ArchiveSong(
                 id = song.id,
@@ -325,8 +350,51 @@ object PlayRemoteController {
                 keySignature = song.keySignature,
                 notes = song.notes,
                 fileType = song.fileType,
-                isPlaceholder = song.isPlaceholder,
             )
+        }
+    }
+
+    private fun songSortStateToJson(): PlayRemoteServer.SongSortJson {
+        val criterion = when (songSortState.criterion) {
+            SongSortCriterion.Alpha -> "alpha"
+            SongSortCriterion.Added -> "added"
+            SongSortCriterion.Viewed -> "viewed"
+        }
+        return PlayRemoteServer.SongSortJson(criterion, songSortState.reversed)
+    }
+
+    private suspend fun sortArchiveSongs(criterion: String): Result<Unit> {
+        val ctx = appContext ?: return Result.failure(IllegalStateException("Server not ready"))
+        val app = PlaylistsApp.from(ctx as android.app.Application)
+        return try {
+            val parsed = when (criterion) {
+                "alpha" -> SongSortCriterion.Alpha
+                "added" -> SongSortCriterion.Added
+                "viewed" -> SongSortCriterion.Viewed
+                else -> return Result.failure(IllegalArgumentException("Invalid criterion"))
+            }
+            val reversed = if (songSortState.criterion == parsed) {
+                !songSortState.reversed
+            } else {
+                false
+            }
+            songSortState = SongSortState(parsed, reversed)
+            applyArchiveSongSort(parsed, reversed, app)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun applyArchiveSongSort(
+        criterion: SongSortCriterion,
+        reversed: Boolean,
+        app: PlaylistsApp,
+    ) {
+        when (criterion) {
+            SongSortCriterion.Alpha -> app.songRepository.sortAlpha(reversed)
+            SongSortCriterion.Added -> app.songRepository.sortByRecentlyAdded(reversed)
+            SongSortCriterion.Viewed -> app.songRepository.sortByRecentlyViewed(reversed)
         }
     }
 
@@ -435,7 +503,6 @@ object PlayRemoteController {
                 title = song.title,
                 keySignature = song.keySignature,
                 notes = song.notes,
-                isPlaceholder = song.isPlaceholder,
             )
         }
     }
@@ -457,7 +524,6 @@ object PlayRemoteController {
             val songId = app.songRepository.createPlaceholder(
                 title = parsed.title,
                 keySignature = parsed.keySignature,
-                notes = parsed.notes,
             )
             app.playlistRepository.addSong(playlistId, songId)
             val entries = app.playlistRepository.getSongs(playlistId)
@@ -470,14 +536,13 @@ object PlayRemoteController {
         }
     }
 
-    private suspend fun handleUpload(
-        playlistId: Long,
+    private suspend fun insertSongFromUpload(
         title: String,
         key: String,
         notes: String,
         tempFile: File,
         mimeType: String,
-    ): Result<Unit> {
+    ): Result<Long> {
         val ctx = appContext ?: return Result.failure(IllegalStateException("Server not ready"))
         val app = PlaylistsApp.from(ctx as android.app.Application)
         return try {
@@ -491,9 +556,35 @@ object PlayRemoteController {
                     notes = notes.trim(),
                     filePath = SongStoragePaths.toStoredPath(stored),
                     fileType = fileType.name,
-                    mimeType = mimeType,
                 ),
             )
+            Result.success(songId)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun handleCatalogUpload(
+        title: String,
+        key: String,
+        notes: String,
+        tempFile: File,
+        mimeType: String,
+    ): Result<Unit> =
+        insertSongFromUpload(title, key, notes, tempFile, mimeType).map { }
+
+    private suspend fun handlePlaylistUpload(
+        playlistId: Long,
+        title: String,
+        key: String,
+        notes: String,
+        tempFile: File,
+        mimeType: String,
+    ): Result<Unit> {
+        val ctx = appContext ?: return Result.failure(IllegalStateException("Server not ready"))
+        val app = PlaylistsApp.from(ctx as android.app.Application)
+        return try {
+            val songId = insertSongFromUpload(title, key, notes, tempFile, mimeType).getOrThrow()
             app.playlistRepository.addSong(playlistId, songId)
             val entries = app.playlistRepository.getSongs(playlistId)
             server?.let { remote ->

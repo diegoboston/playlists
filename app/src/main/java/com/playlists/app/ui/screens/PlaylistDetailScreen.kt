@@ -415,7 +415,6 @@ private fun PlaylistSongRow(
                 SongTitleWithKey(
                     title = entry.title,
                     keySignature = entry.keySignature,
-                    isPlaceholder = entry.isPlaceholder,
                 )
                 val notes = SongDisplay.notesLine(entry.notes)
                 if (notes.isNotEmpty()) {
@@ -501,7 +500,6 @@ private fun AddSongDialog(
                             SongTitleWithKey(
                                 title = song.title,
                                 keySignature = song.keySignature,
-                                isPlaceholder = song.isPlaceholder,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }

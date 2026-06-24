@@ -166,7 +166,6 @@ private fun formatQuickstartSummary(
             com.playlists.app.ui.SongDisplay.adjustedSongTitle(
                 song.title,
                 song.keySignature,
-                song.isPlaceholder,
             )
         } else {
             noMatchLabel

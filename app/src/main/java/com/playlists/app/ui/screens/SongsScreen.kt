@@ -1,6 +1,7 @@
 package com.playlists.app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -29,7 +30,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,12 +46,9 @@ import com.playlists.app.data.Song
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDeletePrompt
 import com.playlists.app.ui.SongSortCriterion
-import kotlinx.coroutines.launch
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
-import com.playlists.app.ui.reorder.DraggableItem
-import com.playlists.app.ui.reorder.ReorderDragState
-import com.playlists.app.ui.reorder.syncDisplayedKeys
+import kotlinx.coroutines.launch
 
 @Composable
 fun SongsScreen(
@@ -60,19 +57,49 @@ fun SongsScreen(
 ) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val sortState by viewModel.songSortState.collectAsStateWithLifecycle()
+    val sortGeneration by viewModel.songSortGeneration.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    val displayedKeys = remember { mutableStateListOf<String>() }
-    val dragState = remember { ReorderDragState() }
     var editTarget by remember { mutableStateOf<Song?>(null) }
     var deleteTarget by remember { mutableStateOf<SongDeletePrompt?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(songs, dragState.draggingKey) {
-        syncDisplayedKeys(displayedKeys, dragState.draggingKey, songs.map { "s:${it.id}" })
+    val displayedSongs = remember(songs, searchQuery) {
+        val query = searchQuery.trim().lowercase()
+        if (query.isEmpty()) {
+            songs
+        } else {
+            songs.filter { song ->
+                song.title.lowercase().contains(query) ||
+                    song.keySignature.lowercase().contains(query) ||
+                    song.notes.lowercase().contains(query)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (viewModel.refreshSongListSort()) {
+            listState.scrollToItem(0)
+        }
+    }
+
+    LaunchedEffect(sortGeneration) {
+        if (sortGeneration > 0) {
+            listState.scrollToItem(0)
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (songs.isNotEmpty()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text(stringResource(R.string.search_songs)) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -110,39 +137,27 @@ fun SongsScreen(
             ) {
                 Text(stringResource(R.string.empty_songs), style = MaterialTheme.typography.bodyLarge)
             }
+        } else if (displayedSongs.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(stringResource(R.string.no_songs_match_search), style = MaterialTheme.typography.bodyLarge)
+            }
         } else {
             LazyColumn(
                 state = listState,
-                userScrollEnabled = !dragState.isDragging,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                items(
-                    items = displayedKeys.toList(),
-                    key = { it },
-                ) { key ->
-                    val songId = key.removePrefix("s:").toLongOrNull() ?: return@items
-                    val song = songs.find { it.id == songId } ?: return@items
-                    DraggableItem(
-                        isDragging = dragState.draggingKey == key,
-                        dragOffset = dragState.currentDragOffset(listState),
+                items(displayedSongs, key = { it.id }) { song ->
+                    SongRow(
+                        song = song,
                         onTap = { onOpenSong(song.id) },
-                        onDragStart = { dragState.onDragStart(key, listState) },
-                        onDrag = { delta -> dragState.onDrag(delta, listState, displayedKeys) },
-                        onDragEnd = {
-                            dragState.finishDrag {
-                                val ids = displayedKeys.mapNotNull { it.removePrefix("s:").toLongOrNull() }
-                                viewModel.reorderSongs(ids)
-                            }
-                        },
-                        onDragCancel = { dragState.cancelDrag() },
-                    ) {
-                        SongRow(
-                            song = song,
-                            onEdit = { editTarget = song },
-                        )
-                    }
+                        onEdit = { editTarget = song },
+                    )
                 }
             }
         }
@@ -304,10 +319,13 @@ private fun EditSongDialog(
 @Composable
 private fun SongRow(
     song: Song,
+    onTap: () -> Unit,
     onEdit: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onTap),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
@@ -322,7 +340,6 @@ private fun SongRow(
                 SongTitleWithKey(
                     title = song.title,
                     keySignature = song.keySignature,
-                    isPlaceholder = song.isPlaceholder,
                 )
                 val noteLine = SongDisplay.notesLine(song.notes)
                 if (noteLine.isNotEmpty()) {

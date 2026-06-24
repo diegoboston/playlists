@@ -44,5 +44,4 @@ data class PlaylistSongWithDetails(
     val notes: String,
     val filePath: String,
     val fileType: String,
-    val isPlaceholder: Boolean,
 )

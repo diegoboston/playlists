@@ -29,14 +29,17 @@ Update this file when adding features or recording **intentional** differences.
 | Nav thresholds | `PlaybackNav.kt` | `NAV` in `play.html` | Must stay in sync |
 | Zoom blocks navigation | `scale > ZOOM_NAV_MAX` | same | Aligned |
 | Record song view | `recordSongView` on change | — | **Intentional** (local analytics) |
-| Upload new song | Share intent / import flow | `+` overlay, `/api/upload` | **Intentional** (remote only) |
+| Upload new song | Share intent / import flow | `+` on play/edit → playlist upload; `/songs` → catalog upload | **Intentional** (remote only) |
+| Browse song archive | Songs tab — search + sort | `/songs` — search + same sort buttons | Aligned |
 | Open playlist editor | In-app detail screen | Pencil → `/edit` | Aligned entry points |
 
 ## Server / data
 
 | Endpoint | Purpose |
 | -------- | ------- |
-| `GET /api/songs` | Full song archive list |
+| `GET /api/songs` | Full song archive list + current sort state |
+| `POST /api/songs/sort` | Sort archive (A-Z / Added / Viewed; tap again to reverse) |
+| `POST /api/songs/upload` | Add song file to catalog only |
 | `POST /api/songs/update` | Edit song title/key/notes |
 | `GET /api/songs/search` | Archive search (global; used by edit add dialog) |
 | `GET /api/parse-filename` | Suggest title/key/notes on upload |
@@ -54,7 +57,7 @@ Update this file when adding features or recording **intentional** differences.
 | `POST /api/playlists/{id}/remove` | Remove entry from playlist |
 | `POST /api/playlists/{id}/add` | Add archive song to playlist |
 | `POST /api/playlists/{id}/add-placeholder` | Add placeholder to playlist |
-| `POST /api/playlists/{id}/upload` | Add song file + metadata |
+| `POST /api/playlists/{id}/upload` | Add song file to catalog **and** playlist |
 
 Local mutations from remote go through `PlayRemoteController` callbacks into the same Room repos as `PlaylistsViewModel`.
 
@@ -74,5 +77,7 @@ app/src/main/assets/remote/
   index.html                           # remote playlist picker
   play.html                            # remote playback
   edit.html                            # remote playlist editor
+  songs.html                           # remote song archive browser
+  upload.js / upload-panel.css         # shared upload overlay
   pin.html                             # Cloudflare PIN gate
 ```

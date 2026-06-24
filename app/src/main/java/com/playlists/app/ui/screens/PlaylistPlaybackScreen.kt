@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,6 +53,7 @@ fun PlaylistPlaybackScreen(
     var frames by remember { mutableStateOf<List<PlaybackFrame>>(emptyList()) }
     var songCount by remember { mutableIntStateOf(0) }
     var currentIndex by remember { mutableIntStateOf(0) }
+    var restartTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(playlistId) {
         val songs = viewModel.getPlaylistSongs(playlistId)
@@ -85,7 +87,6 @@ fun PlaylistPlaybackScreen(
                 SongDisplay.adjustedSongTitle(
                     frame.entry.title,
                     frame.entry.keySignature,
-                    frame.entry.isPlaceholder,
                 ),
             ),
         )
@@ -110,11 +111,22 @@ fun PlaylistPlaybackScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
+                actions = {
+                    IconButton(onClick = {
+                        currentIndex = 0
+                        restartTick++
+                    }) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.playback_restart),
+                        )
+                    }
+                },
             )
         },
     ) { padding ->
         PlaybackStage(
-            contentKey = currentIndex,
+            contentKey = restartTick to currentIndex,
             canGoPrev = currentIndex > 0,
             canGoNext = currentIndex < frames.lastIndex,
             onPrev = { if (currentIndex > 0) currentIndex-- },

@@ -8,8 +8,8 @@ import org.junit.Test
 
 class QuickstartMatcherTest {
     private val archive = listOf(
-        Song(id = 1, title = "Amazing Grace", keySignature = "G", notes = "", filePath = "", fileType = "PDF", mimeType = ""),
-        Song(id = 2, title = "Blue Moon", keySignature = "C", notes = "", filePath = "", fileType = "PDF", mimeType = ""),
+        Song(id = 1, title = "Amazing Grace", keySignature = "G", notes = "", filePath = "", fileType = "PDF"),
+        Song(id = 2, title = "Blue Moon", keySignature = "C", notes = "", filePath = "", fileType = "PDF"),
     )
 
     @Test

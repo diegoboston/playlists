@@ -23,10 +23,14 @@ class PlayRemoteServer(
     private val playHtml: String,
     private val indexHtml: String,
     private val editHtml: String,
+    private val songsHtml: String,
     private val pinHtml: String,
     private val songDisplayJs: String,
     private val compatJs: String,
+    private val uploadJs: String,
+    private val uploadPanelCss: String,
     private val onLoadPlaylist: ((playlistId: Long) -> PlaylistLoad?)? = null,
+    private val onUploadSong: ((title: String, key: String, notes: String, tempFile: File, mimeType: String) -> Result<Unit>)? = null,
     private val onUpload: ((playlistId: Long, title: String, key: String, notes: String, tempFile: File, mimeType: String) -> Result<Unit>)? = null,
     private val onReorder: ((playlistId: Long, entryIds: List<Long>) -> Result<Unit>)? = null,
     private val onRemove: ((playlistId: Long, entryId: Long) -> Result<Unit>)? = null,
@@ -34,6 +38,8 @@ class PlayRemoteServer(
     private val onAddPlaceholder: ((playlistId: Long, title: String, key: String, notes: String) -> Result<Unit>)? = null,
     private val onSearchSongs: ((query: String) -> List<SearchSong>)? = null,
     private val onListSongs: (() -> List<ArchiveSong>)? = null,
+    private val onGetSongSortState: (() -> SongSortJson)? = null,
+    private val onSortSongs: ((criterion: String) -> Result<Unit>)? = null,
     private val onUpdateSong: ((songId: Long, title: String, key: String, notes: String) -> Result<Unit>)? = null,
     private val onListPlaylists: (() -> List<RemotePlaylistSummary>)? = null,
     private val onRenamePlaylist: ((id: Long, name: String) -> Result<Unit>)? = null,
@@ -55,7 +61,6 @@ class PlayRemoteServer(
         val fileType: String,
         val filePath: String,
         val pageCount: Int,
-        val isPlaceholder: Boolean,
     )
 
     data class PlaylistLoad(
@@ -69,7 +74,6 @@ class PlayRemoteServer(
         val title: String,
         val keySignature: String,
         val notes: String,
-        val isPlaceholder: Boolean,
     )
 
     data class ArchiveSong(
@@ -78,7 +82,11 @@ class PlayRemoteServer(
         val keySignature: String,
         val notes: String,
         val fileType: String,
-        val isPlaceholder: Boolean,
+    )
+
+    data class SongSortJson(
+        val criterion: String,
+        val reversed: Boolean,
     )
 
     data class RemotePlaylistSummary(
@@ -102,6 +110,8 @@ class PlayRemoteServer(
             return when {
                 uri == "/compat.js" -> jsResponse(compatJs)
                 uri == "/song-display.js" -> jsResponse(songDisplayJs)
+                uri == "/upload.js" -> jsResponse(uploadJs)
+                uri == "/upload-panel.css" -> cssResponse(uploadPanelCss)
                 isHtmlPageRoute(uri) -> htmlResponse(pinHtml)
                 uri.startsWith("/api/") -> jsonUnauthorized()
                 else -> notFound()
@@ -129,9 +139,14 @@ class PlayRemoteServer(
             isPlayPageRoute(uri, session) -> htmlResponse(playHtml)
             uri == "/" || uri == "/index.html" -> htmlResponse(indexHtml)
             uri == "/edit" || uri == "/edit.html" -> htmlResponse(editHtml)
+            uri == "/songs" || uri == "/songs.html" -> htmlResponse(songsHtml)
             uri == "/song-display.js" -> jsResponse(songDisplayJs)
             uri == "/compat.js" -> jsResponse(compatJs)
+            uri == "/upload.js" -> jsResponse(uploadJs)
+            uri == "/upload-panel.css" -> cssResponse(uploadPanelCss)
             uri == "/api/songs" && session.method == Method.GET -> handleListSongs()
+            uri == "/api/songs/sort" && session.method == Method.POST -> handleSortSongs(session)
+            uri == "/api/songs/upload" && session.method == Method.POST -> handleCatalogUpload(session)
             uri == "/api/songs/update" && session.method == Method.POST -> handleUpdateSong(session)
             uri == "/api/playlists" && session.method == Method.GET -> handleListPlaylists()
             uri == "/api/playlists/reorder" && session.method == Method.POST -> handleReorderPlaylists(session)
@@ -148,7 +163,16 @@ class PlayRemoteServer(
     private fun isHtmlPageRoute(uri: String): Boolean =
         uri == "/" || uri == "/index.html" ||
             uri == "/play" || uri == "/play.html" ||
-            uri == "/edit" || uri == "/edit.html"
+            uri == "/edit" || uri == "/edit.html" ||
+            uri == "/songs" || uri == "/songs.html"
+
+    private data class ParsedUpload(
+        val title: String,
+        val key: String,
+        val notes: String,
+        val tempFile: File,
+        val mimeType: String,
+    )
 
     private fun isPlayPageRoute(uri: String, session: IHTTPSession): Boolean =
         uri == "/play" || uri == "/play.html" ||
@@ -218,6 +242,7 @@ class PlayRemoteServer(
         when (direction) {
             "next" -> step(loaded.songs, state, 1)
             "prev" -> step(loaded.songs, state, -1)
+            "reset" -> resetPlayback(state)
         }
         return jsonResponse(buildStateJson(loaded, state))
     }
@@ -278,7 +303,7 @@ class PlayRemoteServer(
         results.forEachIndexed { i, song ->
             if (i > 0) sb.append(',')
             sb.append(
-                """{"id":${song.id},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"isPlaceholder":${song.isPlaceholder}}""",
+                """{"id":${song.id},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)}}""",
             )
         }
         sb.append("]}")
@@ -287,21 +312,42 @@ class PlayRemoteServer(
 
     private fun handleListSongs(): Response {
         if (onListSongs == null) return jsonError("Song list not available")
-        return jsonResponse(buildSongsListJson())
+        return jsonResponse(buildSongsResponseJson())
     }
 
-    private fun buildSongsListJson(): String {
-        val handler = onListSongs ?: return """{"songs":[]}"""
+    private fun buildSongsResponseJson(): String {
+        val sort = onGetSongSortState?.invoke() ?: SongSortJson("alpha", false)
+        return """{"sort":{"criterion":${jsonStr(sort.criterion)},"reversed":${sort.reversed}},"songs":[${buildSongsArrayJson()}]}"""
+    }
+
+    private fun buildSongsListJson(): String = """{"songs":[${buildSongsArrayJson()}]}"""
+
+    private fun buildSongsArrayJson(): String {
+        val handler = onListSongs ?: return ""
         val songs = handler()
-        val sb = StringBuilder("""{"songs":[""")
+        val sb = StringBuilder()
         songs.forEachIndexed { i, song ->
             if (i > 0) sb.append(',')
             sb.append(
-                """{"id":${song.id},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"isPlaceholder":${song.isPlaceholder}}""",
+                """{"id":${song.id},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)}}""",
             )
         }
-        sb.append("]}")
         return sb.toString()
+    }
+
+    private fun handleSortSongs(session: IHTTPSession): Response {
+        val handler = onSortSongs ?: return jsonError("Sort not available")
+        val criterion = parseStringField(readPostBody(session), "criterion")
+            ?: return jsonError("Missing criterion")
+        val normalized = criterion.lowercase()
+        if (normalized !in setOf("alpha", "added", "viewed")) {
+            return jsonError("Invalid criterion")
+        }
+        return if (handler(normalized).isSuccess) {
+            jsonResponse(buildSongsResponseJson())
+        } else {
+            jsonError("Sort failed")
+        }
     }
 
     private fun handleUpdateSong(session: IHTTPSession): Response {
@@ -313,7 +359,7 @@ class PlayRemoteServer(
         val key = parseStringField(raw, "key").orEmpty()
         val notes = parseStringField(raw, "notes").orEmpty()
         return if (handler(songId, title, key, notes).isSuccess) {
-            jsonResponse(buildSongsListJson())
+            jsonResponse(buildSongsResponseJson())
         } else {
             jsonError("Song update failed")
         }
@@ -402,29 +448,56 @@ class PlayRemoteServer(
         }
     }
 
-    private fun handleUpload(playlistId: Long, session: IHTTPSession): Response {
-        val handler = onUpload ?: return jsonError("Upload not available")
+    private fun parseUploadRequest(session: IHTTPSession): Pair<ParsedUpload?, Response?> {
         val files = HashMap<String, String>()
         try {
             session.parseBody(files)
         } catch (_: Exception) {
-            return jsonError("Invalid upload")
+            return null to jsonError("Invalid upload")
         }
         val title = session.parameters["title"]?.firstOrNull().orEmpty()
         val key = session.parameters["key"]?.firstOrNull().orEmpty()
         val notes = session.parameters["notes"]?.firstOrNull().orEmpty()
         val rawFilename = session.parameters["filename"]?.firstOrNull().orEmpty()
-        val tempPath = files["file"] ?: return jsonError("Missing file")
+        val tempPath = files["file"] ?: return null to jsonError("Missing file")
         val tempFile = File(tempPath)
-        if (!tempFile.exists()) return jsonError("Missing file")
+        if (!tempFile.exists()) return null to jsonError("Missing file")
         val mimeType = session.parameters["mime"]?.firstOrNull()
             ?: guessMimeType(tempFile)
-        if (!isAllowedMime(mimeType)) return jsonError("Unsupported file type")
+        if (!isAllowedMime(mimeType)) return null to jsonError("Unsupported file type")
         val parsed = SongTitleMigration.parse(rawFilename.ifBlank { tempFile.name })
         val resolvedTitle = title.trim().ifBlank { parsed.title }
         val resolvedKey = key.trim().ifBlank { parsed.keySignature }
         val resolvedNotes = notes.trim().ifBlank { parsed.notes }
-        val result = handler(playlistId, resolvedTitle, resolvedKey, resolvedNotes, tempFile, mimeType)
+        return ParsedUpload(resolvedTitle, resolvedKey, resolvedNotes, tempFile, mimeType) to null
+    }
+
+    private fun handleCatalogUpload(session: IHTTPSession): Response {
+        val handler = onUploadSong ?: return jsonError("Upload not available")
+        val (upload, error) = parseUploadRequest(session)
+        if (error != null) return error
+        val parsed = upload ?: return jsonError("Invalid upload")
+        val result = handler(parsed.title, parsed.key, parsed.notes, parsed.tempFile, parsed.mimeType)
+        return if (result.isSuccess) {
+            jsonResponse(buildSongsResponseJson())
+        } else {
+            jsonError(result.exceptionOrNull()?.message ?: "Upload failed")
+        }
+    }
+
+    private fun handleUpload(playlistId: Long, session: IHTTPSession): Response {
+        val handler = onUpload ?: return jsonError("Upload not available")
+        val (upload, error) = parseUploadRequest(session)
+        if (error != null) return error
+        val parsed = upload ?: return jsonError("Invalid upload")
+        val result = handler(
+            playlistId,
+            parsed.title,
+            parsed.key,
+            parsed.notes,
+            parsed.tempFile,
+            parsed.mimeType,
+        )
         return if (result.isSuccess) {
             handleState(playlistId)
         } else {
@@ -512,6 +585,13 @@ class PlayRemoteServer(
             state.songIndex = state.songIndex.coerceIn(0, songs.lastIndex)
             val pages = songs[state.songIndex].pageCount.coerceAtLeast(1)
             state.pageIndex = state.pageIndex.coerceIn(0, pages - 1)
+        }
+    }
+
+    private fun resetPlayback(state: PlaybackState) {
+        synchronized(state) {
+            state.songIndex = 0
+            state.pageIndex = 0
         }
     }
 
@@ -605,7 +685,7 @@ class PlayRemoteServer(
         loaded.songs.forEachIndexed { i, song ->
             if (i > 0) sb.append(',')
             sb.append(
-                """{"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount},"isPlaceholder":${song.isPlaceholder}}""",
+                """{"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount}}""",
             )
         }
         sb.append("]}")
@@ -620,7 +700,7 @@ class PlayRemoteServer(
         loaded.songs.forEachIndexed { i, song ->
             if (i > 0) sb.append(',')
             sb.append(
-                """{"entryId":${song.entryId},"songId":${song.songId},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount},"isPlaceholder":${song.isPlaceholder}}""",
+                """{"entryId":${song.entryId},"songId":${song.songId},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount}}""",
             )
         }
         sb.append("]}")
@@ -662,6 +742,9 @@ class PlayRemoteServer(
 
     private fun jsResponse(body: String): Response =
         newFixedLengthResponse(Response.Status.OK, "application/javascript; charset=utf-8", body)
+
+    private fun cssResponse(body: String): Response =
+        newFixedLengthResponse(Response.Status.OK, "text/css; charset=utf-8", body)
 
     private fun jsonResponse(body: String): Response =
         newFixedLengthResponse(Response.Status.OK, "application/json", body)

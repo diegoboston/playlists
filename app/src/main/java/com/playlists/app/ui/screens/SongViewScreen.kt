@@ -57,7 +57,6 @@ fun SongViewScreen(
                     SongTitleWithKey(
                         title = loaded.title,
                         keySignature = loaded.keySignature,
-                        isPlaceholder = loaded.isPlaceholder,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 2,
                     )
