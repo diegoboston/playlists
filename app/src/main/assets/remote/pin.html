@@ -6,9 +6,9 @@
   <title>Stage Manager Remote</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: #000; color: #fff; font-family: system-ui, sans-serif; }
-    main { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; }
-    form { width: min(320px, 100%); text-align: center; }
+    html, body { height: 100%; background: #000; color: #fff; font-family: sans-serif; }
+    main { min-height: 100%; display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center; padding: 24px; }
+    form { width: 100%; max-width: 320px; text-align: center; }
     h1 { font-size: 22px; margin-bottom: 8px; }
     p { opacity: .75; font-size: 14px; margin-bottom: 20px; line-height: 1.4; }
     input { width: 100%; padding: 14px; font-size: 28px; letter-spacing: .35em; text-align: center; border-radius: 10px; border: 1px solid #444; background: #111; color: #fff; }
@@ -27,41 +27,37 @@
       <div id="error"></div>
     </form>
   </main>
+  <script src="/compat.js"></script>
   <script>
-    const form = document.getElementById('pinForm');
-    const pinInput = document.getElementById('pin');
-    const errorEl = document.getElementById('error');
+    var form = document.getElementById('pinForm');
+    var pinInput = document.getElementById('pin');
+    var errorEl = document.getElementById('error');
+    var submitBtn = form.querySelector('button');
 
-    pinInput.addEventListener('input', () => {
+    pinInput.addEventListener('input', function() {
       pinInput.value = pinInput.value.replace(/\D/g, '').slice(0, 5);
       errorEl.textContent = '';
     });
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const pin = pinInput.value;
+    form.addEventListener('submit', function(e) {
+      if (e.preventDefault) e.preventDefault();
+      e.returnValue = false;
+      var pin = pinInput.value;
       if (pin.length !== 5) {
         errorEl.textContent = 'Enter 5 digits.';
-        return;
+        return false;
       }
-      form.querySelector('button').disabled = true;
-      try {
-        const res = await fetch('/api/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin }),
-        });
-        if (res.ok) {
+      submitBtn.disabled = true;
+      RemoteCompat.postJson('/api/auth', { pin: pin }, function(ok) {
+        if (ok) {
           window.location.href = '/';
           return;
         }
         errorEl.textContent = 'Wrong PIN. Try again.';
         pinInput.select();
-      } catch (_) {
-        errorEl.textContent = 'Could not connect.';
-      } finally {
-        form.querySelector('button').disabled = false;
-      }
+        submitBtn.disabled = false;
+      });
+      return false;
     });
   </script>
 </body>

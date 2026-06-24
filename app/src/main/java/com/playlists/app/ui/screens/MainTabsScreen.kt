@@ -136,7 +136,9 @@ fun MainTabsScreen(
                                 active = remoteRunning,
                                 onClick = {
                                     if (remoteRunning) {
-                                        PlayRemoteController.stop()
+                                        scope.launch(Dispatchers.IO) {
+                                            PlayRemoteController.stop()
+                                        }
                                         Toast.makeText(
                                             context,
                                             R.string.remote_stopped,

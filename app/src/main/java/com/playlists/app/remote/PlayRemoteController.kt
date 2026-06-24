@@ -100,6 +100,7 @@ object PlayRemoteController {
         val editHtml = context.assets.open("remote/edit.html").bufferedReader().readText()
         val pinHtml = context.assets.open("remote/pin.html").bufferedReader().readText()
         val songDisplayJs = context.assets.open("remote/song-display.js").bufferedReader().readText()
+        val compatJs = context.assets.open("remote/compat.js").bufferedReader().readText()
         val port = AppPrefs.getRemoteCode(context)
         val pin = AppPrefs.getRemotePin(context)
         val remote = PlayRemoteServer(
@@ -112,6 +113,7 @@ object PlayRemoteController {
             editHtml = editHtml,
             pinHtml = pinHtml,
             songDisplayJs = songDisplayJs,
+            compatJs = compatJs,
             onLoadPlaylist = { id ->
                 runBlocking { loadPlaylist(id) }
             },
@@ -233,7 +235,7 @@ object PlayRemoteController {
             serviceContext = appContext
         }
         teardownResources()
-        serviceContext?.let { RemotePlayService.requestStop(it) }
+        serviceContext?.let { RemotePlayService.requestStop(it.applicationContext) }
     }
 
     internal fun teardownResources() {

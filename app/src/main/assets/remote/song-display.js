@@ -1,16 +1,16 @@
 // Keep in sync with SongDisplay.kt (title/key, notes preview, placeholder marker).
-const SongDisplay = (() => {
-  const PREVIEW_LEN = 20;
-  const PLACEHOLDER_MARKER = ' 🚧';
+var SongDisplay = (function() {
+  var PREVIEW_LEN = 20;
+  var PLACEHOLDER_MARKER = ' \uD83D\uDEA7';
 
   function preview(text) {
-    const trimmed = (text || '').trim();
-    return trimmed.length <= PREVIEW_LEN ? trimmed : trimmed.slice(0, PREVIEW_LEN) + '…';
+    var trimmed = (text || '').replace(/^\s+|\s+$/g, '');
+    return trimmed.length <= PREVIEW_LEN ? trimmed : trimmed.slice(0, PREVIEW_LEN) + '\u2026';
   }
 
   function keySuffix(keySignature) {
-    const key = (keySignature || '').trim();
-    return key ? ` (${key})` : '';
+    var key = (keySignature || '').replace(/^\s+|\s+$/g, '');
+    return key ? ' (' + key + ')' : '';
   }
 
   function adjustedSongTitle(title, keySignature, isPlaceholder) {
@@ -22,13 +22,13 @@ const SongDisplay = (() => {
   }
 
   function addPlaceholderPrompt(title) {
-    return `Add placeholder page: “${title}”${PLACEHOLDER_MARKER}`;
+    return 'Add placeholder page: \u201c' + title + '\u201d' + PLACEHOLDER_MARKER;
   }
 
   return {
-    PLACEHOLDER_MARKER,
-    adjustedSongTitle,
-    notesLine,
-    addPlaceholderPrompt,
+    PLACEHOLDER_MARKER: PLACEHOLDER_MARKER,
+    adjustedSongTitle: adjustedSongTitle,
+    notesLine: notesLine,
+    addPlaceholderPrompt: addPlaceholderPrompt
   };
 })();

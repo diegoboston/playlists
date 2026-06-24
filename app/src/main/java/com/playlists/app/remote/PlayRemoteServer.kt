@@ -25,6 +25,7 @@ class PlayRemoteServer(
     private val editHtml: String,
     private val pinHtml: String,
     private val songDisplayJs: String,
+    private val compatJs: String,
     private val onLoadPlaylist: ((playlistId: Long) -> PlaylistLoad?)? = null,
     private val onUpload: ((playlistId: Long, title: String, key: String, notes: String, tempFile: File, mimeType: String) -> Result<Unit>)? = null,
     private val onReorder: ((playlistId: Long, entryIds: List<Long>) -> Result<Unit>)? = null,
@@ -99,6 +100,8 @@ class PlayRemoteServer(
         }
         if (requirePin && !isAuthorized(session)) {
             return when {
+                uri == "/compat.js" -> jsResponse(compatJs)
+                uri == "/song-display.js" -> jsResponse(songDisplayJs)
                 isHtmlPageRoute(uri) -> htmlResponse(pinHtml)
                 uri.startsWith("/api/") -> jsonUnauthorized()
                 else -> notFound()
@@ -127,6 +130,7 @@ class PlayRemoteServer(
             uri == "/" || uri == "/index.html" -> htmlResponse(indexHtml)
             uri == "/edit" || uri == "/edit.html" -> htmlResponse(editHtml)
             uri == "/song-display.js" -> jsResponse(songDisplayJs)
+            uri == "/compat.js" -> jsResponse(compatJs)
             uri == "/api/songs" && session.method == Method.GET -> handleListSongs()
             uri == "/api/songs/update" && session.method == Method.POST -> handleUpdateSong(session)
             uri == "/api/playlists" && session.method == Method.GET -> handleListPlaylists()

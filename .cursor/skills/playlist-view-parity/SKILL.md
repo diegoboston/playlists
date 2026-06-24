@@ -32,6 +32,7 @@ if the user only asked to change one.
 3. **Reuse shared rules** (below) — do not invent a third format in HTML.
 4. **Document intentional gaps** in PARITY.md only when a difference is deliberate.
 5. **Run rebuild-app**, then **update-readme** if user-facing behaviour changed.
+6. If the change affects **old tablet browsers**, follow **remote-play-back-compat** for `play.html` / `compat.js`.
 
 ## Shared rules (single source of truth)
 
@@ -113,6 +114,7 @@ Parity:
 - [ ] PlaybackNav ↔ play.html NAV constants match (if playback touched)
 - [ ] PlayRemoteServer JSON includes new fields (if API touched)
 - [ ] PARITY.md matrix updated if behaviour intentionally diverges
+- [ ] remote-play-back-compat checked if play.html / compat.js / media API changed
 - [ ] rebuild-app VERIFY OK
 - [ ] README updated (update-readme) if user-visible
 ```

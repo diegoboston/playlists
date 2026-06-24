@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +52,8 @@ import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @Composable
 fun PlaylistsScreen(
@@ -59,6 +62,7 @@ fun PlaylistsScreen(
     onQuickstart: () -> Unit,
 ) {
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val displayedKeys = remember { mutableStateListOf<String>() }
     val dragState = remember { ReorderDragState() }
@@ -181,7 +185,9 @@ fun PlaylistsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     deleteTarget = null
-                    if (PlayRemoteController.isRunningFor(playlist.id)) PlayRemoteController.stop()
+                    if (PlayRemoteController.isRunningFor(playlist.id)) {
+                        scope.launch(Dispatchers.IO) { PlayRemoteController.stop() }
+                    }
                     viewModel.deletePlaylist(playlist.id)
                 }) {
                     Text(stringResource(R.string.delete_playlist))

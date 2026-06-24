@@ -1,5 +1,6 @@
 package com.playlists.app.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,11 +16,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -75,23 +78,23 @@ fun SongsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = stringResource(R.string.sort_label),
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(end = 4.dp),
                 )
-                SongSortChip(
+                SongSortButton(
                     label = stringResource(R.string.sort_songs_alpha),
                     selected = sortState.criterion == SongSortCriterion.Alpha,
                     onClick = { viewModel.sortSongs(SongSortCriterion.Alpha) },
                 )
-                SongSortChip(
+                SongSortButton(
                     label = stringResource(R.string.sort_songs_recently_added),
                     selected = sortState.criterion == SongSortCriterion.Added,
                     onClick = { viewModel.sortSongs(SongSortCriterion.Added) },
                 )
-                SongSortChip(
+                SongSortButton(
                     label = stringResource(R.string.sort_songs_recently_viewed),
                     selected = sortState.criterion == SongSortCriterion.Viewed,
                     onClick = { viewModel.sortSongs(SongSortCriterion.Viewed) },
@@ -199,24 +202,31 @@ fun SongsScreen(
 }
 
 @Composable
-private fun SongSortChip(
+private fun SongSortButton(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    TextButton(
+    OutlinedButton(
         onClick = onClick,
-        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+        border = if (selected) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            ButtonDefaults.outlinedButtonBorder(enabled = true)
+        },
+        colors = if (selected) {
+            ButtonDefaults.outlinedButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+            )
+        } else {
+            ButtonDefaults.outlinedButtonColors()
+        },
     ) {
         Text(
-            text = "[$label]",
+            text = label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
         )
     }
 }

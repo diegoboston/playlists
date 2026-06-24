@@ -6,13 +6,15 @@ import android.content.Intent
 import android.os.IBinder
 
 class RemotePlayService : Service() {
+    private var inForeground = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
                 PlayRemoteController.teardownResources()
-                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopForegroundSafely()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -20,10 +22,13 @@ class RemotePlayService : Service() {
                 val name = intent.getStringExtra(EXTRA_PLAYLIST_NAME).orEmpty()
                 val notification = RemotePlayNotification.build(this, name)
                 startForeground(RemotePlayNotification.NOTIFICATION_ID, notification)
+                inForeground = true
                 return START_STICKY
             }
             else -> {
-                stopForeground(STOP_FOREGROUND_REMOVE)
+                // System restarted the service without our start intent — sync controller state.
+                PlayRemoteController.teardownResources()
+                stopForegroundSafely()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -31,8 +36,19 @@ class RemotePlayService : Service() {
     }
 
     override fun onDestroy() {
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopForegroundSafely()
+        PlayRemoteController.teardownResources()
         super.onDestroy()
+    }
+
+    private fun stopForegroundSafely() {
+        if (!inForeground) return
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (_: Exception) {
+        } finally {
+            inForeground = false
+        }
     }
 
     companion object {

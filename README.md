@@ -24,7 +24,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores and dashes → spaces, extension dropped, trailing key → Key, trailing instrument → Notes).
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
-- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. Placeholder songs (no real sheet yet) show a 🚧 after the title. **Sort:** **[A-Z] [Added] [Viewed]** — tap a chip to sort the archive (persists order); tap the same chip again to reverse. Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
+- **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. Placeholder songs (no real sheet yet) show a 🚧 after the title. **Sort:** **A-Z**, **Added**, **Viewed** outlined buttons (same style as **New playlist**) — tap to sort the archive (persists order); tap the same button again to reverse. Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
 - **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages.
 
 ### Playlists
@@ -135,7 +135,7 @@ REMOTE PLAY ACTIVE (notification shade)
 ## Usage
 
 1. **Import a song** — Gallery or browser → Share → Stage Manager → fill Title, Key, Notes → Save.
-2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **Sort: [A-Z] [Added] [Viewed]** — tap again on the same chip to reverse order.
+2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **Sort: A-Z / Added / Viewed** — tap again on the same button to reverse order.
 3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete from the colorful blocks on the list.
 4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (🚧) to add a title-only stand-in sheet.
 5. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
@@ -161,7 +161,7 @@ playlists/
 │   └── src/main/
 │       ├── assets/
 │       │   ├── jniLibs/arm64-v8a/libcloudflared.so  # Bundled tunnel binary (gitignored; built by script)
-│       │   └── remote/             # index.html, play.html, edit.html, pin.html, song-display.js
+│       │   └── remote/             # index.html, play.html, edit.html, pin.html, compat.js, song-display.js
 │       └── java/com/playlists/app/
 │           ├── data/               # Room: Song, Playlist, PlaylistSong
 │           ├── remote/             # HTTP server, tunnel, foreground service, notification
@@ -254,7 +254,7 @@ Control playback from a **second screen** over the internet (e.g. iPad on a musi
 7. **Stop** — Tap the highlighted **Wi‑Fi** icon again, **Stop** on the system notification, or delete the active playlist.
 8. **Status / debug** — While remote is active, **long-press** the **Wi‑Fi** icon (main tabs or playlist detail) to reopen the URL (with the same **▼** QR chevron); connection checks and cloudflared log appear only when something looks wrong. **Copy debug info** is available from that panel when checks are shown — useful if the browser says the URL is unreachable.
 
-Requires **internet** on the phone for Cloudflare mode (Wi‑Fi or cellular). LAN mode needs both devices on the same network; the URL uses the phone’s Wi‑Fi IPv4 address. Cloudflare tunnel URLs change each session. On Android 13+, the app requests notification permission so the remote-play foreground notification can appear. CI bundles `cloudflared` via `scripts/fetch-cloudflared.sh` on every release build. Implementation: `PlayRemoteController.kt`, `CloudflareTunnel.kt`, `NetworkAddresses.kt`, `RemotePlayFlowDialog.kt`, `RemotePlayStartedDialog.kt`, `RemotePlayService.kt`, `RemotePlayNotification.kt`, `PlayRemoteServer.kt`, `SettingsScreen.kt`, `assets/remote/play.html`, `assets/remote/edit.html`, `assets/remote/pin.html`, `assets/remote/index.html`.
+Requires **internet** on the phone for Cloudflare mode (Wi‑Fi or cellular). LAN mode needs both devices on the same network; the URL uses the phone’s Wi‑Fi IPv4 address. Cloudflare tunnel URLs change each session. Remote web views use ES5 JavaScript (`compat.js` + `XMLHttpRequest`) so playback works on old tablet browsers (e.g. Android 4.x WebKit). On Android 13+, the app requests notification permission so the remote-play foreground notification can appear. CI bundles `cloudflared` via `scripts/fetch-cloudflared.sh` on every release build. Implementation: `PlayRemoteController.kt`, `CloudflareTunnel.kt`, `NetworkAddresses.kt`, `RemotePlayFlowDialog.kt`, `RemotePlayStartedDialog.kt`, `RemotePlayService.kt`, `RemotePlayNotification.kt`, `PlayRemoteServer.kt`, `SettingsScreen.kt`, `assets/remote/play.html`, `assets/remote/edit.html`, `assets/remote/pin.html`, `assets/remote/index.html`, `assets/remote/compat.js`.
 
 ### HTTP API
 
@@ -338,6 +338,7 @@ Project-local skills under `.cursor/skills/` guide automated edits:
 | **rebuild-app** | After any app change — run `rebuild-app.sh` (Java 17 env, compile, unit tests, debug APK; must print `VERIFY OK`) |
 | **compile-kotlin** | Fast Kotlin-only check (no APK) when explicitly requested |
 | **playlist-view-parity** | When changing playlist detail, playback, remote HTML, or `PlayRemoteServer` — keep local Compose and remote web views aligned |
+| **remote-play-back-compat** | When changing remote play web assets — try to maintain back compat with old devices (Nexus 10, Android 4.3); play fullscreen is the main target |
 | **update-readme** | After user-facing or structural changes — keeps this README accurate |
 | **local-workspace** | When a path looks missing — search locally; do not rsync or run `update.sh` from this repo |
 

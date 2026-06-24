@@ -211,7 +211,9 @@ fun PlaylistDetailScreen(
                             active = remoteActiveHere,
                             onClick = {
                                 if (remoteActiveHere) {
-                                    PlayRemoteController.stop()
+                                    scope.launch(Dispatchers.IO) {
+                                        PlayRemoteController.stop()
+                                    }
                                     Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
                                 } else {
                                     remoteFlow = RemotePlayFlowState.ChooseMode
@@ -340,7 +342,9 @@ fun PlaylistDetailScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showDelete = false
-                    if (PlayRemoteController.isRunningFor(playlistId)) PlayRemoteController.stop()
+                    if (PlayRemoteController.isRunningFor(playlistId)) {
+                        scope.launch(Dispatchers.IO) { PlayRemoteController.stop() }
+                    }
                     viewModel.deletePlaylist(playlistId)
                     onBack()
                 }) {
