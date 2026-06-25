@@ -38,6 +38,7 @@ import com.playlists.app.ui.screens.PlaylistDetailScreen
 import com.playlists.app.ui.screens.PlaylistPlaybackScreen
 import com.playlists.app.ui.screens.QuickstartScreen
 import com.playlists.app.ui.screens.SettingsScreen
+import com.playlists.app.ui.screens.ChartRetransposeScreen
 import com.playlists.app.ui.screens.SongViewScreen
 import com.playlists.app.util.AppUpdate
 import java.io.File
@@ -48,11 +49,13 @@ object Routes {
     const val QUICKSTART = "quickstart"
     const val SETTINGS = "settings"
     const val SONG = "song/{songId}"
+    const val SONG_RETRANSPOSE = "song/{songId}/retranspose"
     const val PLAYLIST = "playlist/{playlistId}"
     const val PLAYBACK = "playlist/{playlistId}/play"
     const val CHART_ASSISTANT = "playlist/{playlistId}/assistant"
 
     fun song(songId: Long) = "song/$songId"
+    fun songRetranspose(songId: Long) = "song/$songId/retranspose"
     fun playlist(playlistId: Long) = "playlist/$playlistId"
     fun playback(playlistId: Long) = "playlist/$playlistId/play"
     fun chartAssistant(playlistId: Long) = "playlist/$playlistId/assistant"
@@ -148,6 +151,7 @@ fun AppNavigation(
                         viewModel = viewModel,
                         onOpenSong = { navController.navigate(Routes.song(it)) },
                         onOpenPlaylist = { navController.navigate(Routes.playlist(it)) },
+                        onNewKey = { navController.navigate(Routes.songRetranspose(it)) },
                         onQuickstart = { navController.navigate(Routes.QUICKSTART) },
                         onSettings = { navController.navigate(Routes.SETTINGS) },
                     )
@@ -201,6 +205,23 @@ fun AppNavigation(
                         songId = songId,
                         viewModel = viewModel,
                         onBack = onBack,
+                        onNewKey = { navController.navigate(Routes.songRetranspose(it)) },
+                    )
+                }
+                composable(
+                    route = Routes.SONG_RETRANSPOSE,
+                    arguments = listOf(navArgument("songId") { type = NavType.LongType }),
+                ) { entry ->
+                    val songId = entry.arguments?.getLong("songId") ?: return@composable
+                    val onBack = rememberGuardedBackHandler(entry) {
+                        navController.popBackStack()
+                    }
+                    ChartRetransposeScreen(
+                        songId = songId,
+                        onBack = onBack,
+                        onSaved = {
+                            navController.popBackStack()
+                        },
                     )
                 }
                 composable(

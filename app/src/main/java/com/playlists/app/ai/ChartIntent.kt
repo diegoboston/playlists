@@ -31,6 +31,5 @@ data class ChartIntent(
         append(songTitle)
         if (!artist.isNullOrBlank()) append(' ').append(artist)
         append(" chords lyrics")
-        if (!key.isNullOrBlank()) append(' ').append(key)
     }.trim()
 }

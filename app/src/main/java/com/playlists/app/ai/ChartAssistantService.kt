@@ -4,7 +4,6 @@ import com.playlists.app.find.PageFetcher
 import com.playlists.app.find.SearchResult
 import com.playlists.app.find.WebSearchService
 import com.playlists.app.render.ChartPdfRenderer
-import com.playlists.app.render.ChordTransposer
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -49,8 +48,8 @@ class OpenAiClient(
             action (always "find_chart" for now),
             songTitle (required),
             artist (optional),
-            key (optional target key like G, Am, F#),
             playlistName (optional).
+            Do not ask for or require a musical key — transposition happens in the preview UI.
             Context: $playlistsContextJson
         """.trimIndent()
         val content = chatJson(system, transcript) ?: return null
@@ -61,10 +60,8 @@ class OpenAiClient(
         pageText: String,
         songTitle: String,
         artist: String?,
-        targetKey: String?,
         sourceUrl: String,
     ): ChartDraft? {
-        val keyInstruction = targetKey?.let { "Target key for output: $it." }.orEmpty()
         val system = """
             Extract a chord chart with lyrics from the web page text.
             Return JSON only:
@@ -72,14 +69,16 @@ class OpenAiClient(
               "title": "...",
               "artist": "...",
               "sourceKey": "key on page if stated",
-              "key": "same as sourceKey unless transposing",
+              "key": "same as sourceKey",
               "capo": null or string,
               "columns": 1,
               "sections": [{"label":"Verse 1","lines":["G  C  G","lyrics with chords above or inline"]}],
               "notes": "optional",
               "sourceUrl": "$sourceUrl"
             }
-            Include chord symbols with lyric lines. $keyInstruction
+            Keep chords in the original key from the page (do not transpose).
+            Use conventional spelling for the key (e.g. Bb not A# in flat keys).
+            Include chord symbols with lyric lines.
             Song requested: $songTitle ${artist.orEmpty()}
         """.trimIndent()
         val content = chatJson(system, pageText.take(30_000)) ?: return null
@@ -174,19 +173,14 @@ class ChartAssistantService(
     ): Pair<ChartDraft, ByteArray> {
         val pageText = PageFetcher.fetchText(result.url)
             ?: throw ChartAssistantException("Could not fetch page")
-        var draft = openAiClient.extractChart(
+        val draft = openAiClient.extractChart(
             pageText = pageText,
             songTitle = intent.songTitle,
             artist = intent.artist,
-            targetKey = intent.key,
             sourceUrl = result.url,
         ) ?: throw ChartAssistantException("Could not extract chart from page")
-        draft = draft.copy(sourceUrl = result.url)
-        if (!intent.key.isNullOrBlank()) {
-            draft = ChordTransposer.transpose(draft, intent.key)
-        }
-        val pdf = ChartPdfRenderer.render(draft)
-        return draft to pdf
+        val pdf = ChartPdfRenderer.render(draft.copy(sourceUrl = result.url))
+        return draft.copy(sourceUrl = result.url) to pdf
     }
 }
 

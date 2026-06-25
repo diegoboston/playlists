@@ -5,7 +5,7 @@ import org.junit.Test
 
 class ChartIntentTest {
     @Test
-    fun searchQuery_includesArtistAndKey() {
+    fun searchQuery_includesArtistNotKey() {
         val intent = ChartIntent(
             action = "find_chart",
             songTitle = "Lean on Me",
@@ -13,7 +13,7 @@ class ChartIntentTest {
             key = "C",
             playlistName = "Sunday set",
         )
-        assertEquals("Lean on Me Bill Withers chords lyrics C", intent.searchQuery())
+        assertEquals("Lean on Me Bill Withers chords lyrics", intent.searchQuery())
     }
 
     @Test

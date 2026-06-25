@@ -1,6 +1,7 @@
 package com.playlists.app.data
 
 import com.playlists.app.ui.SongDisplay
+import com.playlists.app.util.ChartDraftStore
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.PlaceholderImageGenerator
 import com.playlists.app.util.SongStoragePaths
@@ -29,6 +30,7 @@ class SongRepository(private val songDao: SongDao) {
         val stillReferenced = songDao.getAll().any { it.filePath == storedPath }
         if (!stillReferenced) {
             file.delete()
+            ChartDraftStore.deleteIfPresent(storedPath)
         }
     }
 

@@ -5,6 +5,13 @@ import android.app.Application
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -15,18 +22,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.runtime.key
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,11 +46,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
+import kotlin.math.sin
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -56,7 +66,7 @@ import com.playlists.app.find.SearchResult
 import com.playlists.app.ui.ChartAssistantUiState
 import com.playlists.app.ui.ChartAssistantViewModel
 import com.playlists.app.ui.ChartAssistantViewModelFactory
-import com.playlists.app.ui.components.SongMediaViewer
+import com.playlists.app.ui.components.ChartKeyPreviewContent
 import com.playlists.app.util.AiCredentialStore
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,9 +85,7 @@ fun ChartAssistantScreen(
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) viewModel.startRecording()
-    }
+    ) { /* hold mic again after granting permission */ }
 
     LaunchedEffect(Unit) {
         viewModel.savedSongId.collect { songId ->
@@ -119,7 +127,10 @@ fun ChartAssistantScreen(
                     )
                 }
                 when (current) {
-                    is ChartAssistantUiState.Idle -> IdleMic(
+                    is ChartAssistantUiState.Idle,
+                    is ChartAssistantUiState.Recording,
+                    -> HoldToRecordMic(
+                        isRecording = current is ChartAssistantUiState.Recording,
                         onPressMic = {
                             when {
                                 ContextCompat.checkSelfPermission(
@@ -130,10 +141,7 @@ fun ChartAssistantScreen(
                             }
                         },
                         onReleaseMic = viewModel::stopRecordingAndProcess,
-                    )
-                    is ChartAssistantUiState.Recording -> RecordingMic(
-                        onRelease = viewModel::stopRecordingAndProcess,
-                        onCancel = viewModel::cancelRecording,
+                        onCancelMic = viewModel::cancelRecording,
                     )
                     is ChartAssistantUiState.Processing -> ProcessingBlock()
                     is ChartAssistantUiState.IntentReady -> {
@@ -160,26 +168,55 @@ fun ChartAssistantScreen(
 }
 
 @Composable
-private fun IdleMic(
+private fun HoldToRecordMic(
+    isRecording: Boolean,
     onPressMic: () -> Unit,
     onReleaseMic: () -> Unit,
+    onCancelMic: () -> Unit,
 ) {
+    val micBackground = if (isRecording) {
+        MaterialTheme.colorScheme.errorContainer
+    } else {
+        MaterialTheme.colorScheme.primaryContainer
+    }
+    val micTint = if (isRecording) {
+        MaterialTheme.colorScheme.onErrorContainer
+    } else {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    }
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(R.string.chart_assistant_hold_mic))
+        Text(
+            if (isRecording) {
+                stringResource(R.string.chart_assistant_recording)
+            } else {
+                stringResource(R.string.chart_assistant_hold_mic)
+            },
+        )
+        if (isRecording) {
+            RecordingWaveform(
+                modifier = Modifier
+                    .widthIn(max = 200.dp)
+                    .fillMaxWidth(0.55f)
+                    .height(36.dp),
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         Box(
             modifier = Modifier
                 .size(96.dp)
-                .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.large)
-                .pointerInput(Unit) {
+                .background(micBackground, MaterialTheme.shapes.large)
+                .pointerInput(onPressMic, onReleaseMic, onCancelMic) {
                     awaitEachGesture {
                         awaitFirstDown()
                         onPressMic()
-                        waitForUpOrCancellation()
-                        onReleaseMic()
+                        when (waitForUpOrCancellation()) {
+                            null -> onCancelMic()
+                            else -> onReleaseMic()
+                        }
                     }
                 },
             contentAlignment = Alignment.Center,
@@ -188,28 +225,44 @@ private fun IdleMic(
                 Icons.Default.Mic,
                 contentDescription = stringResource(R.string.chart_assistant_mic),
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = micTint,
             )
         }
     }
 }
 
 @Composable
-private fun RecordingMic(
-    onRelease: () -> Unit,
-    onCancel: () -> Unit,
+private fun RecordingWaveform(
+    modifier: Modifier = Modifier,
+    color: Color,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(stringResource(R.string.chart_assistant_recording))
-        CircularProgressIndicator()
-        Button(onClick = onRelease) {
-            Text(stringResource(R.string.chart_assistant_stop_send))
-        }
-        OutlinedButton(onClick = onCancel) {
-            Text(stringResource(R.string.cancel))
+    val infiniteTransition = rememberInfiniteTransition(label = "recording-wave")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "phase",
+    )
+    Canvas(modifier = modifier) {
+        val barCount = 14
+        val gap = size.width / (barCount * 3f)
+        val barWidth = gap * 1.4f
+        val centerY = size.height / 2f
+        for (i in 0 until barCount) {
+            val t = (i.toFloat() / barCount + phase) % 1f
+            val wave = sin(t * 2 * PI).toFloat()
+            val normalized = (wave + 1f) / 2f
+            val barHeight = size.height * (0.15f + 0.85f * normalized)
+            val x = i * (barWidth + gap) + gap
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(x, centerY - barHeight / 2f),
+                size = Size(barWidth, barHeight),
+                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f),
+            )
         }
     }
 }
@@ -275,78 +328,20 @@ private fun PreviewContent(
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(
-                stringResource(
-                    R.string.chart_assistant_confirm_add,
-                    state.draft.title,
-                    state.playlist.name,
-                ),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                FilledTonalIconButton(
-                    onClick = { onNudgeKey(-1) },
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Text(
-                        text = "−",
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                }
-                Text(
-                    text = state.draft.key ?: "—",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier
-                        .padding(horizontal = 20.dp)
-                        .widthIn(min = 48.dp),
-                )
-                FilledTonalIconButton(
-                    onClick = { onNudgeKey(1) },
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Text(
-                        text = "+",
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                }
-            }
-            state.transposeNote?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-        }
-        Box(modifier = Modifier.weight(1f)) {
-            key(state.previewRevision) {
-                SongMediaViewer(
-                    file = state.pdfFile,
-                    fileType = FileType.PDF,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.chart_assistant_confirm))
-            }
-            OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
-    }
+    ChartKeyPreviewContent(
+        modifier = modifier,
+        title = stringResource(
+            R.string.chart_assistant_confirm_add,
+            state.draft.title,
+            state.playlist.name,
+        ),
+        keyLabel = state.draft.key,
+        transposeNote = state.transposeNote,
+        previewRevision = state.previewRevision,
+        pdfFile = state.pdfFile,
+        confirmLabel = stringResource(R.string.chart_assistant_confirm),
+        onNudgeKey = onNudgeKey,
+        onConfirm = onConfirm,
+        onCancel = onCancel,
+    )
 }

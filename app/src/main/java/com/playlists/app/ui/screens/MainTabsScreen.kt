@@ -53,6 +53,7 @@ fun MainTabsScreen(
     viewModel: PlaylistsViewModel,
     onOpenSong: (Long) -> Unit,
     onOpenPlaylist: (Long) -> Unit,
+    onNewKey: (Long) -> Unit,
     onQuickstart: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -185,7 +186,7 @@ fun MainTabsScreen(
                 )
             }
             when (selectedTab) {
-                0 -> SongsScreen(viewModel, onOpenSong)
+                0 -> SongsScreen(viewModel, onOpenSong, onNewKey)
                 1 -> PlaylistsScreen(viewModel, onOpenPlaylist, onQuickstart)
             }
         }

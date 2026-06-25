@@ -23,6 +23,7 @@ import com.playlists.app.util.AiCredentialStore
 import com.playlists.app.util.AudioRecorder
 import com.playlists.app.render.ChartPdfRenderer
 import com.playlists.app.render.ChordTransposer
+import com.playlists.app.util.ChartDraftStore
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.SongStoragePaths
 import kotlinx.coroutines.Dispatchers
@@ -52,7 +53,9 @@ sealed class ChartAssistantUiState {
     data class Preview(
         val intent: ChartIntent,
         val playlist: Playlist,
+        val sourceDraft: ChartDraft,
         val draft: ChartDraft,
+        val semitoneOffset: Int = 0,
         val pdfFile: File,
         val transposeNote: String?,
         val previewRevision: Int = 0,
@@ -157,7 +160,8 @@ class ChartAssistantViewModel(
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val newDraft = ChordTransposer.transposeBySemitones(state.draft, semitones)
+                    val newOffset = state.semitoneOffset + semitones
+                    val newDraft = draftAtOffset(state.sourceDraft, newOffset)
                     val pdfBytes = ChartPdfRenderer.render(newDraft)
                     state.pdfFile.writeBytes(pdfBytes)
                     val transposeNote = newDraft.sourceKey?.takeIf { source ->
@@ -165,6 +169,7 @@ class ChartAssistantViewModel(
                     }?.let { source -> "Source: $source → ${newDraft.key}" }
                     state.copy(
                         draft = newDraft,
+                        semitoneOffset = newOffset,
                         transposeNote = transposeNote,
                         previewRevision = state.previewRevision + 1,
                     )
@@ -176,6 +181,9 @@ class ChartAssistantViewModel(
             }
         }
     }
+
+    private fun draftAtOffset(source: ChartDraft, offset: Int): ChartDraft =
+        if (offset == 0) source else ChordTransposer.transposeBySemitones(source, offset)
 
     private suspend fun processAudio(audioFile: File) {
         val context = getApplication<Application>()
@@ -259,7 +267,9 @@ class ChartAssistantViewModel(
             _uiState.value = ChartAssistantUiState.Preview(
                 intent = intent,
                 playlist = playlist,
+                sourceDraft = draft,
                 draft = draft,
+                semitoneOffset = 0,
                 pdfFile = bundle.file,
                 transposeNote = bundle.transposeNote,
             )
@@ -273,13 +283,15 @@ class ChartAssistantViewModel(
         val key = draft.key.orEmpty()
         val notes = buildNotes(draft)
         val storedFile = FileStorage.storeBytes(state.pdfFile.readBytes(), "pdf")
+        val storedPath = SongStoragePaths.toStoredPath(storedFile)
+        ChartDraftStore.save(state.sourceDraft, storedPath)
         state.pdfFile.delete()
         val songId = songRepo.insert(
             Song(
                 title = draft.title,
                 keySignature = key,
                 notes = notes,
-                filePath = SongStoragePaths.toStoredPath(storedFile),
+                filePath = storedPath,
                 fileType = FileType.PDF.name,
             ),
         )

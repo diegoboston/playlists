@@ -109,16 +109,14 @@ fun SettingsScreen(
                 .padding(16.dp),
         ) {
             Text(
-                text = stringResource(R.string.settings_remote_section),
+                text = stringResource(R.string.settings_remote_pin),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
             Text(
-                text = stringResource(R.string.settings_remote_section_hint),
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
-            Text(
-                text = stringResource(R.string.settings_remote_code),
+                text = stringResource(R.string.settings_remote_pin_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
             OutlinedTextField(
@@ -129,44 +127,9 @@ fun SettingsScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
             Text(
-                text = stringResource(R.string.settings_remote_code_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            Text(
-                text = stringResource(R.string.settings_remote_code_port_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
-            )
-            Button(
-                onClick = {
-                    if (!AppPrefs.isValidRemoteCode(codeText)) {
-                        Toast.makeText(context, R.string.settings_remote_code_invalid, Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    AppPrefs.setRemoteCode(context, codeText.toInt())
-                    AiCredentialStore.setOpenAiApiKey(context, openAiKeyText)
-                    Toast.makeText(context, R.string.settings_saved, Toast.LENGTH_SHORT).show()
-                    onBack()
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.save))
-            }
-            Text(
-                text = stringResource(R.string.settings_ai_section),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 32.dp, bottom = 4.dp),
-            )
-            Text(
-                text = stringResource(R.string.settings_ai_section_hint),
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
-            Text(
                 text = stringResource(R.string.settings_openai_api_key),
-                modifier = Modifier.padding(bottom = 8.dp),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
             )
             OutlinedTextField(
                 value = openAiKeyText,
@@ -205,6 +168,23 @@ fun SettingsScreen(
                     )
                 }
                 OpenAiKeyStatus.Unknown -> Unit
+            }
+            Button(
+                onClick = {
+                    if (!AppPrefs.isValidRemoteCode(codeText)) {
+                        Toast.makeText(context, R.string.settings_remote_code_invalid, Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    AppPrefs.setRemoteCode(context, codeText.toInt())
+                    AiCredentialStore.setOpenAiApiKey(context, openAiKeyText)
+                    Toast.makeText(context, R.string.settings_saved, Toast.LENGTH_SHORT).show()
+                    onBack()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp),
+            ) {
+                Text(stringResource(R.string.save))
             }
             Text(
                 text = stringResource(R.string.settings_app_version),

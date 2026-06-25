@@ -3,8 +3,8 @@ package com.playlists.app.util
 import android.content.Context
 
 object AppPrefs {
-    const val DEFAULT_REMOTE_CODE = 44444
-    const val REMOTE_CODE_MIN = 10000
+    const val DEFAULT_REMOTE_CODE = 55555
+    const val REMOTE_CODE_MIN = 49152
     const val REMOTE_CODE_MAX = 65535
 
     fun getRemoteCode(context: Context): Int = StageManagerState.readRemoteCode(context)

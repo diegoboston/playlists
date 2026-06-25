@@ -4,6 +4,16 @@
 
 ---
 
+## 1.0.45 · `28a1bd7` — open AI integration
+
+**Released:** 2026-06-25 (8:06 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/28a1bd7508e168a8d528b4c7e7394d18193c6f42)
+
+- **Find chart** on playlist detail: hold the mic, voice-parse the request, search the web, preview a one-page chord PDF, transpose, and add to the playlist.
+- Settings stores your **OpenAI API key** on-device (encrypted) with live validation before save.
+- OpenAI pipeline: Whisper transcription, intent JSON, chart draft generation, plus chord transposition and PDF rendering.
+
+---
+
 ## 1.0.44 · `3859c2d` — Song search/DB cleanup/song page
 
 **Released:** 2026-06-24 (6:28 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/3859c2dc5f61a7e21a95916272bd4fb0db03b87c)

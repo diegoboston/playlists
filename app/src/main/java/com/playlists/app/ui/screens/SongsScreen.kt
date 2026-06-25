@@ -48,12 +48,15 @@ import com.playlists.app.ui.SongDeletePrompt
 import com.playlists.app.ui.SongSortCriterion
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
+import com.playlists.app.ui.components.EditSongDialog
+import com.playlists.app.util.ChartDraftStore
 import kotlinx.coroutines.launch
 
 @Composable
 fun SongsScreen(
     viewModel: PlaylistsViewModel,
     onOpenSong: (Long) -> Unit,
+    onNewKey: (Long) -> Unit,
 ) {
     val songs by viewModel.songs.collectAsStateWithLifecycle()
     val sortState by viewModel.songSortState.collectAsStateWithLifecycle()
@@ -166,6 +169,7 @@ fun SongsScreen(
     editTarget?.let { song ->
         EditSongDialog(
             song = song,
+            hasChartSource = ChartDraftStore.hasChart(song.filePath),
             onDismiss = { editTarget = null },
             onSave = { title, key, notes ->
                 viewModel.updateSong(song.id, title, key, notes)
@@ -177,6 +181,7 @@ fun SongsScreen(
                     deleteTarget = viewModel.prepareSongDelete(song.id)
                 }
             },
+            onNewKey = { onNewKey(song.id) },
         )
     }
 
@@ -244,76 +249,6 @@ private fun SongSortButton(
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }
-}
-
-@Composable
-private fun EditSongDialog(
-    song: Song,
-    onDismiss: () -> Unit,
-    onSave: (title: String, key: String, notes: String) -> Unit,
-    onDelete: () -> Unit,
-) {
-    var title by remember(song.id) { mutableStateOf(song.title) }
-    var key by remember(song.id) { mutableStateOf(song.keySignature) }
-    var notes by remember(song.id) { mutableStateOf(song.notes) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.edit_song)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.title_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = key,
-                    onValueChange = { key = it },
-                    label = { Text(stringResource(R.string.key_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text(stringResource(R.string.notes_hint)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(onClick = onDelete) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .padding(end = 4.dp)
-                                .size(18.dp),
-                        )
-                        Text(stringResource(R.string.delete_song))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onSave(title, key, notes) },
-                enabled = title.trim().isNotEmpty(),
-            ) {
-                Text(stringResource(R.string.save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(android.R.string.cancel))
-            }
-        },
-    )
 }
 
 @Composable

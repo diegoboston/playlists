@@ -58,12 +58,9 @@
     <string name="remote_no_last_playlist">Open a playlist first — remote uses your last opened playlist.</string>
     <string name="remote_playlist_gone">That playlist was deleted.</string>
     <string name="settings">Settings</string>
-    <string name="settings_remote_section">Remote play</string>
-    <string name="settings_remote_section_hint">One 5-digit code. Cloudflare: enter it as the PIN. LAN: it is the port in the URL.</string>
-    <string name="settings_remote_code">Remote code</string>
-    <string name="settings_remote_code_hint">5 digits from 10000 to 65535. Same number for Cloudflare PIN and LAN port.</string>
-    <string name="settings_remote_code_port_hint">For LAN, this is the TCP port. IANA reserves 49152–65535 as dynamic/private — a safe band if you want to avoid common services.</string>
-    <string name="settings_remote_code_invalid">Enter exactly 5 digits from 10000 to 65535.</string>
+    <string name="settings_remote_pin">PIN for remote play, 5 digits</string>
+    <string name="settings_remote_pin_hint">This is also the port for LAN server. Use range 49152-65535</string>
+    <string name="settings_remote_code_invalid">Enter exactly 5 digits from 49152 to 65535.</string>
     <string name="settings_saved">Settings saved</string>
     <string name="settings_app_version">App version</string>
     <string name="settings_app_version_value">%1$s</string>
@@ -116,17 +113,15 @@
     <string name="storage_access_message">Stage Manager keeps your songs, playlists, and settings in Music/StageManager so they survive app reinstall. Grant “All files access” to continue.</string>
     <string name="storage_access_open_settings">Open settings</string>
     <string name="cancel">Cancel</string>
-    <string name="settings_ai_section">AI chart assistant</string>
-    <string name="settings_ai_section_hint">Your OpenAI API key stays on this device (encrypted). Get a key at platform.openai.com.</string>
-    <string name="settings_openai_api_key">OpenAI API key</string>
+    <string name="settings_openai_api_key">OpenAI API Key for AI assistant</string>
     <string name="settings_openai_api_key_hint">sk-…</string>
-    <string name="settings_openai_key_valid">OpenAI key accepted</string>
+    <string name="settings_openai_key_valid">key accepted</string>
     <string name="settings_openai_key_invalid">OpenAI key failed</string>
     <string name="settings_openai_key_testing">Testing OpenAI key…</string>
     <string name="chart_assistant_title">Find chart</string>
     <string name="chart_assistant_mic">Voice search</string>
-    <string name="chart_assistant_hold_mic">Hold the mic and say e.g. “Search chords and lyrics for Amazing Grace by John Newton in G”</string>
-    <string name="chart_assistant_recording">Listening…</string>
+    <string name="chart_assistant_hold_mic">Hold the mic and say e.g. “Search chords and lyrics for Amazing Grace by John Newton”</string>
+    <string name="chart_assistant_recording">Listening… release to send</string>
     <string name="chart_assistant_stop_send">Stop and send</string>
     <string name="chart_assistant_working">Working…</string>
     <string name="chart_assistant_heard">Heard: %1$s</string>
@@ -139,4 +134,7 @@
     <string name="chart_assistant_key_down">Transpose down half step</string>
     <string name="chart_assistant_key_up">Transpose up half step</string>
     <string name="find_chart">Find chart</string>
+    <string name="song_new_key">New key</string>
+    <string name="song_new_key_title">Choose key</string>
+    <string name="song_new_key_prompt">Choose a key for “%1$s”</string>
 </resources>

@@ -21,6 +21,28 @@ data class ChartDraft(
 ) {
     fun withTargetKey(targetKey: String): ChartDraft = copy(key = targetKey)
 
+    fun toJson(): JSONObject {
+        val json = JSONObject()
+            .put("title", title)
+            .put("columns", columns)
+        artist?.let { json.put("artist", it) }
+        sourceKey?.let { json.put("sourceKey", it) }
+        key?.let { json.put("key", it) }
+        capo?.let { json.put("capo", it) }
+        notes?.let { json.put("notes", it) }
+        sourceUrl?.let { json.put("sourceUrl", it) }
+        val sectionsArr = JSONArray()
+        sections.forEach { section ->
+            sectionsArr.put(
+                JSONObject()
+                    .put("label", section.label)
+                    .put("lines", JSONArray(section.lines)),
+            )
+        }
+        json.put("sections", sectionsArr)
+        return json
+    }
+
     companion object {
         fun fromJson(json: JSONObject): ChartDraft? {
             val title = json.optString("title").trim()
