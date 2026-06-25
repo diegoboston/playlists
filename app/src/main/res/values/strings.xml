@@ -132,7 +132,9 @@
     <string name="chart_assistant_no_api_key">Add your OpenAI API key in Settings first.</string>
     <string name="chart_assistant_try_again">Try again</string>
     <string name="chart_assistant_confirm">Add to playlist</string>
+    <string name="chart_assistant_confirm_archive">Add to archive</string>
     <string name="chart_assistant_confirm_add">Add “%1$s” to “%2$s”?</string>
+    <string name="chart_assistant_confirm_add_archive">Add “%1$s” to your song archive?</string>
     <string name="chart_assistant_key_down">Transpose down half step</string>
     <string name="chart_assistant_key_up">Transpose up half step</string>
     <string name="find_chart">Find chart</string>

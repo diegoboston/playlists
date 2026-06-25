@@ -53,13 +53,24 @@ object Routes {
     const val SONG_RETRANSPOSE = "song/{songId}/retranspose"
     const val PLAYLIST = "playlist/{playlistId}"
     const val PLAYBACK = "playlist/{playlistId}/play"
-    const val CHART_ASSISTANT = "playlist/{playlistId}/assistant"
+    const val CHART_ASSISTANT = "assistant"
+    const val CHART_ASSISTANT_PLAYLIST = "playlist/{playlistId}/assistant"
 
     fun song(songId: Long) = "song/$songId"
     fun songRetranspose(songId: Long) = "song/$songId/retranspose"
     fun playlist(playlistId: Long) = "playlist/$playlistId"
     fun playback(playlistId: Long) = "playlist/$playlistId/play"
-    fun chartAssistant(playlistId: Long) = "playlist/$playlistId/assistant"
+    fun chartAssistant(playlistId: Long? = null): String =
+        if (playlistId != null) "playlist/$playlistId/assistant" else CHART_ASSISTANT
+}
+
+internal fun openPlaylistIdFromRoute(entry: NavBackStackEntry?): Long? {
+    val route = entry?.destination?.route ?: return null
+    return when (route) {
+        Routes.PLAYLIST, Routes.PLAYBACK, Routes.CHART_ASSISTANT_PLAYLIST ->
+            entry.arguments?.getLong("playlistId")?.takeIf { it > 0L }
+        else -> null
+    }
 }
 
 @Composable
@@ -109,10 +120,22 @@ fun AppNavigation(
     val context = LocalContext.current
     val updateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
     val pendingImport by viewModel.pendingImport.collectAsStateWithLifecycle()
+    val pendingChartImport by viewModel.pendingChartImport.collectAsStateWithLifecycle()
+
+    LaunchedEffect(navBackStackEntry) {
+        viewModel.setOpenPlaylistId(openPlaylistIdFromRoute(navBackStackEntry))
+    }
 
     LaunchedEffect(pendingImport) {
         if (pendingImport != null && navController.currentDestination?.route != Routes.IMPORT) {
             navController.navigate(Routes.IMPORT)
+        }
+    }
+
+    LaunchedEffect(pendingChartImport) {
+        val pending = pendingChartImport ?: return@LaunchedEffect
+        navController.navigate(Routes.chartAssistant(pending.playlistId)) {
+            launchSingleTop = true
         }
     }
 
@@ -249,8 +272,22 @@ fun AppNavigation(
                         onFindChart = { navController.navigate(Routes.chartAssistant(it)) },
                     )
                 }
+                composable(Routes.CHART_ASSISTANT) { entry ->
+                    val onBack = rememberGuardedBackHandler(entry) {
+                        navController.popBackStack()
+                    }
+                    ChartAssistantScreen(
+                        playlistId = null,
+                        playlistsViewModel = viewModel,
+                        onBack = onBack,
+                        onSaved = { songId ->
+                            navController.popBackStack()
+                            navController.navigate(Routes.song(songId))
+                        },
+                    )
+                }
                 composable(
-                    route = Routes.CHART_ASSISTANT,
+                    route = Routes.CHART_ASSISTANT_PLAYLIST,
                     arguments = listOf(navArgument("playlistId") { type = NavType.LongType }),
                 ) { entry ->
                     val playlistId = entry.arguments?.getLong("playlistId") ?: return@composable
@@ -259,6 +296,7 @@ fun AppNavigation(
                     }
                     ChartAssistantScreen(
                         playlistId = playlistId,
+                        playlistsViewModel = viewModel,
                         onBack = onBack,
                         onSaved = { songId ->
                             navController.popBackStack()

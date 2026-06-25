@@ -12,7 +12,9 @@ import com.playlists.app.data.SongRepository
 import java.io.File
 
 object ShareImporter {
-    fun parseIntent(context: Context, intent: Intent): PendingImport? {
+    private val URL_IN_TEXT = Regex("""https?://[^\s<>"']+""")
+
+    fun parseIntent(context: Context, intent: Intent): SharePayload? {
         return when (intent.action) {
             Intent.ACTION_SEND -> parseSend(context, intent)
             Intent.ACTION_VIEW -> parseView(context, intent)
@@ -20,17 +22,24 @@ object ShareImporter {
         }
     }
 
-    private fun parseSend(context: Context, intent: Intent): PendingImport? {
+    fun titleHintFromUrl(url: String): String =
+        url.substringAfterLast('/').substringBefore('?').replace('_', ' ').trim()
+            .ifBlank { "Shared chart" }
+
+    fun extractUrl(text: String): String? {
+        val match = URL_IN_TEXT.find(text.trim()) ?: return null
+        return match.value.trimEnd('.', ',', ';', ')', ']', '"', '\'')
+    }
+
+    private fun parseSend(context: Context, intent: Intent): SharePayload? {
         val type = intent.type ?: return null
         return when {
             type.startsWith("text/") -> {
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
                 if (text.isEmpty()) return null
-                if (URLUtil.isNetworkUrl(text)) {
-                    importFromUrl(context, text)
-                } else {
-                    null
-                }
+                val url = extractUrl(text) ?: return null
+                if (!URLUtil.isNetworkUrl(url)) return null
+                SharePayload.ChartUrl(url, titleHintFromUrl(url))
             }
             type.startsWith("image/") || type == "application/pdf" -> {
                 val uri = IntentCompat.getParcelableExtra(
@@ -38,16 +47,20 @@ object ShareImporter {
                     Intent.EXTRA_STREAM,
                     Uri::class.java,
                 ) ?: return null
-                importFromUri(context, uri, type)
+                SharePayload.FileImport(importFromUri(context, uri, type) ?: return null)
             }
             else -> null
         }
     }
 
-    private fun parseView(context: Context, intent: Intent): PendingImport? {
+    private fun parseView(context: Context, intent: Intent): SharePayload? {
         val uri = intent.data ?: return null
+        val url = uri.toString()
+        if (URLUtil.isNetworkUrl(url)) {
+            return SharePayload.ChartUrl(url, titleHintFromUrl(url))
+        }
         val type = intent.type ?: context.contentResolver.getType(uri) ?: return null
-        return importFromUri(context, uri, type)
+        return SharePayload.FileImport(importFromUri(context, uri, type) ?: return null)
     }
 
     private fun importFromUri(context: Context, uri: Uri, mimeType: String): PendingImport? {
@@ -58,15 +71,6 @@ object ShareImporter {
         } ?: return null
         val fileType = if (mimeType.contains("pdf")) FileType.PDF else FileType.IMAGE
         val rawTitle = rawTitleFromUri(resolver, uri, file)
-        return PendingImport.fromRawTitle(file, fileType, rawTitle)
-    }
-
-    private fun importFromUrl(context: Context, url: String): PendingImport? {
-        val (bytes, mime) = FileStorage.downloadUrl(url) ?: return null
-        val ext = FileStorage.extensionForMime(mime)
-        val file = FileStorage.storeBytes(bytes, ext)
-        val fileType = if (mime.contains("pdf")) FileType.PDF else FileType.IMAGE
-        val rawTitle = url.substringAfterLast('/').substringBefore('?').ifBlank { "Shared link" }
         return PendingImport.fromRawTitle(file, fileType, rawTitle)
     }
 
@@ -91,7 +95,7 @@ object ShareImporter {
                 notes = notes.trim().ifBlank { pending.suggestedNotes },
                 filePath = SongStoragePaths.toStoredPath(pending.file),
                 fileType = pending.fileType.name,
-            )
+            ),
         )
     }
 }

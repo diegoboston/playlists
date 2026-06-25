@@ -52,7 +52,7 @@ sealed class ChartAssistantUiState {
     ) : ChartAssistantUiState()
     data class Preview(
         val intent: ChartIntent,
-        val playlist: Playlist,
+        val playlist: Playlist?,
         val sourceDraft: ChartDraft,
         val draft: ChartDraft,
         val semitoneOffset: Int = 0,
@@ -65,7 +65,7 @@ sealed class ChartAssistantUiState {
 
 class ChartAssistantViewModel(
     app: Application,
-    private val playlistId: Long,
+    private val playlistId: Long?,
 ) : AndroidViewModel(app) {
     private val playlistsApp = PlaylistsApp.from(app)
     private val playlistRepo = playlistsApp.playlistRepository
@@ -130,6 +130,30 @@ class ChartAssistantViewModel(
         }
     }
 
+    fun importSharedUrl(url: String, titleHint: String) {
+        if (_uiState.value is ChartAssistantUiState.Processing ||
+            _uiState.value is ChartAssistantUiState.Preview
+        ) {
+            return
+        }
+        viewModelScope.launch {
+            val playlist = playlistId?.let { id -> playlistRepo.getById(id) }
+            val intent = ChartIntent(
+                action = "find_chart",
+                songTitle = titleHint,
+                artist = null,
+                key = null,
+                playlistName = playlist?.name,
+            )
+            _uiState.value = ChartAssistantUiState.Processing
+            extractFromResult(
+                intent,
+                playlist,
+                SearchResult(title = titleHint, url = url, snippet = ""),
+            )
+        }
+    }
+
     fun confirmSave() {
         val state = _uiState.value as? ChartAssistantUiState.Preview ?: return
         _uiState.value = ChartAssistantUiState.Processing
@@ -153,7 +177,7 @@ class ChartAssistantViewModel(
     fun cancelPreview() {
         val state = _uiState.value as? ChartAssistantUiState.Preview ?: return
         state.pdfFile.delete()
-        _uiState.value = if (lastSearchResults.isNotEmpty()) {
+        _uiState.value = if (lastSearchResults.isNotEmpty() && state.playlist != null) {
             ChartAssistantUiState.SearchResults(
                 intent = state.intent,
                 playlist = state.playlist,
@@ -251,7 +275,7 @@ class ChartAssistantViewModel(
 
     private suspend fun extractFromResult(
         intent: ChartIntent,
-        playlist: Playlist,
+        playlist: Playlist?,
         result: SearchResult,
     ) {
         val context = getApplication<Application>()
@@ -300,7 +324,7 @@ class ChartAssistantViewModel(
                 fileType = FileType.PDF.name,
             ),
         )
-        playlistRepo.addSong(state.playlist.id, songId)
+        state.playlist?.let { playlistRepo.addSong(it.id, songId) }
         return songId
     }
 

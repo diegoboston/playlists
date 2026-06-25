@@ -10,6 +10,7 @@ import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.data.Song
 import com.playlists.app.util.AppUpdate
 import com.playlists.app.util.PendingImport
+import com.playlists.app.util.PendingChartImport
 import com.playlists.app.util.QuickstartMatcher
 import com.playlists.app.util.ShareImporter
 import com.playlists.app.util.SongStoragePaths
@@ -38,6 +39,11 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     private val _pendingImport = MutableStateFlow<PendingImport?>(null)
     val pendingImport: StateFlow<PendingImport?> = _pendingImport.asStateFlow()
 
+    private val _pendingChartImport = MutableStateFlow<PendingChartImport?>(null)
+    val pendingChartImport: StateFlow<PendingChartImport?> = _pendingChartImport.asStateFlow()
+
+    private val _openPlaylistId = MutableStateFlow<Long?>(null)
+
     private val _appUpdateState = MutableStateFlow<AppUpdateUiState?>(null)
     val appUpdateState: StateFlow<AppUpdateUiState?> = _appUpdateState.asStateFlow()
 
@@ -63,6 +69,24 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearPendingImport() {
         _pendingImport.value = null
+    }
+
+    fun setOpenPlaylistId(playlistId: Long?) {
+        _openPlaylistId.value = playlistId
+    }
+
+    fun setPendingChartImport(url: String, titleHint: String) {
+        _pendingChartImport.value = PendingChartImport(
+            url = url,
+            titleHint = titleHint,
+            playlistId = _openPlaylistId.value,
+        )
+    }
+
+    fun consumePendingChartImport(): PendingChartImport? {
+        val pending = _pendingChartImport.value
+        _pendingChartImport.value = null
+        return pending
     }
 
     suspend fun getSong(id: Long): Song? = songRepo.getById(id)

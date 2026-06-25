@@ -4,6 +4,14 @@
 
 ---
 
+## Unreleased — chart key UI, share import, settings
+
+- Chart preview no longer shows “null” for a missing key — uses the first chord in the chart instead; transposer only rewrites bracketed `<chord>` tokens.
+- Share a chord-page **URL** to Stage Manager to open **Find chart** and extract the page (same as picking a search result); saves to the **archive**, or also adds to the **open playlist** if you shared while viewing one. PDF/image shares still use the normal import dialog.
+- Settings: OpenAI key validation keeps the green check only (removed redundant “key accepted” text).
+
+---
+
 ## 1.0.46 · `0c69200` — retranspose/mic UI
 
 **Released:** 2026-06-25 (8:51 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/0c6920090cdf70dc0fede70687460f55504953e4)

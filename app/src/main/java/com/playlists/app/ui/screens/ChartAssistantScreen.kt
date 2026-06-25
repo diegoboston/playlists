@@ -67,13 +67,15 @@ import com.playlists.app.find.SearchResult
 import com.playlists.app.ui.ChartAssistantUiState
 import com.playlists.app.ui.ChartAssistantViewModel
 import com.playlists.app.ui.ChartAssistantViewModelFactory
+import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.components.ChartKeyPreviewContent
 import com.playlists.app.util.AiCredentialStore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChartAssistantScreen(
-    playlistId: Long,
+    playlistId: Long?,
+    playlistsViewModel: PlaylistsViewModel,
     onBack: () -> Unit,
     onSaved: (Long) -> Unit,
 ) {
@@ -83,6 +85,7 @@ fun ChartAssistantScreen(
         factory = ChartAssistantViewModelFactory(app, playlistId),
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val pendingChartImport by playlistsViewModel.pendingChartImport.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -92,6 +95,13 @@ fun ChartAssistantScreen(
         viewModel.savedSongId.collect { songId ->
             onSaved(songId)
         }
+    }
+
+    LaunchedEffect(pendingChartImport) {
+        val pending = pendingChartImport ?: return@LaunchedEffect
+        if (pending.playlistId != playlistId) return@LaunchedEffect
+        playlistsViewModel.consumePendingChartImport()
+        viewModel.importSharedUrl(pending.url, pending.titleHint)
     }
 
     val handleBack = {
@@ -343,16 +353,29 @@ private fun PreviewContent(
 ) {
     ChartKeyPreviewContent(
         modifier = modifier,
-        title = stringResource(
-            R.string.chart_assistant_confirm_add,
-            state.draft.title,
-            state.playlist.name,
-        ),
+        title = if (state.playlist != null) {
+            stringResource(
+                R.string.chart_assistant_confirm_add,
+                state.draft.title,
+                state.playlist.name,
+            )
+        } else {
+            stringResource(
+                R.string.chart_assistant_confirm_add_archive,
+                state.draft.title,
+            )
+        },
         keyLabel = state.draft.displayKeyLabel(),
         transposeNote = state.transposeNote,
         previewRevision = state.previewRevision,
         pdfFile = state.pdfFile,
-        confirmLabel = stringResource(R.string.chart_assistant_confirm),
+        confirmLabel = stringResource(
+            if (state.playlist != null) {
+                R.string.chart_assistant_confirm
+            } else {
+                R.string.chart_assistant_confirm_archive
+            },
+        ),
         onNudgeKey = onNudgeKey,
         onConfirm = onConfirm,
         onCancel = onCancel,

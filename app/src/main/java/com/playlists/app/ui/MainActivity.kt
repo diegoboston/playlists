@@ -27,6 +27,7 @@ import com.playlists.app.ui.screens.StorageAccessScreen
 import com.playlists.app.ui.theme.PlaylistsTheme
 import com.playlists.app.util.AppUpdate
 import com.playlists.app.util.ShareImporter
+import com.playlists.app.util.SharePayload
 import com.playlists.app.util.StageManagerStorage
 import java.io.File
 
@@ -122,8 +123,10 @@ class MainActivity : ComponentActivity() {
 
     private fun handleShareIntent(intent: Intent?) {
         if (intent == null || !storageReady) return
-        val pending = ShareImporter.parseIntent(this, intent) ?: return
-        viewModel.setPendingImport(pending)
+        when (val payload = ShareImporter.parseIntent(this, intent) ?: return) {
+            is SharePayload.FileImport -> viewModel.setPendingImport(payload.pending)
+            is SharePayload.ChartUrl -> viewModel.setPendingChartImport(payload.url, payload.titleHint)
+        }
     }
 
     private fun queueInstall(apk: File) {

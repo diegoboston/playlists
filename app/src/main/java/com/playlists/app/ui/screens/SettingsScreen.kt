@@ -166,14 +166,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                OpenAiKeyStatus.Valid -> {
-                    Text(
-                        text = stringResource(R.string.settings_openai_key_valid),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF2E7D32),
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
+                OpenAiKeyStatus.Valid -> Unit
                 OpenAiKeyStatus.Testing -> {
                     Text(
                         text = stringResource(R.string.settings_openai_key_testing),
