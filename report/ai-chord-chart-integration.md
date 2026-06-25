@@ -8,7 +8,7 @@
 
 Add a **voice-first AI assistant** to find songs on the internet (lyrics, chords, chord pages), turn them into a one-page PDF chart, and add them to a playlist after user confirmation.
 
-**MVP (v0.1) in one sentence:** Hold mic → say the command → app searches the web → user taps a result → LLM extracts a chart → PDF preview → confirm → add to playlist.
+**MVP (v0.1) in one sentence:** Hold mic → say e.g. “search chords and lyrics for {song} by {artist} in {key}” → app searches the web → user taps a result → LLM extracts → **transpose to spoken key** → PDF preview → confirm → add to playlist.
 
 The app uses the user’s **OpenAI API key** (stored locally, encrypted — never in git). v0.1 is OpenAI-only (voice input, web search, and extraction). Claude and multi-action commands come later.
 
@@ -23,11 +23,12 @@ This fits the existing model: charts are opaque PDF/image files with `title`, `k
 | # | Step | Detail |
 |---|------|--------|
 | 1 | **Voice command** | Push-to-hold mic on playlist detail (and/or main tabs). `RECORD_AUDIO` permission. |
-| 2 | **Intent from audio** | Send WAV + text context to OpenAI → JSON `{ title, key?, playlistName?, action: "find_chart" }`. Show transcript (“Heard: …”). |
+| 2 | **Intent from audio** | Send WAV + text context to OpenAI → JSON `{ songTitle, artist?, key?, playlistName?, action: "find_chart" }`. Show transcript (“Heard: …”). |
 | 3 | **Resolve playlist** | Fuzzy-match spoken name against playlist list; default to current playlist when opened from detail. Confirm if ambiguous. |
-| 4 | **Find on web** | Search “{title} chords” (+ key if given). Show 3–5 results (title, snippet, URL). **User taps one.** |
-| 5 | **Extract** | Fetch page HTML/text → LLM extracts `ChartDraft` JSON. |
-| 6 | **Render** | Single-column one-page PDF via `PdfDocument`. |
+| 4 | **Find on web** | Search “{title} {artist} chords lyrics” (+ key optional — helps pick a chart, not required). Show 3–5 results (title, snippet, URL). **User taps one.** |
+| 5 | **Extract** | Fetch page HTML/text → LLM extracts `ChartDraft` JSON (chords + lyrics, `sourceKey` if stated on page). |
+| 5b | **Transpose** | If user gave a **target key** and it differs from `sourceKey`, transpose all chord symbols to target key before render. **MVP requirement.** |
+| 6 | **Render** | Single-column one-page PDF via `PdfDocument`; header shows **target key**. |
 | 7 | **Confirm** | Preview (reuse `SongMediaViewer`) + “Add **Title (Key)** to **Playlist**?” |
 | 8 | **Save** | `FileStorage` → `SongRepository.insert` → `playlistRepository.addSong` (append at end). |
 | 9 | **Settings** | OpenAI API key only; encrypted storage. |
@@ -53,6 +54,7 @@ Hold mic
   → resolve playlist name → playlistId
   → web search → user picks URL
   → fetch page → LLM extract → ChartDraft
+  → transpose to target key (if spoken key ≠ sourceKey)
   → PDF preview
   → tap Confirm
   → archive + addSong(playlistId, songId)
@@ -67,16 +69,17 @@ sequenceDiagram
     participant Render as ChartPdfRenderer
     participant Repo as Repositories
 
-    User->>UI: hold mic — "Amazing Grace in G to Sunday set"
+    User->>UI: hold mic — "search chords and lyrics for Lean on Me by Bill Withers in C"
     UI->>OpenAI: input_audio + system context (playlists, schema)
     OpenAI-->>UI: intent JSON + transcript
     UI->>UI: resolve playlistName → playlistId
-    UI->>Web: search "{title} chords"
+    UI->>Web: search "Lean on Me Bill Withers chords lyrics"
     Web-->>UI: 3–5 links
     User->>UI: tap result
     UI->>UI: fetch URL HTML
     UI->>OpenAI: extract ChartDraft from page text
-    OpenAI-->>UI: ChartDraft JSON
+    OpenAI-->>UI: ChartDraft JSON (sourceKey e.g. F)
+    UI->>UI: transpose F → C (target key from intent)
     UI->>Render: draft → PDF
     Render-->>UI: preview bytes
     UI-->>User: preview + Confirm / Cancel
@@ -89,6 +92,69 @@ sequenceDiagram
 - **Voice** = command input, not full hands-free operation.
 - User still **taps** a search result and **confirms** before anything is saved.
 - Transcript always visible so misheard titles are caught before search.
+
+---
+
+## Voice command examples
+
+Natural phrases map to the same `find_chart` action. **`artist`** strongly improves search; **`key`** is the **target key** for the saved chart (transpose after extract).
+
+### Intent fields
+
+| Field | Required | Role |
+|-------|----------|------|
+| `songTitle` | yes | e.g. `"Lean on Me"` |
+| `artist` | optional | e.g. `"Bill Withers"` — included in web search query |
+| `key` | optional | Target key — **transpose to this** before PDF (e.g. `"C"`) |
+| `playlistName` | optional | Default = current playlist when opened from playlist detail |
+
+### Example: search by song + artist + key + playlist
+
+**You (hold mic, playlist “Sunday set” open):**
+
+> “Search chords and lyrics for **Lean on Me** by **Bill Withers** in **C**.”
+
+**Transcript:** `Heard: Search chords and lyrics for Lean on Me by Bill Withers in C`
+
+**Intent JSON:**
+
+```json
+{
+  "action": "find_chart",
+  "songTitle": "Lean on Me",
+  "artist": "Bill Withers",
+  "key": "C",
+  "playlistName": "Sunday set"
+}
+```
+
+**Web search query:** `Lean on Me Bill Withers chords lyrics`
+
+**After you tap a result** (page might be in F):
+
+1. Extract → `ChartDraft` with `sourceKey: "F"`, chords aligned to lyrics  
+2. Transpose **F → C** (because you said “in C”)  
+3. Preview header: **Lean on Me (C)**  
+4. Confirm → saved with `keySignature = "C"`
+
+### More example phrases
+
+| You say | Notes |
+|---------|--------|
+| “Search chords and lyrics for **Fast Car** by **Tracy Chapman**.” | No key → chart stays in source key from page |
+| “Find chords and lyrics for **Amazing Grace** — traditional — in **G**, add to **Sunday set**.” | Artist optional for hymns; explicit playlist |
+| “**Wagon Wheel** by **Old Crow Medicine Show** in **G**.” | Shorter phrasing; playlist = current if on detail screen |
+| “Search chords and lyrics for **Hallelujah** by **Leonard Cohen**.” | Archive-only OK if no playlist named (confirm: save to archive) |
+
+### Transposition (MVP)
+
+- Spoken key = **target key**, not a filter on which search result to pick.
+- Flow: extract in whatever key the page uses → detect `sourceKey` → transpose chord symbols to target → render PDF.
+- If page has **capo** (e.g. “Capo 2, play G shapes”), extract prompt should normalize to concert pitch or document capo in `ChartDraft.capo`; transpose still applies to concert/key field user asked for.
+- If user **does not** say a key, skip transpose; `key` on saved song = `sourceKey` from extract (or empty).
+- Preview shows both when transposed: e.g. `Source: F → Chart: C` in subtitle so mismatches are visible before confirm.
+
+**Implementation:** prefer **LLM transpose in extract step** (“extract and output in key C”) with a **deterministic chord transposer** (`ChordTransposer.kt`) as validator/fallback — unit-test transposer with known progressions.
 
 ---
 
@@ -149,12 +215,13 @@ OpenAI returns **intent as text/JSON**. The app validates and executes.
 {
   "action": "find_chart",
   "songTitle": "Amazing Grace",
+  "artist": null,
   "key": "G",
   "playlistName": "Sunday set"
 }
 ```
 
-From playlist detail, `playlistName` may be omitted in speech; context supplies the current playlist.
+`key` is the **target key** for transposition and for `Song.keySignature`. From playlist detail, `playlistName` may be omitted in speech; context supplies the current playlist.
 
 ### OpenAI options for v0.1
 
@@ -195,20 +262,24 @@ Structured JSON between extract and PDF (enables refinement in v0.2):
 
 ```json
 {
-  "title": "Amazing Grace",
-  "key": "G",
+  "title": "Lean on Me",
+  "artist": "Bill Withers",
+  "sourceKey": "F",
+  "key": "C",
   "capo": null,
   "columns": 1,
   "sections": [
-    { "label": "Verse 1", "lines": ["G    C    G", "Em   D    G"] },
-    { "label": "Chorus", "lines": ["G    C    G", "G    D    G"] }
+    { "label": "Verse 1", "lines": ["C    F    C", "Am   G    C"] },
+    { "label": "Chorus", "lines": ["C    F    C", "C    G    C"] }
   ],
-  "notes": "4/4, moderate",
+  "notes": "4/4",
   "sourceUrl": "https://…"
 }
 ```
 
-Store `sourceUrl` in song `notes` or append for traceability.
+- **`sourceKey`** — key detected on the fetched page (before transpose).  
+- **`key`** — target key after transpose (matches user request and `Song.keySignature`).  
+- Store `sourceUrl` (and optionally `sourceKey`) in song `notes` for traceability.
 
 **PDF** via `android.graphics.pdf.PdfDocument` (minSdk 26 OK). Single column v0.1; auto-shrink font to one page.
 
@@ -220,7 +291,7 @@ v0.1 supports one action: **`find_chart`**. Later versions add a command languag
 
 | Action type | Example | Confirm | Maps to |
 |-------------|---------|---------|---------|
-| `find_chart` | “Find chords for Amazing Grace in G for Sunday set” | Preview + confirm | v0.1 flow |
+| `find_chart` | “Search chords and lyrics for Lean on Me by Bill Withers in C” | Preview + confirm | v0.1 flow |
 | `add_existing` | “Add Amazing Grace to Sunday set” | Light confirm | `playlistRepository.addSong` |
 | `delete_song` | “Delete Old Chart” | Always — show playlists affected | `songRepository.delete` |
 | `remove_from_playlist` | “Remove X from Sunday set” | Always | `playlistRepository.removeSong` |
@@ -295,6 +366,7 @@ find/
 
 render/
   ChartPdfRenderer.kt                ChartDraft → PDF bytes
+  ChordTransposer.kt                 sourceKey → target key on ChartDraft
 
 util/
   AiCredentialStore.kt               EncryptedSharedPreferences
@@ -324,16 +396,17 @@ playlistRepository.addSong(playlistId, songId)
 
 Build order (voice early, not last):
 
-1. [ ] `ChartDraft` schema + extract prompt
-2. [ ] `ChartPdfRenderer` — single column, one page
-3. [ ] `WebSearchService` + `PageFetcher`
-4. [ ] Extract pipeline: URL → ChartDraft → PDF (test with typed URL first)
-5. [ ] `AudioRecorder` + mic UI + `RECORD_AUDIO`
-6. [ ] OpenAI audio → intent JSON + transcript display
-7. [ ] `PlaylistNameResolver`
-8. [ ] Full flow: mic → search → pick → preview → confirm → save
-9. [ ] Error states: no key, no network, no results, fetch failed, bad JSON
-10. [ ] README + `update-readme` skill
+1. [ ] `ChartDraft` schema + extract prompt (`sourceKey`, `artist`, full lyrics)
+2. [ ] `ChordTransposer` + unit tests (major/minor, sharps/flats, `#`/`b` chords)
+3. [ ] `ChartPdfRenderer` — single column, one page
+4. [ ] `WebSearchService` + `PageFetcher` (search query includes artist when present)
+5. [ ] Extract pipeline: URL → ChartDraft → transpose if target key set → PDF (test with typed URL first)
+6. [ ] `AudioRecorder` + mic UI + `RECORD_AUDIO`
+7. [ ] OpenAI audio → intent JSON (`songTitle`, `artist`, `key`) + transcript display
+8. [ ] `PlaylistNameResolver`
+9. [ ] Full flow: mic → search → pick → extract → transpose → preview → confirm → save
+10. [ ] Error states: no API key, no network, no results, fetch failed, bad JSON, unknown sourceKey + transpose requested
+11. [ ] README + `update-readme` skill
 
 ### Phase 2 — v0.2 polish (3–5 days)
 
@@ -379,6 +452,7 @@ No PDF library if using platform `PdfDocument`.
 |-------|----------|
 | `PlaylistNameResolver` | JVM unit tests |
 | `ChartPdfRenderer` | Fixed draft → PDF magic bytes, page count = 1 |
+| `ChordTransposer` | Known progression F→C, Am→Em, handles `Bb`/`F#` |
 | `OpenAiClient` | MockWebServer — audio request shape, extract response |
 | `PageFetcher` | Fixture HTML files |
 | `AiCredentialStore` | Round-trip encrypt |
@@ -399,6 +473,7 @@ Do **not** call real APIs in CI.
 | API cost | User’s key; short recordings; one extract per pick |
 | One-page overflow | Auto scale font; warning if truncated |
 | Wrong source / bad extract | User picks another search result; refine in v0.2 |
+| Bad transpose | Show sourceKey → target on preview; transposer unit tests; re-extract fallback |
 
 ---
 
@@ -428,10 +503,11 @@ Do **not** call real APIs in CI.
 
 - [ ] User configures OpenAI key in Settings; survives reboot; absent from git
 - [ ] Push-to-hold mic on playlist detail; `RECORD_AUDIO` granted
-- [ ] Spoken “find / add chart for {song} in {key} to {playlist}” → transcript shown
-- [ ] Web search returns pickable results; tap fetches and extracts chart
-- [ ] PDF preview matches normal song viewer behaviour
-- [ ] Confirm adds song to **correct** playlist (spoken or current)
+- [ ] Spoken “search chords and lyrics for {song} by {artist} in {key}” → transcript shown
+- [ ] Web search uses artist in query; pickable results; tap fetches and extracts chart
+- [ ] Spoken key transposes chart to target key (verify: page in F, request C → saved as C)
+- [ ] PDF preview matches normal song viewer behaviour; shows target key in header
+- [ ] Confirm adds song to **correct** playlist (spoken or current) with correct `keySignature`
 - [ ] No Room migration
 - [ ] End-to-end on good network in ~30–60s
 

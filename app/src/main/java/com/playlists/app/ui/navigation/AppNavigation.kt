@@ -31,6 +31,7 @@ import com.playlists.app.R
 import com.playlists.app.ui.AppUpdateUiState
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.components.AppUpdateBanner
+import com.playlists.app.ui.screens.ChartAssistantScreen
 import com.playlists.app.ui.screens.ImportSongScreen
 import com.playlists.app.ui.screens.MainTabsScreen
 import com.playlists.app.ui.screens.PlaylistDetailScreen
@@ -49,10 +50,12 @@ object Routes {
     const val SONG = "song/{songId}"
     const val PLAYLIST = "playlist/{playlistId}"
     const val PLAYBACK = "playlist/{playlistId}/play"
+    const val CHART_ASSISTANT = "playlist/{playlistId}/assistant"
 
     fun song(songId: Long) = "song/$songId"
     fun playlist(playlistId: Long) = "playlist/$playlistId"
     fun playback(playlistId: Long) = "playlist/$playlistId/play"
+    fun chartAssistant(playlistId: Long) = "playlist/$playlistId/assistant"
 }
 
 @Composable
@@ -217,6 +220,24 @@ fun AppNavigation(
                         onNavigateToDuplicate = { newId ->
                             navController.popBackStack()
                             navController.navigate(Routes.playlist(newId))
+                        },
+                        onFindChart = { navController.navigate(Routes.chartAssistant(it)) },
+                    )
+                }
+                composable(
+                    route = Routes.CHART_ASSISTANT,
+                    arguments = listOf(navArgument("playlistId") { type = NavType.LongType }),
+                ) { entry ->
+                    val playlistId = entry.arguments?.getLong("playlistId") ?: return@composable
+                    val onBack = rememberGuardedBackHandler(entry) {
+                        navController.popBackStack()
+                    }
+                    ChartAssistantScreen(
+                        playlistId = playlistId,
+                        onBack = onBack,
+                        onSaved = { songId ->
+                            navController.popBackStack()
+                            navController.navigate(Routes.song(songId))
                         },
                     )
                 }
