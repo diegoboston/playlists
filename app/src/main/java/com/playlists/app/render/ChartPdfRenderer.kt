@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import com.playlists.app.ai.ChartDraft
+import com.playlists.app.ai.normalizeOptionalField
 import java.io.ByteArrayOutputStream
 import kotlin.math.abs
 import kotlin.math.min
@@ -88,8 +89,8 @@ object ChartPdfRenderer {
         draft.sections.map { Block(it.label, it.lines) }
 
     private fun drawHeader(canvas: Canvas, draft: ChartDraft, paint: Paint, y: Float): Float {
-        val keyPart = draft.key?.let { " ($it)" }.orEmpty()
-        val artistPart = draft.artist?.let { " — $it" }.orEmpty()
+        val keyPart = draft.key.normalizeOptionalField()?.let { " ($it)" }.orEmpty()
+        val artistPart = draft.artist.normalizeOptionalField()?.let { " — $it" }.orEmpty()
         canvas.drawText("${draft.title}$keyPart$artistPart", MARGIN, y, paint)
         var nextY = y + paint.fontSpacing
         val meta = draft.notes.orEmpty()

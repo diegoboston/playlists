@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.playlists.app.R
+import com.playlists.app.ai.normalizeOptionalField
 import com.playlists.app.data.FileType
 import java.io.File
 
@@ -57,7 +58,7 @@ fun ChartKeyPreviewContent(
                     )
                 }
                 Text(
-                    text = keyLabel ?: "—",
+                    text = keyLabel.normalizeOptionalField() ?: "—",
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier
                         .padding(horizontal = 20.dp)

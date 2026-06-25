@@ -3,6 +3,10 @@ package com.playlists.app.ai
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Blank or JSON-null strings from [JSONObject.optString] become Kotlin null. */
+internal fun String?.normalizeOptionalField(): String? =
+    this?.trim()?.takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
+
 data class ChartSection(
     val label: String,
     val lines: List<String>,
@@ -64,18 +68,18 @@ data class ChartDraft(
                 }
             }
             if (sections.isEmpty()) return null
-            val sourceKey = json.optString("sourceKey").trim().takeIf { it.isNotEmpty() }
-            val key = json.optString("key").trim().takeIf { it.isNotEmpty() } ?: sourceKey
+            val sourceKey = json.optString("sourceKey").normalizeOptionalField()
+            val key = json.optString("key").normalizeOptionalField() ?: sourceKey
             return ChartDraft(
                 title = title,
-                artist = json.optString("artist").trim().takeIf { it.isNotEmpty() },
+                artist = json.optString("artist").normalizeOptionalField(),
                 sourceKey = sourceKey,
                 key = key,
-                capo = json.optString("capo").trim().takeIf { it.isNotEmpty() },
+                capo = json.optString("capo").normalizeOptionalField(),
                 columns = json.optInt("columns", 1).coerceIn(1, 2),
                 sections = sections,
-                notes = json.optString("notes").trim().takeIf { it.isNotEmpty() },
-                sourceUrl = json.optString("sourceUrl").trim().takeIf { it.isNotEmpty() },
+                notes = json.optString("notes").normalizeOptionalField(),
+                sourceUrl = json.optString("sourceUrl").normalizeOptionalField(),
             )
         }
     }

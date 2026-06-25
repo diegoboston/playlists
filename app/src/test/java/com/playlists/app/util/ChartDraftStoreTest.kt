@@ -2,8 +2,10 @@ package com.playlists.app.util
 
 import com.playlists.app.ai.ChartDraft
 import com.playlists.app.ai.ChartSection
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ChartDraftStoreTest {
@@ -39,5 +41,22 @@ class ChartDraftStoreTest {
         assertEquals("F", loaded.sourceKey)
         assertEquals(1, loaded.sections.size)
         assertEquals("F  Bb  C", loaded.sections.first().lines.first())
+    }
+
+    @Test
+    fun fromJson_nullKey_isMissing() {
+        val json = JSONObject(
+            """
+            {
+              "title": "Test Song",
+              "key": null,
+              "sections": [{"label": "Verse", "lines": ["<C> hello"]}]
+            }
+            """.trimIndent(),
+        )
+        val loaded = ChartDraft.fromJson(json)
+        assertNotNull(loaded)
+        assertNull(loaded!!.key)
+        assertNull(loaded.sourceKey)
     }
 }
