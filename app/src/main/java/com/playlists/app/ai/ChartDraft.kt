@@ -25,6 +25,21 @@ data class ChartDraft(
 ) {
     fun withTargetKey(targetKey: String): ChartDraft = copy(key = targetKey)
 
+    /** First bracketed chord in section order, e.g. `Am` from `<Am>`. */
+    fun firstChord(): String? {
+        for (section in sections) {
+            for (line in section.lines) {
+                val chord = BRACKETED_CHORD.find(line)?.groupValues?.getOrNull(1)?.trim()
+                if (!chord.isNullOrEmpty()) return chord
+            }
+        }
+        return null
+    }
+
+    /** Key shown in preview UI: explicit key, else first chord when unknown. */
+    fun displayKeyLabel(): String? =
+        key.normalizeOptionalField() ?: sourceKey.normalizeOptionalField() ?: firstChord()
+
     fun toJson(): JSONObject {
         val json = JSONObject()
             .put("title", title)
@@ -83,4 +98,6 @@ data class ChartDraft(
             )
         }
     }
+
+    private val BRACKETED_CHORD = Regex("""<([^>]+)>""")
 }

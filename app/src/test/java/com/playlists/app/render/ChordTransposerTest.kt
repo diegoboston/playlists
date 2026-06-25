@@ -35,9 +35,9 @@ class ChordTransposerTest {
     }
 
     @Test
-    fun transposeLine_legacy_doesNotTransposeLyricsStartingWithA() {
-        val result = ChordTransposer.transposeLine("Almeno tutto", 1, "C")
-        assertEquals("Almeno tutto", result)
+    fun transposeLine_unbracketedLine_isUnchanged() {
+        val result = ChordTransposer.transposeLine("C  G  Am", 2, "D")
+        assertEquals("C  G  Am", result)
     }
 
     @Test
@@ -67,13 +67,32 @@ class ChordTransposerTest {
             capo = null,
             columns = 1,
             sections = listOf(
-                com.playlists.app.ai.ChartSection("Verse", listOf("C  G  Am")),
+                com.playlists.app.ai.ChartSection("Verse", listOf("<C>  <G>  <Am>")),
             ),
             notes = null,
             sourceUrl = null,
         )
         val up = ChordTransposer.transposeBySemitones(draft, 2)
         assertEquals("D", up.key)
-        assertTrue(up.sections.first().lines.first().contains("D"))
+        assertTrue(up.sections.first().lines.first().contains("<D>"))
+    }
+
+    @Test
+    fun transposeBySemitones_usesFirstChordWhenKeyMissing() {
+        val draft = com.playlists.app.ai.ChartDraft(
+            title = "Test",
+            artist = null,
+            sourceKey = null,
+            key = null,
+            capo = null,
+            columns = 1,
+            sections = listOf(
+                com.playlists.app.ai.ChartSection("Verse", listOf("<Am>  <Dm>")),
+            ),
+            notes = null,
+            sourceUrl = null,
+        )
+        val up = ChordTransposer.transposeBySemitones(draft, 2)
+        assertEquals("Bm", up.key)
     }
 }

@@ -75,7 +75,7 @@ fun ChartRetransposeScreen(
             is ChartRetransposeUiState.Preview -> ChartKeyPreviewContent(
                 modifier = Modifier.padding(padding),
                 title = stringResource(R.string.song_new_key_prompt, current.song.title),
-                keyLabel = current.draft.key,
+                keyLabel = current.draft.displayKeyLabel(),
                 transposeNote = current.transposeNote,
                 previewRevision = current.previewRevision,
                 pdfFile = current.pdfFile,

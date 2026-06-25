@@ -59,4 +59,41 @@ class ChartDraftStoreTest {
         assertNull(loaded!!.key)
         assertNull(loaded.sourceKey)
     }
+
+    @Test
+    fun firstChord_returnsFirstBracketedSymbol() {
+        val draft = ChartDraft(
+            title = "Test Song",
+            artist = null,
+            sourceKey = null,
+            key = null,
+            capo = null,
+            columns = 1,
+            sections = listOf(
+                ChartSection("Verse", listOf("When I <Am> find myself")),
+            ),
+            notes = null,
+            sourceUrl = null,
+        )
+        assertEquals("Am", draft.firstChord())
+        assertEquals("Am", draft.displayKeyLabel())
+    }
+
+    @Test
+    fun displayKeyLabel_prefersExplicitKey() {
+        val draft = ChartDraft(
+            title = "Test Song",
+            artist = null,
+            sourceKey = null,
+            key = "G",
+            capo = null,
+            columns = 1,
+            sections = listOf(
+                ChartSection("Verse", listOf("<C> hello")),
+            ),
+            notes = null,
+            sourceUrl = null,
+        )
+        assertEquals("G", draft.displayKeyLabel())
+    }
 }

@@ -348,7 +348,7 @@ private fun PreviewContent(
             state.draft.title,
             state.playlist.name,
         ),
-        keyLabel = state.draft.key,
+        keyLabel = state.draft.displayKeyLabel(),
         transposeNote = state.transposeNote,
         previewRevision = state.previewRevision,
         pdfFile = state.pdfFile,

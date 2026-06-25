@@ -18,9 +18,8 @@ object ChordTransposer {
 
     private val BRACKETED_CHORD = Regex("""<([^>]+)>""")
 
-    /** Legacy unbracketed charts: skip matches followed by lowercase (e.g. "Almeno"). */
-    private val LEGACY_CHORD_PATTERN = Regex(
-        """(?<![A-Za-z])([A-G])([#b])?(m(?:aj(?:7|9)?|in(?:or)?(?:7|9)?|7|6|9|11|13)?|maj7|maj9|dim(?:7)?|aug|sus[24]|add\d+|M7|M)?(\d+)?(/([A-G])([#b])?)?(?![a-z])""",
+    private val CHORD_SYMBOL = Regex(
+        """^([A-G])([#b])?(m(?:aj(?:7|9)?|in(?:or)?(?:7|9)?|7|6|9|11|13)?|maj7|maj9|dim(?:7)?|aug|sus[24]|add\d+|M7|M)?(\d+)?(/([A-G])([#b])?)?$""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -31,7 +30,8 @@ object ChordTransposer {
     }
 
     fun transpose(draft: ChartDraft, targetKey: String): ChartDraft {
-        val source = draft.sourceKey ?: draft.key ?: return draft.withTargetKey(targetKey)
+        val source = draft.sourceKey ?: draft.key ?: draft.firstChord()
+            ?: return draft.withTargetKey(targetKey)
         if (source.equals(targetKey, ignoreCase = true)) {
             return draft.withTargetKey(targetKey)
         }
@@ -42,7 +42,7 @@ object ChordTransposer {
     /** Shift source chart up or down by half-steps (semitones) from its source key. */
     fun transposeBySemitones(draft: ChartDraft, semitones: Int): ChartDraft {
         if (semitones == 0) return draft
-        val sourceKey = draft.sourceKey ?: draft.key ?: "C"
+        val sourceKey = draft.sourceKey ?: draft.key ?: draft.firstChord() ?: "C"
         val newKey = shiftKey(sourceKey, semitones)
         return applySemitones(draft, semitones, newKey)
     }
@@ -87,21 +87,14 @@ object ChordTransposer {
     fun transposeLine(line: String, semitones: Int, spellingKey: String? = null): String {
         if (semitones == 0) return line
         val preferFlat = prefersFlats(spellingKey.orEmpty())
-        if (line.contains('<')) {
-            return BRACKETED_CHORD.replace(line) { match ->
-                val transposed = transposeChordSymbol(match.groupValues[1], semitones, preferFlat)
-                "<$transposed>"
-            }
-        }
-        return LEGACY_CHORD_PATTERN.replace(line) { match ->
-            transposeChordSymbol(match.value, semitones, preferFlat)
+        return BRACKETED_CHORD.replace(line) { match ->
+            val transposed = transposeChordSymbol(match.groupValues[1], semitones, preferFlat)
+            "<$transposed>"
         }
     }
 
     private fun transposeChordSymbol(symbol: String, semitones: Int, preferFlat: Boolean): String {
-        val match = LEGACY_CHORD_PATTERN.matchEntire(symbol.trim())
-            ?: LEGACY_CHORD_PATTERN.find(symbol.trim())
-            ?: return symbol
+        val match = CHORD_SYMBOL.matchEntire(symbol.trim()) ?: return symbol
         val root = match.groupValues[1]
         val acc = match.groupValues[2]
         val quality = match.groupValues[3]
