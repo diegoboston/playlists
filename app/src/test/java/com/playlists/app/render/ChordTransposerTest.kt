@@ -13,17 +13,31 @@ class ChordTransposerTest {
 
     @Test
     fun transposeLine_fMajorToC() {
-        val result = ChordTransposer.transposeLine("F  Bb  C", 7, "C")
-        assertTrue(result.contains("C"))
-        assertTrue(result.contains("F"))
-        assertTrue(result.contains("G"))
+        val result = ChordTransposer.transposeLine("<F>  <Bb>  <C>", 7, "C")
+        assertTrue(result.contains("<C>"))
+        assertTrue(result.contains("<F>"))
+        assertTrue(result.contains("<G>"))
     }
 
     @Test
     fun transposeLine_inKeyOfF_usesBbNotAsharp() {
-        val result = ChordTransposer.transposeLine("F  Bb  C", 0, "F")
-        assertTrue(result.contains("Bb"))
+        val result = ChordTransposer.transposeLine("<F>  <Bb>  <C>", 0, "F")
+        assertTrue(result.contains("<Bb>"))
         assertFalse(result.contains("A#"))
+    }
+
+    @Test
+    fun transposeLine_bracketed_doesNotTransposeLyrics() {
+        val result = ChordTransposer.transposeLine("Almeno <Am> tutto", 1, "C")
+        assertTrue(result.startsWith("Almeno "))
+        assertTrue(result.contains("tutto"))
+        assertFalse(result.contains("Blmeno"))
+    }
+
+    @Test
+    fun transposeLine_legacy_doesNotTransposeLyricsStartingWithA() {
+        val result = ChordTransposer.transposeLine("Almeno tutto", 1, "C")
+        assertEquals("Almeno tutto", result)
     }
 
     @Test

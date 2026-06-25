@@ -4,6 +4,18 @@
 
 ---
 
+## 1.0.46 · `0c69200` — retranspose/mic UI
+
+**Released:** 2026-06-25 (8:51 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/0c6920090cdf70dc0fede70687460f55504953e4)
+
+- **New key** on AI charts: edit dialog (Songs list or song view) opens transpose/PDF preview to pick a key and save; source chords/lyrics stored as `.chart.json` beside the PDF.
+- Find chart no longer asks for a key by voice — search is title/artist only; transpose with +/− in preview before saving.
+- Transposer uses conventional flat/sharp spelling (e.g. Bb in F, not A#).
+- Settings: PIN + OpenAI key + **Save**, then app version and **Check for updates** (49152–65535 PIN range).
+- Mic UX: “Listening… release to send”.
+
+---
+
 ## 1.0.45 · `28a1bd7` — open AI integration
 
 **Released:** 2026-06-25 (8:06 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/28a1bd7508e168a8d528b4c7e7394d18193c6f42)

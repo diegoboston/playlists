@@ -1,12 +1,15 @@
 package com.playlists.app.ui.screens
 
+import android.text.format.Formatter
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -40,12 +43,15 @@ import com.playlists.app.R
 import com.playlists.app.ai.OpenAiClient
 import com.playlists.app.ui.AppUpdateUiState
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.components.AppUpdateBanner
 import com.playlists.app.util.AiCredentialStore
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.AppUpdate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import com.playlists.app.util.StageManagerStorage
+import java.io.File
 
 private sealed interface OpenAiKeyStatus {
     data object Unknown : OpenAiKeyStatus
@@ -59,6 +65,7 @@ private sealed interface OpenAiKeyStatus {
 fun SettingsScreen(
     viewModel: PlaylistsViewModel,
     onBack: () -> Unit,
+    onInstallUpdate: (File) -> Unit = {},
 ) {
     val context = LocalContext.current
     val updateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
@@ -72,6 +79,13 @@ fun SettingsScreen(
         mutableStateOf(AiCredentialStore.getOpenAiApiKey(context).orEmpty())
     }
     var openAiKeyStatus by remember { mutableStateOf<OpenAiKeyStatus>(OpenAiKeyStatus.Unknown) }
+    var librarySizeLabel by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        librarySizeLabel = withContext(Dispatchers.IO) {
+            Formatter.formatFileSize(context, StageManagerStorage.librarySizeBytes())
+        }
+    }
 
     LaunchedEffect(openAiKeyText) {
         val key = openAiKeyText.trim()
@@ -106,7 +120,8 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
         ) {
             Text(
                 text = stringResource(R.string.settings_remote_pin),
@@ -188,10 +203,12 @@ fun SettingsScreen(
             }
             Text(
                 text = stringResource(R.string.settings_app_version),
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 32.dp, bottom = 8.dp),
             )
             Text(
                 text = stringResource(R.string.settings_app_version_value, versionName),
+                style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
             OutlinedButton(
@@ -201,6 +218,29 @@ fun SettingsScreen(
             ) {
                 Text(stringResource(R.string.settings_check_for_updates))
             }
+            updateState?.let { state ->
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    AppUpdateBanner(
+                        state = state,
+                        onDismiss = { viewModel.clearAppUpdateState() },
+                        onInstall = onInstallUpdate,
+                    )
+                }
+            }
+            Text(
+                text = stringResource(R.string.settings_storage),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 32.dp, bottom = 8.dp),
+            )
+            Text(
+                text = librarySizeLabel ?: stringResource(R.string.settings_storage_calculating),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (librarySizeLabel == null) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
         }
     }
 }

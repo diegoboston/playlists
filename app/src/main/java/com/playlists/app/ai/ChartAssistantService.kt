@@ -72,13 +72,14 @@ class OpenAiClient(
               "key": "same as sourceKey",
               "capo": null or string,
               "columns": 1,
-              "sections": [{"label":"Verse 1","lines":["G  C  G","lyrics with chords above or inline"]}],
+              "sections": [{"label":"Verse 1","lines":["<G>  <C>  <G>","When I <Am> find myself in times of trouble"]}],
               "notes": "optional",
               "sourceUrl": "$sourceUrl"
             }
+            Wrap every chord symbol in angle brackets, e.g. <G>, <Am7>, <F/C>. Never put bare chord letters in lyrics.
+            Chord-only lines should contain only bracketed chords and spaces.
             Keep chords in the original key from the page (do not transpose).
             Use conventional spelling for the key (e.g. Bb not A# in flat keys).
-            Include chord symbols with lyric lines.
             Song requested: $songTitle ${artist.orEmpty()}
         """.trimIndent()
         val content = chatJson(system, pageText.take(30_000)) ?: return null

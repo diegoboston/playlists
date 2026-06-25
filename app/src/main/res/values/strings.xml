@@ -65,6 +65,8 @@
     <string name="settings_app_version">App version</string>
     <string name="settings_app_version_value">%1$s</string>
     <string name="settings_check_for_updates">Check for updates</string>
+    <string name="settings_storage">Storage</string>
+    <string name="settings_storage_calculating">Calculating…</string>
     <string name="remote_stopped">Remote play stopped</string>
     <string name="remote_notification_channel">Remote play</string>
     <string name="remote_notification_channel_desc">Shows while remote play is active</string>
@@ -134,7 +136,7 @@
     <string name="chart_assistant_key_down">Transpose down half step</string>
     <string name="chart_assistant_key_up">Transpose up half step</string>
     <string name="find_chart">Find chart</string>
-    <string name="song_new_key">New key</string>
+    <string name="song_new_key">Change key</string>
     <string name="song_new_key_title">Choose key</string>
     <string name="song_new_key_prompt">Choose a key for “%1$s”</string>
 </resources>

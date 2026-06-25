@@ -35,6 +35,11 @@ object ChartPdfRenderer {
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
             textAlign = Paint.Align.LEFT
         }
+        val chordPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            textAlign = Paint.Align.LEFT
+        }
         val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.DKGRAY
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD_ITALIC)
@@ -46,6 +51,7 @@ object ChartPdfRenderer {
         while (textSize >= MIN_TEXT_SIZE) {
             titlePaint.textSize = min(MAX_TITLE_SIZE, textSize + 8f)
             bodyPaint.textSize = textSize
+            chordPaint.textSize = textSize
             labelPaint.textSize = textSize
             if (measureHeight(blocks, titlePaint, bodyPaint, labelPaint, draft) <= PAGE_HEIGHT - MARGIN * 2) {
                 break
@@ -63,7 +69,7 @@ object ChartPdfRenderer {
                 y += labelPaint.fontSpacing
             }
             block.lines.forEach { line ->
-                canvas.drawText(line, MARGIN, y, bodyPaint)
+                drawLine(canvas, line, MARGIN, y, bodyPaint, chordPaint)
                 y += bodyPaint.fontSpacing
             }
             y += bodyPaint.fontSpacing * 0.35f
@@ -86,15 +92,7 @@ object ChartPdfRenderer {
         val artistPart = draft.artist?.let { " — $it" }.orEmpty()
         canvas.drawText("${draft.title}$keyPart$artistPart", MARGIN, y, paint)
         var nextY = y + paint.fontSpacing
-        val meta = buildList {
-            draft.sourceKey?.let { source ->
-                if (draft.key != null && !source.equals(draft.key, ignoreCase = true)) {
-                    add("Source key: $source → ${draft.key}")
-                }
-            }
-            draft.capo?.let { add("Capo: $it") }
-            draft.notes?.let { add(it) }
-        }.joinToString(" · ")
+        val meta = draft.notes.orEmpty()
         if (meta.isNotEmpty()) {
             paint.textSize = min(paint.textSize, 12f)
             canvas.drawText(meta, MARGIN, nextY, paint)
@@ -111,16 +109,41 @@ object ChartPdfRenderer {
         draft: ChartDraft,
     ): Float {
         var height = titlePaint.fontSpacing * 2
-        draft.sourceKey?.let {
-            if (draft.key != null && !it.equals(draft.key, ignoreCase = true)) {
-                height += 12f
-            }
-        }
+        draft.notes?.takeIf { it.isNotEmpty() }?.let { height += 12f }
         blocks.forEach { block ->
             if (block.label.isNotEmpty()) height += labelPaint.fontSpacing
             height += block.lines.size * bodyPaint.fontSpacing
             height += bodyPaint.fontSpacing * 0.35f
         }
         return height
+    }
+
+    private fun drawLine(
+        canvas: Canvas,
+        line: String,
+        x: Float,
+        y: Float,
+        bodyPaint: Paint,
+        chordPaint: Paint,
+    ) {
+        var xPos = x
+        for ((text, isChord) in parseLineSegments(line)) {
+            val paint = if (isChord) chordPaint else bodyPaint
+            canvas.drawText(text, xPos, y, paint)
+            xPos += paint.measureText(text)
+        }
+    }
+
+    private fun parseLineSegments(line: String): List<Pair<String, Boolean>> {
+        if (!line.contains('<')) return listOf(line to false)
+        val segments = mutableListOf<Pair<String, Boolean>>()
+        val pattern = Regex("""<([^>]+)>|([^<]+)""")
+        pattern.findAll(line).forEach { match ->
+            when {
+                match.groupValues[1].isNotEmpty() -> segments.add(match.groupValues[1] to true)
+                match.groupValues[2].isNotEmpty() -> segments.add(match.groupValues[2] to false)
+            }
+        }
+        return segments.ifEmpty { listOf(line to false) }
     }
 }

@@ -16,8 +16,11 @@ object ChordTransposer {
     /** Relative-minor roots that use flats (Dm, Gm, Cm, …). */
     private val FLAT_MINOR_ROOTS = setOf(2, 7, 0, 5, 10, 3, 8) // Dm, Gm, Cm, Fm, Bbm, Ebm, Abm
 
-    private val CHORD_PATTERN = Regex(
-        """(?<![A-Za-z])([A-G])([#b])?(m(?:aj(?:7|9)?|in(?:or)?(?:7|9)?|7|6|9|11|13)?|maj7|maj9|dim(?:7)?|aug|sus[24]|add\d+|M7|M)?(\d+)?(/([A-G])([#b])?)?""",
+    private val BRACKETED_CHORD = Regex("""<([^>]+)>""")
+
+    /** Legacy unbracketed charts: skip matches followed by lowercase (e.g. "Almeno"). */
+    private val LEGACY_CHORD_PATTERN = Regex(
+        """(?<![A-Za-z])([A-G])([#b])?(m(?:aj(?:7|9)?|in(?:or)?(?:7|9)?|7|6|9|11|13)?|maj7|maj9|dim(?:7)?|aug|sus[24]|add\d+|M7|M)?(\d+)?(/([A-G])([#b])?)?(?![a-z])""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -84,21 +87,34 @@ object ChordTransposer {
     fun transposeLine(line: String, semitones: Int, spellingKey: String? = null): String {
         if (semitones == 0) return line
         val preferFlat = prefersFlats(spellingKey.orEmpty())
-        return CHORD_PATTERN.replace(line) { match ->
-            val root = match.groupValues[1]
-            val acc = match.groupValues[2]
-            val quality = match.groupValues[3]
-            val extension = match.groupValues[4]
-            val bassRoot = match.groupValues[5]
-            val bassAcc = match.groupValues[6]
-            val transposedRoot = transposeNote(root, acc, semitones, preferFlat)
-            val transposedBass = if (bassRoot.isNotEmpty()) {
-                "/${transposeNote(bassRoot, bassAcc, semitones, preferFlat)}"
-            } else {
-                ""
+        if (line.contains('<')) {
+            return BRACKETED_CHORD.replace(line) { match ->
+                val transposed = transposeChordSymbol(match.groupValues[1], semitones, preferFlat)
+                "<$transposed>"
             }
-            "$transposedRoot$quality$extension$transposedBass"
         }
+        return LEGACY_CHORD_PATTERN.replace(line) { match ->
+            transposeChordSymbol(match.value, semitones, preferFlat)
+        }
+    }
+
+    private fun transposeChordSymbol(symbol: String, semitones: Int, preferFlat: Boolean): String {
+        val match = LEGACY_CHORD_PATTERN.matchEntire(symbol.trim())
+            ?: LEGACY_CHORD_PATTERN.find(symbol.trim())
+            ?: return symbol
+        val root = match.groupValues[1]
+        val acc = match.groupValues[2]
+        val quality = match.groupValues[3]
+        val extension = match.groupValues[4]
+        val bassRoot = match.groupValues[5]
+        val bassAcc = match.groupValues[6]
+        val transposedRoot = transposeNote(root, acc, semitones, preferFlat)
+        val transposedBass = if (bassRoot.isNotEmpty()) {
+            "/${transposeNote(bassRoot, bassAcc, semitones, preferFlat)}"
+        } else {
+            ""
+        }
+        return "$transposedRoot$quality$extension$transposedBass"
     }
 
     private fun transposeNote(

@@ -61,11 +61,10 @@ class ChartRetransposeViewModel(
                     val newDraft = draftAtOffset(state.sourceDraft, newOffset)
                     val pdfBytes = ChartPdfRenderer.render(newDraft)
                     state.pdfFile.writeBytes(pdfBytes)
-                    val transposeNote = transposeNoteFor(newDraft)
                     state.copy(
                         draft = newDraft,
                         semitoneOffset = newOffset,
-                        transposeNote = transposeNote,
+                        transposeNote = null,
                         previewRevision = state.previewRevision + 1,
                     )
                 }
@@ -124,7 +123,7 @@ class ChartRetransposeViewModel(
                     draft = displayDraft,
                     semitoneOffset = offset,
                     pdfFile = previewFile,
-                    transposeNote = transposeNoteFor(displayDraft),
+                    transposeNote = null,
                 )
             }
         }.onSuccess { preview ->
@@ -136,11 +135,6 @@ class ChartRetransposeViewModel(
 
     private fun draftAtOffset(source: ChartDraft, offset: Int): ChartDraft =
         if (offset == 0) source else ChordTransposer.transposeBySemitones(source, offset)
-
-    private fun transposeNoteFor(draft: ChartDraft): String? =
-        draft.sourceKey?.takeIf { source ->
-            draft.key != null && !source.equals(draft.key, ignoreCase = true)
-        }?.let { source -> "Source: $source → ${draft.key}" }
 }
 
 class ChartRetransposeViewModelFactory(

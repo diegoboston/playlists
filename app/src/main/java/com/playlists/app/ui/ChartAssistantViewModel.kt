@@ -78,6 +78,8 @@ class ChartAssistantViewModel(
     private val _savedSongId = MutableSharedFlow<Long>()
     val savedSongId: SharedFlow<Long> = _savedSongId.asSharedFlow()
 
+    private var lastSearchResults: List<SearchResult> = emptyList()
+
     fun startRecording() {
         if (_uiState.value is ChartAssistantUiState.Recording) return
         runCatching { audioRecorder.start() }
@@ -151,7 +153,15 @@ class ChartAssistantViewModel(
     fun cancelPreview() {
         val state = _uiState.value as? ChartAssistantUiState.Preview ?: return
         state.pdfFile.delete()
-        _uiState.value = ChartAssistantUiState.Idle
+        _uiState.value = if (lastSearchResults.isNotEmpty()) {
+            ChartAssistantUiState.SearchResults(
+                intent = state.intent,
+                playlist = state.playlist,
+                results = lastSearchResults,
+            )
+        } else {
+            ChartAssistantUiState.Idle
+        }
     }
 
     fun nudgePreviewKey(semitones: Int) {
@@ -164,13 +174,10 @@ class ChartAssistantViewModel(
                     val newDraft = draftAtOffset(state.sourceDraft, newOffset)
                     val pdfBytes = ChartPdfRenderer.render(newDraft)
                     state.pdfFile.writeBytes(pdfBytes)
-                    val transposeNote = newDraft.sourceKey?.takeIf { source ->
-                        newDraft.key != null && !source.equals(newDraft.key, ignoreCase = true)
-                    }?.let { source -> "Source: $source → ${newDraft.key}" }
                     state.copy(
                         draft = newDraft,
                         semitoneOffset = newOffset,
-                        transposeNote = transposeNote,
+                        transposeNote = null,
                         previewRevision = state.previewRevision + 1,
                     )
                 }
@@ -233,6 +240,7 @@ class ChartAssistantViewModel(
                 if (results.isEmpty()) {
                     _uiState.value = ChartAssistantUiState.Error("No search results")
                 } else {
+                    lastSearchResults = results
                     _uiState.value = ChartAssistantUiState.SearchResults(intent, playlist, results)
                 }
             }.onFailure {
@@ -258,10 +266,7 @@ class ChartAssistantViewModel(
                 val (draft, pdfBytes) = service.fetchAndBuildChart(result, intent)
                 val previewFile = File(context.cacheDir, "chart-preview-${System.currentTimeMillis()}.pdf")
                 previewFile.writeBytes(pdfBytes)
-                val transposeNote = draft.sourceKey?.takeIf { source ->
-                    draft.key != null && !source.equals(draft.key, ignoreCase = true)
-                }?.let { source -> "Source: $source → ${draft.key}" }
-                draft to PreviewBundle(previewFile, transposeNote)
+                draft to PreviewBundle(previewFile)
             }
         }.onSuccess { (draft, bundle) ->
             _uiState.value = ChartAssistantUiState.Preview(
@@ -271,7 +276,7 @@ class ChartAssistantViewModel(
                 draft = draft,
                 semitoneOffset = 0,
                 pdfFile = bundle.file,
-                transposeNote = bundle.transposeNote,
+                transposeNote = null,
             )
         }.onFailure {
             _uiState.value = ChartAssistantUiState.Error(it.userMessage())
@@ -313,5 +318,5 @@ class ChartAssistantViewModel(
         else -> message ?: "Something went wrong"
     }
 
-    private data class PreviewBundle(val file: File, val transposeNote: String?)
+    private data class PreviewBundle(val file: File)
 }

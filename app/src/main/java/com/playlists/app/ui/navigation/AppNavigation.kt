@@ -25,6 +25,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.playlists.app.R
@@ -102,6 +103,8 @@ fun AppNavigation(
     retryInstallApk: (File) -> Unit,
 ) {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val onSettingsScreen = navBackStackEntry?.destination?.route == Routes.SETTINGS
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val updateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
@@ -178,6 +181,7 @@ fun AppNavigation(
                     SettingsScreen(
                         viewModel = viewModel,
                         onBack = onBack,
+                        onInstallUpdate = retryInstallApk,
                     )
                 }
                 composable(Routes.QUICKSTART) { entry ->
@@ -278,12 +282,14 @@ fun AppNavigation(
                 }
             }
 
-            updateState?.let { state ->
-                AppUpdateBanner(
-                    state = state,
-                    onDismiss = { viewModel.clearAppUpdateState() },
-                    onInstall = { apk -> retryInstallApk(apk) },
-                )
+            if (!onSettingsScreen) {
+                updateState?.let { state ->
+                    AppUpdateBanner(
+                        state = state,
+                        onDismiss = { viewModel.clearAppUpdateState() },
+                        onInstall = { apk -> retryInstallApk(apk) },
+                    )
+                }
             }
         }
     }

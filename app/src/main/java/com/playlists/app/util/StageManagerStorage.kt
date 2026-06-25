@@ -54,4 +54,13 @@ object StageManagerStorage {
             root().isDirectory && songsDir().isDirectory
         }.getOrDefault(false)
     }
+
+    /** Total bytes under the StageManager library folder (songs, DB, chart sidecars, state). */
+    fun librarySizeBytes(): Long = directorySizeBytes(root())
+
+    internal fun directorySizeBytes(dir: File): Long {
+        if (!dir.exists()) return 0L
+        if (dir.isFile) return dir.length()
+        return dir.listFiles()?.sumOf { directorySizeBytes(it) } ?: 0L
+    }
 }

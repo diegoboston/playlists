@@ -3,6 +3,7 @@ package com.playlists.app.ui.screens
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
@@ -93,12 +94,24 @@ fun ChartAssistantScreen(
         }
     }
 
+    val handleBack = {
+        if (state is ChartAssistantUiState.Preview) {
+            viewModel.cancelPreview()
+        } else {
+            onBack()
+        }
+    }
+
+    if (state is ChartAssistantUiState.Preview) {
+        BackHandler(onBack = handleBack)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.chart_assistant_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = handleBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
