@@ -78,6 +78,46 @@ class ChordTransposerTest {
     }
 
     @Test
+    fun transposeLine_halfDiminishedAndAlterations() {
+        assertEquals(
+            "<Am7b5>",
+            ChordTransposer.transposeLine("<Bbm7b5>", -1, "Am"),
+        )
+        assertEquals(
+            "<G7b9>",
+            ChordTransposer.transposeLine("<Ab7b9>", -1, "G"),
+        )
+        assertEquals(
+            "<F#m7(b5)>",
+            ChordTransposer.transposeLine("<Gm7(b5)>", -1, "F#m"),
+        )
+        assertEquals(
+            "<Cmaj7#11>",
+            ChordTransposer.transposeLine("<Dbmaj7#11>", -1, "C"),
+        )
+    }
+
+    @Test
+    fun transposeLine_slashBassAndSpellingOverride() {
+        assertEquals(
+            "<B/F#>",
+            ChordTransposer.transposeLine("<A/E>", 2, "G", AccidentalSpelling.Sharps),
+        )
+        assertEquals(
+            "<Am7/E>",
+            ChordTransposer.transposeLine("<Am7/E>", 0, "Am", AccidentalSpelling.Auto),
+        )
+        assertEquals(
+            "<Bb>",
+            ChordTransposer.transposeLine("<A#>", 0, "F", AccidentalSpelling.Flats),
+        )
+        assertEquals(
+            "<A#>",
+            ChordTransposer.transposeLine("<Bb>", 0, "G", AccidentalSpelling.Sharps),
+        )
+    }
+
+    @Test
     fun transposeBySemitones_usesFirstChordWhenKeyMissing() {
         val draft = com.playlists.app.ai.ChartDraft(
             title = "Test",

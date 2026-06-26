@@ -22,6 +22,7 @@ import com.playlists.app.find.SearchResult
 import com.playlists.app.util.AiCredentialStore
 import com.playlists.app.util.AudioRecorder
 import com.playlists.app.render.ChartPdfRenderer
+import com.playlists.app.render.AccidentalSpelling
 import com.playlists.app.render.ChordTransposer
 import com.playlists.app.util.ChartDraftStore
 import com.playlists.app.util.FileStorage
@@ -59,6 +60,8 @@ sealed class ChartAssistantUiState {
         val pdfFile: File,
         val transposeNote: String?,
         val previewRevision: Int = 0,
+        val spellingPreference: AccidentalSpelling = AccidentalSpelling.Auto,
+        val chartKeyGuessed: Boolean = false,
     ) : ChartAssistantUiState()
     data class Error(val message: String) : ChartAssistantUiState()
 }
@@ -195,14 +198,10 @@ class ChartAssistantViewModel(
             runCatching {
                 withContext(Dispatchers.IO) {
                     val newOffset = state.semitoneOffset + semitones
-                    val newDraft = draftAtOffset(state.sourceDraft, newOffset)
-                    val pdfBytes = ChartPdfRenderer.render(newDraft)
-                    state.pdfFile.writeBytes(pdfBytes)
-                    state.copy(
-                        draft = newDraft,
+                    renderPreviewState(
+                        state = state,
                         semitoneOffset = newOffset,
-                        transposeNote = null,
-                        previewRevision = state.previewRevision + 1,
+                        spellingPreference = AccidentalSpelling.Auto,
                     )
                 }
             }.onSuccess { updated ->
@@ -213,8 +212,73 @@ class ChartAssistantViewModel(
         }
     }
 
-    private fun draftAtOffset(source: ChartDraft, offset: Int): ChartDraft =
-        if (offset == 0) source else ChordTransposer.transposeBySemitones(source, offset)
+    fun setChartKey(chartKey: String) {
+        val trimmed = chartKey.trim()
+        if (trimmed.isEmpty()) return
+        val state = _uiState.value as? ChartAssistantUiState.Preview ?: return
+        if (trimmed.equals(state.sourceDraft.chartKeyLabel(), ignoreCase = true)) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    renderPreviewState(
+                        state = state.copy(
+                            sourceDraft = state.sourceDraft.withChartKey(trimmed),
+                            chartKeyGuessed = false,
+                        ),
+                        semitoneOffset = 0,
+                        spellingPreference = AccidentalSpelling.Auto,
+                    )
+                }
+            }.onSuccess { updated ->
+                _uiState.value = updated
+            }.onFailure {
+                _uiState.value = ChartAssistantUiState.Error(it.message ?: "Could not set chart key")
+            }
+        }
+    }
+
+    fun setSpellingPreference(spelling: AccidentalSpelling) {
+        val state = _uiState.value as? ChartAssistantUiState.Preview ?: return
+        if (state.spellingPreference == spelling) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    renderPreviewState(
+                        state = state,
+                        semitoneOffset = state.semitoneOffset,
+                        spellingPreference = spelling,
+                    )
+                }
+            }.onSuccess { updated ->
+                _uiState.value = updated
+            }.onFailure {
+                _uiState.value = ChartAssistantUiState.Error(it.message ?: "Transpose failed")
+            }
+        }
+    }
+
+    private fun draftAtOffset(
+        source: ChartDraft,
+        offset: Int,
+        spelling: AccidentalSpelling = AccidentalSpelling.Auto,
+    ): ChartDraft = ChordTransposer.transposeBySemitones(source, offset, spelling)
+
+    private fun renderPreviewState(
+        state: ChartAssistantUiState.Preview,
+        semitoneOffset: Int,
+        spellingPreference: AccidentalSpelling,
+    ): ChartAssistantUiState.Preview {
+        val newDraft = draftAtOffset(state.sourceDraft, semitoneOffset, spellingPreference)
+        val pdfBytes = ChartPdfRenderer.render(newDraft)
+        state.pdfFile.writeBytes(pdfBytes)
+        return state.copy(
+            draft = newDraft,
+            semitoneOffset = semitoneOffset,
+            spellingPreference = spellingPreference,
+            transposeNote = null,
+            previewRevision = state.previewRevision + 1,
+        )
+    }
 
     private suspend fun processAudio(audioFile: File) {
         val context = getApplication<Application>()
@@ -301,6 +365,7 @@ class ChartAssistantViewModel(
                 semitoneOffset = 0,
                 pdfFile = bundle.file,
                 transposeNote = null,
+                chartKeyGuessed = draft.isChartKeyGuessed(),
             )
         }.onFailure {
             _uiState.value = ChartAssistantUiState.Error(it.userMessage())

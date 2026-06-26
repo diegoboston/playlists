@@ -3,6 +3,12 @@ package com.playlists.app.render
 import com.playlists.app.ai.ChartDraft
 import com.playlists.app.ai.ChartSection
 
+enum class AccidentalSpelling {
+    Auto,
+    Flats,
+    Sharps,
+}
+
 object ChordTransposer {
     private val CHROMATIC_SHARP = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
     private val FLAT_TO_SHARP = mapOf(
@@ -18,8 +24,9 @@ object ChordTransposer {
 
     private val BRACKETED_CHORD = Regex("""<([^>]+)>""")
 
+    /** Root + free-form suffix + optional slash bass (e.g. Bbm7b5, G7#9, F/C). */
     private val CHORD_SYMBOL = Regex(
-        """^([A-G])([#b])?(m(?:aj(?:7|9)?|in(?:or)?(?:7|9)?|7|6|9|11|13)?|maj7|maj9|dim(?:7)?|aug|sus[24]|add\d+|M7|M)?(\d+)?(/([A-G])([#b])?)?$""",
+        """^([A-G])([#b])?(.*?)(?:/([A-G])([#b])?)?$""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -36,20 +43,28 @@ object ChordTransposer {
             return draft.withTargetKey(targetKey)
         }
         val semitones = semitonesBetween(source, targetKey) ?: return draft.withTargetKey(targetKey)
-        return applySemitones(draft, semitones, targetKey)
+        return applySemitones(draft, semitones, targetKey, AccidentalSpelling.Auto)
     }
 
     /** Shift source chart up or down by half-steps (semitones) from its source key. */
-    fun transposeBySemitones(draft: ChartDraft, semitones: Int): ChartDraft {
-        if (semitones == 0) return draft
+    fun transposeBySemitones(
+        draft: ChartDraft,
+        semitones: Int,
+        spelling: AccidentalSpelling = AccidentalSpelling.Auto,
+    ): ChartDraft {
+        if (semitones == 0 && spelling == AccidentalSpelling.Auto) return draft
         val sourceKey = draft.sourceKey ?: draft.key ?: draft.firstChord() ?: "C"
-        val newKey = shiftKey(sourceKey, semitones)
-        return applySemitones(draft, semitones, newKey)
+        val newKey = shiftKey(sourceKey, semitones, spelling)
+        return applySemitones(draft, semitones, newKey, spelling)
     }
 
-    fun shiftKey(key: String, semitones: Int): String {
+    fun shiftKey(
+        key: String,
+        semitones: Int,
+        spelling: AccidentalSpelling = AccidentalSpelling.Auto,
+    ): String {
         val trimmed = key.trim()
-        if (trimmed.isEmpty()) return spellNote(semitones.mod(12), false)
+        if (trimmed.isEmpty()) return spellNote(semitones.mod(12), preferFlatForSpelling(spelling, 0, false))
         val match = Regex("""^([A-G])([#b]?)(.*)$""", RegexOption.IGNORE_CASE).find(trimmed)
             ?: return trimmed
         val suffix = match.groupValues[3]
@@ -57,7 +72,8 @@ object ChordTransposer {
         val newRootSem = (rootSem + semitones).mod(12)
         val isMinor = suffix.startsWith("m", ignoreCase = true) &&
             !suffix.startsWith("maj", ignoreCase = true)
-        val newRoot = spellNote(newRootSem, prefersFlats(newRootSem, isMinor))
+        val preferFlat = preferFlatForSpelling(spelling, newRootSem, isMinor)
+        val newRoot = spellNote(newRootSem, preferFlat)
         return newRoot + suffix
     }
 
@@ -76,38 +92,75 @@ object ChordTransposer {
     private fun prefersFlats(rootSemitone: Int, isMinor: Boolean): Boolean =
         if (isMinor) rootSemitone in FLAT_MINOR_ROOTS else rootSemitone in FLAT_MAJOR_ROOTS
 
-    private fun applySemitones(draft: ChartDraft, semitones: Int, newKey: String): ChartDraft =
+    private fun applySemitones(
+        draft: ChartDraft,
+        semitones: Int,
+        newKey: String,
+        spelling: AccidentalSpelling = AccidentalSpelling.Auto,
+    ): ChartDraft =
         draft.copy(
             key = newKey,
             sections = draft.sections.map { section ->
-                section.copy(lines = section.lines.map { transposeLine(it, semitones, newKey) })
+                section.copy(
+                    lines = section.lines.map { transposeLine(it, semitones, newKey, spelling) },
+                )
             },
         )
 
-    fun transposeLine(line: String, semitones: Int, spellingKey: String? = null): String {
-        if (semitones == 0) return line
-        val preferFlat = prefersFlats(spellingKey.orEmpty())
+    fun transposeLine(
+        line: String,
+        semitones: Int,
+        spellingKey: String? = null,
+        spelling: AccidentalSpelling = AccidentalSpelling.Auto,
+    ): String {
+        if (semitones == 0 && spelling == AccidentalSpelling.Auto) return line
+        val preferFlat = preferFlatForSpelling(spelling, spellingKey)
         return BRACKETED_CHORD.replace(line) { match ->
             val transposed = transposeChordSymbol(match.groupValues[1], semitones, preferFlat)
             "<$transposed>"
         }
     }
 
+    private fun preferFlatForSpelling(
+        spelling: AccidentalSpelling,
+        spellingKey: String?,
+    ): Boolean = preferFlatForSpelling(
+        spelling,
+        rootSemitone(spellingKey.orEmpty()) ?: 0,
+        isMinorKey(spellingKey.orEmpty()),
+    )
+
+    private fun preferFlatForSpelling(
+        spelling: AccidentalSpelling,
+        rootSemitone: Int,
+        isMinor: Boolean,
+    ): Boolean = when (spelling) {
+        AccidentalSpelling.Auto -> prefersFlats(rootSemitone, isMinor)
+        AccidentalSpelling.Flats -> true
+        AccidentalSpelling.Sharps -> false
+    }
+
+    private fun isMinorKey(key: String): Boolean {
+        val match = Regex("""^([A-G])([#b]?)(.*)$""", RegexOption.IGNORE_CASE).find(key.trim()) ?: return false
+        val suffix = match.groupValues[3]
+        return suffix.startsWith("m", ignoreCase = true) &&
+            !suffix.startsWith("maj", ignoreCase = true)
+    }
+
     private fun transposeChordSymbol(symbol: String, semitones: Int, preferFlat: Boolean): String {
         val match = CHORD_SYMBOL.matchEntire(symbol.trim()) ?: return symbol
         val root = match.groupValues[1]
         val acc = match.groupValues[2]
-        val quality = match.groupValues[3]
-        val extension = match.groupValues[4]
-        val bassRoot = match.groupValues[5]
-        val bassAcc = match.groupValues[6]
+        val suffix = match.groupValues[3]
+        val bassRoot = match.groupValues[4]
+        val bassAcc = match.groupValues[5]
         val transposedRoot = transposeNote(root, acc, semitones, preferFlat)
         val transposedBass = if (bassRoot.isNotEmpty()) {
             "/${transposeNote(bassRoot, bassAcc, semitones, preferFlat)}"
         } else {
             ""
         }
-        return "$transposedRoot$quality$extension$transposedBass"
+        return "$transposedRoot$suffix$transposedBass"
     }
 
     private fun transposeNote(

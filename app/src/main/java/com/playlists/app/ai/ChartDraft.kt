@@ -40,6 +40,18 @@ data class ChartDraft(
     fun displayKeyLabel(): String? =
         key.normalizeOptionalField() ?: sourceKey.normalizeOptionalField() ?: firstChord()
 
+    /** Source/chart key anchor (not transposed play key). */
+    fun chartKeyLabel(): String? =
+        sourceKey.normalizeOptionalField() ?: key.normalizeOptionalField() ?: firstChord()
+
+    /** True when no key was stated on the page (label comes from first chord). */
+    fun isChartKeyGuessed(): Boolean = sourceKey.isNullOrBlank()
+
+    fun withChartKey(chartKey: String): ChartDraft {
+        val trimmed = chartKey.trim()
+        return copy(sourceKey = trimmed, key = trimmed)
+    }
+
     fun toJson(): JSONObject {
         val json = JSONObject()
             .put("title", title)

@@ -4,11 +4,42 @@
 
 ---
 
-## Unreleased — chart key UI, share import, settings
+## 1.0.50 · `ac40ff4` — changes on import
 
-- Chart preview no longer shows “null” for a missing key — uses the first chord in the chart instead; transposer only rewrites bracketed `<chord>` tokens.
+**Released:** 2026-06-25 (5:18 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/ac40ff49ae24908f440a2013a12daa0a782b61d6)
+
 - Share a chord-page **URL** to Stage Manager to open **Find chart** and extract the page (same as picking a search result); saves to the **archive**, or also adds to the **open playlist** if you shared while viewing one. PDF/image shares still use the normal import dialog.
+- Find chart works without a playlist context — archive-only flow with **Add to archive** confirm.
 - Settings: OpenAI key validation keeps the green check only (removed redundant “key accepted” text).
+
+---
+
+## 1.0.49 · `ab54932` — minor transpose fixes
+
+**Released:** 2026-06-25 (11:43 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/ab549326a458bd473c8ec894bb02e85700081e69)
+
+- Chart preview key label falls back to the first `<chord>` in the chart when the draft has no explicit key.
+- Transposer only rewrites bracketed `<chord>` tokens (drops legacy bare-chord matching inside lyrics).
+- Transpose ± uses the first chord as the source key when `key` and `sourceKey` are missing.
+
+---
+
+## 1.0.48 · `cabe04b` — don't show null key
+
+**Released:** 2026-06-25 (11:14 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/cabe04b09e81270399669c4f8cbcf06dcfb7973d)
+
+- JSON null or missing key fields no longer render as the literal string “null” in PDF headers or the key preview.
+- Optional AI fields (artist, capo, notes, source URL) normalized the same way.
+
+---
+
+## 1.0.47 · `39818e1` — improve AI/storage count
+
+**Released:** 2026-06-25 (10:49 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/39818e1e6097902afed451eff194cf21f0c80372)
+
+- Settings **Storage** row shows total library size under `Music/StageManager` (song files, chart sidecars, database, and state).
+- AI chart generation uses bracketed `<chord>` tokens; PDF renders chords in bold monospace separate from lyric lines.
+- In-app update download/install banner appears on Settings (hidden on other screens while Settings is open).
 
 ---
 

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.playlists.app.ai.ChartDraft
 import com.playlists.app.data.Song
 import com.playlists.app.render.ChartPdfRenderer
+import com.playlists.app.render.AccidentalSpelling
 import com.playlists.app.render.ChordTransposer
 import com.playlists.app.util.ChartDraftStore
 import com.playlists.app.util.SongStoragePaths
@@ -32,6 +33,8 @@ sealed class ChartRetransposeUiState {
         val pdfFile: File,
         val transposeNote: String?,
         val previewRevision: Int = 0,
+        val spellingPreference: AccidentalSpelling = AccidentalSpelling.Auto,
+        val chartKeyGuessed: Boolean = false,
     ) : ChartRetransposeUiState()
     data class Error(val message: String) : ChartRetransposeUiState()
 }
@@ -58,14 +61,55 @@ class ChartRetransposeViewModel(
             runCatching {
                 withContext(Dispatchers.IO) {
                     val newOffset = state.semitoneOffset + semitones
-                    val newDraft = draftAtOffset(state.sourceDraft, newOffset)
-                    val pdfBytes = ChartPdfRenderer.render(newDraft)
-                    state.pdfFile.writeBytes(pdfBytes)
-                    state.copy(
-                        draft = newDraft,
+                    renderPreviewState(
+                        state = state,
                         semitoneOffset = newOffset,
-                        transposeNote = null,
-                        previewRevision = state.previewRevision + 1,
+                        spellingPreference = AccidentalSpelling.Auto,
+                    )
+                }
+            }.onSuccess { updated ->
+                _uiState.value = updated
+            }.onFailure {
+                _uiState.value = ChartRetransposeUiState.Error(it.message ?: "Transpose failed")
+            }
+        }
+    }
+
+    fun setChartKey(chartKey: String) {
+        val trimmed = chartKey.trim()
+        if (trimmed.isEmpty()) return
+        val state = _uiState.value as? ChartRetransposeUiState.Preview ?: return
+        if (trimmed.equals(state.sourceDraft.chartKeyLabel(), ignoreCase = true)) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    renderPreviewState(
+                        state = state.copy(
+                            sourceDraft = state.sourceDraft.withChartKey(trimmed),
+                            chartKeyGuessed = false,
+                        ),
+                        semitoneOffset = 0,
+                        spellingPreference = AccidentalSpelling.Auto,
+                    )
+                }
+            }.onSuccess { updated ->
+                _uiState.value = updated
+            }.onFailure {
+                _uiState.value = ChartRetransposeUiState.Error(it.message ?: "Could not set chart key")
+            }
+        }
+    }
+
+    fun setSpellingPreference(spelling: AccidentalSpelling) {
+        val state = _uiState.value as? ChartRetransposeUiState.Preview ?: return
+        if (state.spellingPreference == spelling) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    renderPreviewState(
+                        state = state,
+                        semitoneOffset = state.semitoneOffset,
+                        spellingPreference = spelling,
                     )
                 }
             }.onSuccess { updated ->
@@ -83,6 +127,7 @@ class ChartRetransposeViewModel(
                 withContext(Dispatchers.IO) {
                     val pdfFile = SongStoragePaths.resolve(state.song.filePath)
                     pdfFile.writeBytes(state.pdfFile.readBytes())
+                    ChartDraftStore.save(state.sourceDraft, state.song.filePath)
                     songRepo.update(
                         state.song.copy(keySignature = state.draft.key.orEmpty()),
                     )
@@ -124,6 +169,7 @@ class ChartRetransposeViewModel(
                     semitoneOffset = offset,
                     pdfFile = previewFile,
                     transposeNote = null,
+                    chartKeyGuessed = sourceDraft.isChartKeyGuessed(),
                 )
             }
         }.onSuccess { preview ->
@@ -133,8 +179,28 @@ class ChartRetransposeViewModel(
         }
     }
 
-    private fun draftAtOffset(source: ChartDraft, offset: Int): ChartDraft =
-        if (offset == 0) source else ChordTransposer.transposeBySemitones(source, offset)
+    private fun draftAtOffset(
+        source: ChartDraft,
+        offset: Int,
+        spelling: AccidentalSpelling = AccidentalSpelling.Auto,
+    ): ChartDraft = ChordTransposer.transposeBySemitones(source, offset, spelling)
+
+    private fun renderPreviewState(
+        state: ChartRetransposeUiState.Preview,
+        semitoneOffset: Int,
+        spellingPreference: AccidentalSpelling,
+    ): ChartRetransposeUiState.Preview {
+        val newDraft = draftAtOffset(state.sourceDraft, semitoneOffset, spellingPreference)
+        val pdfBytes = ChartPdfRenderer.render(newDraft)
+        state.pdfFile.writeBytes(pdfBytes)
+        return state.copy(
+            draft = newDraft,
+            semitoneOffset = semitoneOffset,
+            spellingPreference = spellingPreference,
+            transposeNote = null,
+            previewRevision = state.previewRevision + 1,
+        )
+    }
 }
 
 class ChartRetransposeViewModelFactory(

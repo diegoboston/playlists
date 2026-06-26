@@ -47,6 +47,19 @@ class OpenAiClientTest {
         assertTrue(error.message!!.contains("401"))
     }
 
+    @Test
+    fun fetchCreditBalance_readsCreditGrants() {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"total_granted":5.0,"total_used":1.5,"total_available":3.5}""",
+            ),
+        )
+        val balance = clientForServer().fetchCreditBalance()
+        assertTrue(balance != null)
+        assertTrue(balance!!.availableUsd == 3.5)
+        assertTrue(server.takeRequest().path!!.contains("credit_grants"))
+    }
+
     private fun clientForServer(): OpenAiClient {
         val http = OkHttpClient.Builder()
             .addInterceptor { chain ->

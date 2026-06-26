@@ -68,6 +68,7 @@ import com.playlists.app.ui.ChartAssistantUiState
 import com.playlists.app.ui.ChartAssistantViewModel
 import com.playlists.app.ui.ChartAssistantViewModelFactory
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.render.AccidentalSpelling
 import com.playlists.app.ui.components.ChartKeyPreviewContent
 import com.playlists.app.util.AiCredentialStore
 
@@ -133,6 +134,9 @@ fun ChartAssistantScreen(
                 modifier = Modifier.padding(padding),
                 state = current,
                 onNudgeKey = viewModel::nudgePreviewKey,
+                onSelectChartKey = viewModel::setChartKey,
+                onPreferFlats = { viewModel.setSpellingPreference(AccidentalSpelling.Flats) },
+                onPreferSharps = { viewModel.setSpellingPreference(AccidentalSpelling.Sharps) },
                 onConfirm = viewModel::confirmSave,
                 onCancel = viewModel::cancelPreview,
             )
@@ -348,6 +352,9 @@ private fun PreviewContent(
     modifier: Modifier = Modifier,
     state: ChartAssistantUiState.Preview,
     onNudgeKey: (Int) -> Unit,
+    onSelectChartKey: (String) -> Unit,
+    onPreferFlats: () -> Unit,
+    onPreferSharps: () -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -365,7 +372,9 @@ private fun PreviewContent(
                 state.draft.title,
             )
         },
-        keyLabel = state.draft.displayKeyLabel(),
+        chartKeyLabel = state.sourceDraft.chartKeyLabel(),
+        playKeyLabel = state.draft.displayKeyLabel(),
+        chartKeyGuessed = state.chartKeyGuessed,
         transposeNote = state.transposeNote,
         previewRevision = state.previewRevision,
         pdfFile = state.pdfFile,
@@ -377,6 +386,10 @@ private fun PreviewContent(
             },
         ),
         onNudgeKey = onNudgeKey,
+        onSelectChartKey = onSelectChartKey,
+        spellingPreference = state.spellingPreference,
+        onPreferFlats = onPreferFlats,
+        onPreferSharps = onPreferSharps,
         onConfirm = onConfirm,
         onCancel = onCancel,
     )

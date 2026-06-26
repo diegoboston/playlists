@@ -96,4 +96,41 @@ class ChartDraftStoreTest {
         )
         assertEquals("G", draft.displayKeyLabel())
     }
+
+    @Test
+    fun withChartKey_updatesSourceAndKeyFields() {
+        val draft = ChartDraft(
+            title = "Test Song",
+            artist = null,
+            sourceKey = null,
+            key = null,
+            capo = null,
+            columns = 1,
+            sections = listOf(ChartSection("Verse", listOf("<Am> hello"))),
+            notes = null,
+            sourceUrl = null,
+        )
+        val updated = draft.withChartKey("G")
+        assertEquals("G", updated.sourceKey)
+        assertEquals("G", updated.key)
+        assertEquals("G", updated.chartKeyLabel())
+        assertEquals(false, updated.isChartKeyGuessed())
+    }
+
+    @Test
+    fun isChartKeyGuessed_whenSourceKeyMissing() {
+        val draft = ChartDraft(
+            title = "Test Song",
+            artist = null,
+            sourceKey = null,
+            key = null,
+            capo = null,
+            columns = 1,
+            sections = listOf(ChartSection("Verse", listOf("<Am> hello"))),
+            notes = null,
+            sourceUrl = null,
+        )
+        assertEquals(true, draft.isChartKeyGuessed())
+        assertEquals("Am", draft.chartKeyLabel())
+    }
 }

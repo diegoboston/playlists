@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.Modifier
@@ -52,7 +53,7 @@ fun PlaylistPlaybackScreen(
 ) {
     var frames by remember { mutableStateOf<List<PlaybackFrame>>(emptyList()) }
     var songCount by remember { mutableIntStateOf(0) }
-    var currentIndex by remember { mutableIntStateOf(0) }
+    var currentIndex by rememberSaveable(playlistId) { mutableIntStateOf(0) }
     var restartTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(playlistId) {
@@ -66,7 +67,7 @@ fun PlaylistPlaybackScreen(
         if (frames.isEmpty()) {
             onBack()
         } else {
-            currentIndex = 0
+            currentIndex = currentIndex.coerceIn(0, frames.lastIndex)
         }
     }
 

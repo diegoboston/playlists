@@ -120,6 +120,15 @@
     <string name="settings_openai_key_valid">key accepted</string>
     <string name="settings_openai_key_invalid">OpenAI key failed</string>
     <string name="settings_openai_key_testing">Testing OpenAI key…</string>
+    <string name="settings_openai_credit_loading">Checking OpenAI credit…</string>
+    <string name="settings_openai_credit_remaining">Remaining credit: $%1$.2f</string>
+    <string name="settings_openai_credit_unavailable">Credit balance unavailable for this key</string>
+    <string name="chart_key_label">Chart key</string>
+    <string name="chart_key_play_in">Play in</string>
+    <string name="chart_key_guessed">Guessed from first chord — tap chart key if wrong</string>
+    <string name="chart_key_picker_title">Chart key</string>
+    <string name="chart_key_prefer_flats">Prefer flat chord spellings</string>
+    <string name="chart_key_prefer_sharps">Prefer sharp chord spellings</string>
     <string name="chart_assistant_title">Find chart</string>
     <string name="chart_assistant_mic">Voice search</string>
     <string name="chart_assistant_hold_mic">Hold the mic and say e.g. “Search chords and lyrics for Amazing Grace by John Newton”</string>

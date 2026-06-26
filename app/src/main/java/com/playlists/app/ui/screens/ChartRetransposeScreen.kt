@@ -28,6 +28,7 @@ import com.playlists.app.R
 import com.playlists.app.ui.ChartRetransposeUiState
 import com.playlists.app.ui.ChartRetransposeViewModel
 import com.playlists.app.ui.ChartRetransposeViewModelFactory
+import com.playlists.app.render.AccidentalSpelling
 import com.playlists.app.ui.components.ChartKeyPreviewContent
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,12 +76,18 @@ fun ChartRetransposeScreen(
             is ChartRetransposeUiState.Preview -> ChartKeyPreviewContent(
                 modifier = Modifier.padding(padding),
                 title = stringResource(R.string.song_new_key_prompt, current.song.title),
-                keyLabel = current.draft.displayKeyLabel(),
+                chartKeyLabel = current.sourceDraft.chartKeyLabel(),
+                playKeyLabel = current.draft.displayKeyLabel(),
+                chartKeyGuessed = current.chartKeyGuessed,
                 transposeNote = current.transposeNote,
                 previewRevision = current.previewRevision,
                 pdfFile = current.pdfFile,
                 confirmLabel = stringResource(R.string.save),
                 onNudgeKey = viewModel::nudgePreviewKey,
+                onSelectChartKey = viewModel::setChartKey,
+                spellingPreference = current.spellingPreference,
+                onPreferFlats = { viewModel.setSpellingPreference(AccidentalSpelling.Flats) },
+                onPreferSharps = { viewModel.setSpellingPreference(AccidentalSpelling.Sharps) },
                 onConfirm = viewModel::confirmSave,
                 onCancel = {
                     viewModel.cancelPreview()
