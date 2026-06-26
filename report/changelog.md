@@ -4,6 +4,26 @@
 
 ---
 
+## `0e74654` — PDF playlist export/fix view UI for songs
+
+**2026-06-26 (11:47 AM EDT)** · [commit](https://github.com/diegoboston/playlists/commit/0e746542f2f39259c8db4f03144885a1a7653bc6)
+
+- **Export PDF** on playlist detail (**⋮**): set-list table of contents (playlist name + song titles with keys) then every chart page in order; PDF charts merged as **vector pages** (original page size), photos embedded on letter pages; raster fallback if a PDF cannot import.
+- Song viewer: single-page PDFs use pinch zoom; multi-page PDF pager fixes (page indicator, empty-state handling).
+- Settings: **OpenAI billing overview** link replaces the in-app credit balance row.
+
+---
+
+## 1.0.51 · `aeac535` — key change fixes/show OpenAI credit
+
+**Released:** 2026-06-26 (10:44 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/aeac535de97a15455391621f985fc05413788b50)
+
+- Find chart / **New key** preview separates **Chart key** (source) from **Play in** (transposed); tap **Chart key** to pick from a key sheet; hint when the key was guessed from the first chord.
+- Transpose ± can prefer **flat** or **sharp** spellings; transposer handles richer chord suffixes (e.g. m7b5, G7#9, slash chords).
+- Settings shows **remaining OpenAI credit** ($) after the API key validates.
+
+---
+
 ## 1.0.50 · `ac40ff4` — changes on import
 
 **Released:** 2026-06-25 (5:18 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/ac40ff49ae24908f440a2013a12daa0a782b61d6)

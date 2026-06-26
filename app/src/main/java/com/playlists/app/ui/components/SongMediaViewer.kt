@@ -37,6 +37,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/** Single-page media for [PlaybackStage] (tap/swipe nav and zoom live in the stage). */
+@Composable
+fun PlaybackSongMedia(
+    file: File,
+    fileType: FileType,
+    pageIndex: Int,
+    modifier: Modifier = Modifier,
+) {
+    if (!file.exists()) return
+    SongMediaViewer(
+        file = file,
+        fileType = fileType,
+        modifier = modifier,
+        pdfPageIndex = if (fileType == FileType.PDF) pageIndex else null,
+        enableZoom = false,
+    )
+}
+
 @Composable
 fun SongMediaViewer(
     file: File,

@@ -1,5 +1,7 @@
 package com.playlists.app.ui.screens
 
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -15,9 +17,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -27,11 +31,15 @@ import com.playlists.app.data.Song
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDeletePrompt
 import com.playlists.app.ui.SongTitleWithKey
+import com.playlists.app.ui.PdfHelper
 import com.playlists.app.ui.components.EditSongDialog
-import com.playlists.app.ui.components.SongMediaViewer
+import com.playlists.app.ui.components.PlaybackSongMedia
+import com.playlists.app.ui.components.PlaybackStage
 import com.playlists.app.util.ChartDraftStore
 import com.playlists.app.util.SongStoragePaths
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,6 +70,21 @@ fun SongViewScreen(
 
     val fileType = runCatching { FileType.valueOf(loaded.fileType) }.getOrDefault(FileType.IMAGE)
     val hasChartSource = ChartDraftStore.hasChart(loaded.filePath)
+    var pageCount by remember(file) { mutableIntStateOf(1) }
+    var pageIndex by rememberSaveable(songId) { mutableIntStateOf(0) }
+
+    LaunchedEffect(file, fileType) {
+        pageCount = when (fileType) {
+            FileType.IMAGE -> 1
+            FileType.PDF -> withContext(Dispatchers.IO) {
+                PdfHelper.pageCount(file).coerceAtLeast(1)
+            }
+        }
+    }
+
+    LaunchedEffect(songId, pageCount) {
+        pageIndex = pageIndex.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+    }
 
     if (showEdit) {
         EditSongDialog(
@@ -121,12 +144,25 @@ fun SongViewScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    SongTitleWithKey(
-                        title = loaded.title,
-                        keySignature = loaded.keySignature,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 2,
-                    )
+                    Column {
+                        SongTitleWithKey(
+                            title = loaded.title,
+                            keySignature = loaded.keySignature,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 2,
+                        )
+                        if (pageCount > 1) {
+                            Text(
+                                text = stringResource(
+                                    R.string.playback_page_indicator,
+                                    pageIndex + 1,
+                                    pageCount,
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -141,12 +177,23 @@ fun SongViewScreen(
             )
         },
     ) { padding ->
-        SongMediaViewer(
-            file = file,
-            fileType = fileType,
+        PlaybackStage(
+            contentKey = songId to pageIndex,
+            canGoPrev = pageIndex > 0,
+            canGoNext = pageIndex < pageCount - 1,
+            onPrev = { if (pageIndex > 0) pageIndex-- },
+            onNext = { if (pageIndex < pageCount - 1) pageIndex++ },
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-        )
+                .padding(padding)
+                .focusable(),
+        ) {
+            PlaybackSongMedia(
+                file = file,
+                fileType = fileType,
+                pageIndex = pageIndex,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }

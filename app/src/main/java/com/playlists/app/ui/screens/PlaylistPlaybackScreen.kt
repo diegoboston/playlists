@@ -29,8 +29,8 @@ import com.playlists.app.ui.PlaybackFrame
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.buildPlaybackFrames
+import com.playlists.app.ui.components.PlaybackSongMedia
 import com.playlists.app.ui.components.PlaybackStage
-import com.playlists.app.ui.components.SongMediaViewer
 import com.playlists.app.util.SongStoragePaths
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -130,15 +130,13 @@ fun PlaylistPlaybackScreen(
         ) {
             val item = frame
             val file = SongStoragePaths.resolve(item.entry.filePath)
-            if (!file.exists()) return@PlaybackStage
             val fileType = runCatching { FileType.valueOf(item.entry.fileType) }
                 .getOrDefault(FileType.IMAGE)
-            SongMediaViewer(
+            PlaybackSongMedia(
                 file = file,
                 fileType = fileType,
+                pageIndex = item.pageIndex,
                 modifier = Modifier.fillMaxSize(),
-                pdfPageIndex = if (fileType == FileType.PDF) item.pageIndex else null,
-                enableZoom = false,
             )
         }
     }
