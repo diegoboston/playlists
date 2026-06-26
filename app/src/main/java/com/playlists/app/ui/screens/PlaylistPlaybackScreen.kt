@@ -25,24 +25,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.playlists.app.R
 import com.playlists.app.data.FileType
-import com.playlists.app.data.PlaylistSongWithDetails
-import com.playlists.app.ui.PdfHelper
+import com.playlists.app.ui.PlaybackFrame
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
-import com.playlists.app.ui.SongTitleWithKey
+import com.playlists.app.ui.buildPlaybackFrames
 import com.playlists.app.ui.components.PlaybackStage
 import com.playlists.app.ui.components.SongMediaViewer
 import com.playlists.app.util.SongStoragePaths
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
-private data class PlaybackFrame(
-    val songIndex: Int,
-    val pageIndex: Int,
-    val pageCount: Int,
-    val entry: PlaylistSongWithDetails,
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,28 +142,4 @@ fun PlaylistPlaybackScreen(
             )
         }
     }
-}
-
-private fun buildPlaybackFrames(songs: List<PlaylistSongWithDetails>): List<PlaybackFrame> {
-    val frames = mutableListOf<PlaybackFrame>()
-    songs.forEachIndexed { songIndex, entry ->
-        val file = SongStoragePaths.resolve(entry.filePath)
-        if (!file.exists()) return@forEachIndexed
-        val fileType = runCatching { FileType.valueOf(entry.fileType) }.getOrDefault(FileType.IMAGE)
-        val pageCount = when (fileType) {
-            FileType.IMAGE -> 1
-            FileType.PDF -> PdfHelper.pageCount(file, fileType).coerceAtLeast(1)
-        }
-        repeat(pageCount) { pageIndex ->
-            frames.add(
-                PlaybackFrame(
-                    songIndex = songIndex,
-                    pageIndex = pageIndex,
-                    pageCount = pageCount,
-                    entry = entry,
-                ),
-            )
-        }
-    }
-    return frames
 }

@@ -20,11 +20,17 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -71,6 +77,7 @@ import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
 import com.playlists.app.util.AppPrefs
+import com.playlists.app.util.PlaylistExportShare
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -102,6 +109,41 @@ fun PlaylistDetailScreen(
     var remoteFlow by remember { mutableStateOf<RemotePlayFlowState?>(null) }
     var remoteStartGeneration by remember { mutableIntStateOf(0) }
     var showRemoteDebug by remember { mutableStateOf(false) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
+    var exporting by remember { mutableStateOf(false) }
+
+    fun exportPlaylistPdf() {
+        if (exporting || entries.isEmpty()) return
+        exporting = true
+        scope.launch {
+            val result = runCatching { viewModel.exportPlaylistPdf(playlistId) }
+            exporting = false
+            val export = result.getOrNull()
+            when {
+                export == null -> {
+                    Toast.makeText(
+                        context,
+                        result.exceptionOrNull()?.message ?: context.getString(R.string.export_playlist_failed),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                else -> {
+                    PlaylistExportShare.sharePdf(context, export.file)
+                    if (export.skippedMissing > 0) {
+                        Toast.makeText(
+                            context,
+                            context.getString(
+                                R.string.export_playlist_skipped_missing,
+                                export.bodyPages,
+                                export.skippedMissing,
+                            ),
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(playlistId) {
         playlist = viewModel.getPlaylist(playlistId)
@@ -245,6 +287,22 @@ fun PlaylistDetailScreen(
                         IconButton(onClick = { showDelete = true }) {
                             Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_playlist))
                         }
+                        IconButton(onClick = { showOverflowMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.export_playlist))
+                        }
+                        DropdownMenu(
+                            expanded = showOverflowMenu,
+                            onDismissRequest = { showOverflowMenu = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.export_playlist)) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    exportPlaylistPdf()
+                                },
+                                enabled = entries.isNotEmpty() && !exporting,
+                            )
+                        }
                     }
                 }
             }
@@ -293,6 +351,21 @@ fun PlaylistDetailScreen(
                             onRemove = { viewModel.removeSongFromPlaylist(entry.id) },
                         )
                     }
+                }
+            }
+        }
+    }
+
+    if (exporting) {
+        BasicAlertDialog(onDismissRequest = {}) {
+            Surface(shape = MaterialTheme.shapes.large) {
+                Row(
+                    modifier = Modifier.padding(24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    Text(stringResource(R.string.export_playlist_working))
                 }
             }
         }

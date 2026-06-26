@@ -59,6 +59,7 @@ fun SongMediaViewer(
             PdfPagerViewer(
                 file = file,
                 modifier = modifier,
+                enableZoom = enableZoom,
                 onPageChanged = onPdfPageChanged,
             )
         }
@@ -148,21 +149,40 @@ private fun SinglePdfPageViewer(
 private fun PdfPagerViewer(
     file: File,
     modifier: Modifier = Modifier,
+    enableZoom: Boolean = true,
     onPageChanged: ((page: Int, pageCount: Int) -> Unit)? = null,
 ) {
     var pageCount by remember(file) { mutableStateOf(0) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    val pagerState = rememberPagerState(pageCount = { pageCount.coerceAtLeast(1) })
 
     LaunchedEffect(file) {
         pageCount = withContext(Dispatchers.IO) { PdfHelper.pageCount(file) }
     }
 
-    if (pageCount <= 0) return
-
-    val pagerState = rememberPagerState(pageCount = { pageCount.coerceAtLeast(1) })
-
     LaunchedEffect(pagerState.currentPage, pageCount) {
-        onPageChanged?.invoke(pagerState.currentPage, pageCount)
+        if (pageCount > 0) {
+            onPageChanged?.invoke(pagerState.currentPage, pageCount)
+        }
+    }
+
+    if (pageCount <= 0) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(Color.Black),
+        )
+        return
+    }
+
+    if (pageCount == 1) {
+        SinglePdfPageViewer(
+            file = file,
+            pageIndex = 0,
+            modifier = modifier,
+            enableZoom = enableZoom,
+        )
+        return
     }
 
     Box(
@@ -179,20 +199,19 @@ private fun PdfPagerViewer(
                 file = file,
                 pageIndex = page,
                 width = containerSize.width.coerceAtLeast(1),
+                enableZoom = false,
             )
         }
-        if (pageCount > 1) {
-            Text(
-                text = "${pagerState.currentPage + 1} / $pageCount",
-                color = Color.White,
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-                    .background(Color.Black.copy(alpha = 0.5f))
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-        }
+        Text(
+            text = "${pagerState.currentPage + 1} / $pageCount",
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+                .background(Color.Black.copy(alpha = 0.5f))
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        )
     }
 }
 

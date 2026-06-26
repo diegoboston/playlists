@@ -121,56 +121,6 @@ class OpenAiClient(
         getJson(request)
     }
 
-    /** Remaining prepaid credits, or monthly budget minus usage when credits are unavailable. */
-    fun fetchCreditBalance(): OpenAiCreditBalance? {
-        fetchCreditGrants()?.let { return it }
-        return fetchSubscriptionBalance()
-    }
-
-    private fun fetchCreditGrants(): OpenAiCreditBalance? = runCatching {
-        val json = getJson(
-            Request.Builder()
-                .url("$API_BASE/dashboard/billing/credit_grants")
-                .header("Authorization", "Bearer $apiKey")
-                .get()
-                .build(),
-        )
-        if (!json.has("total_available")) return@runCatching null
-        OpenAiCreditBalance(
-            availableUsd = json.getDouble("total_available"),
-            source = CreditSource.PrepaidGrants,
-        )
-    }.getOrNull()
-
-    private fun fetchSubscriptionBalance(): OpenAiCreditBalance? = runCatching {
-        val subscription = getJson(
-            Request.Builder()
-                .url("$API_BASE/dashboard/billing/subscription")
-                .header("Authorization", "Bearer $apiKey")
-                .get()
-                .build(),
-        )
-        val hardLimit = subscription.optDouble("hard_limit_usd", Double.NaN)
-        if (hardLimit.isNaN()) return@runCatching null
-        val end = java.time.LocalDate.now()
-        val start = end.withDayOfMonth(1)
-        val usage = getJson(
-            Request.Builder()
-                .url(
-                    "$API_BASE/dashboard/billing/usage" +
-                        "?start_date=$start&end_date=$end",
-                )
-                .header("Authorization", "Bearer $apiKey")
-                .get()
-                .build(),
-        )
-        val usedUsd = usage.optDouble("total_usage", 0.0) / 100.0
-        OpenAiCreditBalance(
-            availableUsd = (hardLimit - usedUsd).coerceAtLeast(0.0),
-            source = CreditSource.MonthlyBudget,
-        )
-    }.getOrNull()
-
     private fun getJson(request: Request): JSONObject {
         httpClient.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
@@ -212,16 +162,6 @@ class OpenAiClient(
 }
 
 class OpenAiException(message: String) : Exception(message)
-
-data class OpenAiCreditBalance(
-    val availableUsd: Double,
-    val source: CreditSource,
-)
-
-enum class CreditSource {
-    PrepaidGrants,
-    MonthlyBudget,
-}
 
 class ChartAssistantService(
     private val openAiClient: OpenAiClient,

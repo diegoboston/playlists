@@ -8,6 +8,7 @@ import com.playlists.app.data.SongRepository
 import com.playlists.app.util.AppUpdate
 import com.playlists.app.util.StageManagerState
 import com.playlists.app.util.StageManagerStorage
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,6 +46,7 @@ class PlaylistsApp : Application() {
             if (initialized) return
             StageManagerStorage.ensureDirectories()
             StageManagerState.exportFromSharedPreferences(this)
+            PDFBoxResourceLoader.init(applicationContext)
             val db = AppDatabase.get(this)
             songRepository = SongRepository(db.songDao())
             playlistRepository = PlaylistRepository(db.playlistDao(), db.playlistSongDao())

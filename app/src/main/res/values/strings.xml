@@ -120,9 +120,7 @@
     <string name="settings_openai_key_valid">key accepted</string>
     <string name="settings_openai_key_invalid">OpenAI key failed</string>
     <string name="settings_openai_key_testing">Testing OpenAI key…</string>
-    <string name="settings_openai_credit_loading">Checking OpenAI credit…</string>
-    <string name="settings_openai_credit_remaining">Remaining credit: $%1$.2f</string>
-    <string name="settings_openai_credit_unavailable">Credit balance unavailable for this key</string>
+    <string name="settings_openai_billing">OpenAI billing overview</string>
     <string name="chart_key_label">Chart key</string>
     <string name="chart_key_play_in">Play in</string>
     <string name="chart_key_guessed">Guessed from first chord — tap chart key if wrong</string>
@@ -150,4 +148,9 @@
     <string name="song_new_key">Change key</string>
     <string name="song_new_key_title">Choose key</string>
     <string name="song_new_key_prompt">Choose a key for “%1$s”</string>
+    <string name="export_playlist">Export PDF</string>
+    <string name="export_playlist_share">Share playlist PDF</string>
+    <string name="export_playlist_working">Building PDF…</string>
+    <string name="export_playlist_failed">Could not export playlist PDF</string>
+    <string name="export_playlist_skipped_missing">Exported %1$d pages; %2$d songs had no file.</string>
 </resources>

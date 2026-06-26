@@ -1,7 +1,10 @@
 package com.playlists.app.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.text.format.Formatter
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
@@ -60,12 +64,8 @@ private sealed interface OpenAiKeyStatus {
     data class Invalid(val message: String) : OpenAiKeyStatus
 }
 
-private sealed interface OpenAiCreditStatus {
-    data object Unknown : OpenAiCreditStatus
-    data object Loading : OpenAiCreditStatus
-    data class Available(val amountUsd: Double) : OpenAiCreditStatus
-    data object Unavailable : OpenAiCreditStatus
-}
+private const val OPENAI_BILLING_URL =
+    "https://platform.openai.com/settings/organization/billing/overview"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +86,6 @@ fun SettingsScreen(
         mutableStateOf(AiCredentialStore.getOpenAiApiKey(context).orEmpty())
     }
     var openAiKeyStatus by remember { mutableStateOf<OpenAiKeyStatus>(OpenAiKeyStatus.Unknown) }
-    var openAiCreditStatus by remember { mutableStateOf<OpenAiCreditStatus>(OpenAiCreditStatus.Unknown) }
     var librarySizeLabel by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -99,11 +98,9 @@ fun SettingsScreen(
         val key = openAiKeyText.trim()
         if (key.isEmpty()) {
             openAiKeyStatus = OpenAiKeyStatus.Unknown
-            openAiCreditStatus = OpenAiCreditStatus.Unknown
             return@LaunchedEffect
         }
         openAiKeyStatus = OpenAiKeyStatus.Testing
-        openAiCreditStatus = OpenAiCreditStatus.Loading
         delay(600)
         val client = OpenAiClient(key)
         openAiKeyStatus = withContext(Dispatchers.IO) {
@@ -112,16 +109,6 @@ fun SettingsScreen(
                     onSuccess = { OpenAiKeyStatus.Valid },
                     onFailure = { OpenAiKeyStatus.Invalid(it.message ?: "Failed") },
                 )
-        }
-        openAiCreditStatus = if (openAiKeyStatus == OpenAiKeyStatus.Valid) {
-            withContext(Dispatchers.IO) {
-                runCatching { client.fetchCreditBalance() }
-                    .getOrNull()
-                    ?.let { OpenAiCreditStatus.Available(it.availableUsd) }
-                    ?: OpenAiCreditStatus.Unavailable
-            }
-        } else {
-            OpenAiCreditStatus.Unknown
         }
     }
 
@@ -198,35 +185,20 @@ fun SettingsScreen(
                 }
                 OpenAiKeyStatus.Unknown -> Unit
             }
-            when (val credit = openAiCreditStatus) {
-                OpenAiCreditStatus.Loading -> {
-                    Text(
-                        text = stringResource(R.string.settings_openai_credit_loading),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                is OpenAiCreditStatus.Available -> {
-                    Text(
-                        text = stringResource(
-                            R.string.settings_openai_credit_remaining,
-                            credit.amountUsd,
-                        ),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                OpenAiCreditStatus.Unavailable -> {
-                    Text(
-                        text = stringResource(R.string.settings_openai_credit_unavailable),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                OpenAiCreditStatus.Unknown -> Unit
-            }
+            Text(
+                text = stringResource(R.string.settings_openai_billing),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline,
+                ),
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .clickable {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(OPENAI_BILLING_URL)),
+                        )
+                    },
+            )
             Button(
                 onClick = {
                     if (!AppPrefs.isValidRemoteCode(codeText)) {

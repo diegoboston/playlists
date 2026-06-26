@@ -8,6 +8,7 @@ import com.playlists.app.data.FileType
 import com.playlists.app.data.Playlist
 import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.data.Song
+import com.playlists.app.render.PlaylistPdfExporter
 import com.playlists.app.util.AppUpdate
 import com.playlists.app.util.PendingImport
 import com.playlists.app.util.PendingChartImport
@@ -95,6 +96,18 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun getPlaylistSongs(playlistId: Long): List<PlaylistSongWithDetails> =
         playlistRepo.getSongs(playlistId)
+
+    suspend fun exportPlaylistPdf(playlistId: Long): PlaylistPdfExporter.Result? =
+        withContext(Dispatchers.IO) {
+            val playlist = playlistRepo.getById(playlistId) ?: return@withContext null
+            val entries = playlistRepo.getSongs(playlistId)
+            if (entries.isEmpty()) return@withContext null
+            PlaylistPdfExporter.export(
+                cacheDir = getApplication<Application>().cacheDir,
+                playlistName = playlist.name,
+                entries = entries,
+            )
+        }
 
     suspend fun prepareSongDelete(id: Long): SongDeletePrompt? = withContext(Dispatchers.IO) {
         val song = songRepo.getById(id) ?: return@withContext null
