@@ -1,6 +1,6 @@
 package com.playlists.app.ui.screens
 
-import androidx.compose.foundation.background
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,16 +12,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -47,22 +46,26 @@ import com.playlists.app.data.Playlist
 import com.playlists.app.remote.PlayRemoteController
 import com.playlists.app.ui.PlaylistAccentColors
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.components.PlaylistActionsMenu
 import com.playlists.app.ui.components.PlaylistColorDialog
 import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
+import com.playlists.app.util.PlaylistExportShare
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaylistsScreen(
     viewModel: PlaylistsViewModel,
     onOpenPlaylist: (Long) -> Unit,
     onQuickstart: () -> Unit,
 ) {
-    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val displayedKeys = remember { mutableStateListOf<String>() }
     val dragState = remember { ReorderDragState() }
@@ -70,6 +73,41 @@ fun PlaylistsScreen(
     var renameTarget by remember { mutableStateOf<Playlist?>(null) }
     var colorTarget by remember { mutableStateOf<Playlist?>(null) }
     var deleteTarget by remember { mutableStateOf<Playlist?>(null) }
+    var duplicateTarget by remember { mutableStateOf<Playlist?>(null) }
+    var exportingPlaylistId by remember { mutableStateOf<Long?>(null) }
+
+    fun exportPlaylistPdf(playlistId: Long, songCount: Int) {
+        if (exportingPlaylistId != null || songCount == 0) return
+        exportingPlaylistId = playlistId
+        scope.launch {
+            val result = runCatching { viewModel.exportPlaylistPdf(playlistId) }
+            exportingPlaylistId = null
+            val export = result.getOrNull()
+            when {
+                export == null -> {
+                    Toast.makeText(
+                        context,
+                        result.exceptionOrNull()?.message ?: context.getString(R.string.export_playlist_failed),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                else -> {
+                    PlaylistExportShare.sharePdf(context, export.file)
+                    if (export.skippedMissing > 0) {
+                        Toast.makeText(
+                            context,
+                            context.getString(
+                                R.string.export_playlist_skipped_missing,
+                                export.bodyPages,
+                                export.skippedMissing,
+                            ),
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(playlists, dragState.draggingKey) {
         syncDisplayedKeys(displayedKeys, dragState.draggingKey, playlists.map { "p:${it.id}" })
@@ -130,9 +168,12 @@ fun PlaylistsScreen(
                             playlist = playlist,
                             songCount = playlistSongs.size,
                             fallbackColor = PlaylistAccentColors.palette[paletteIndex % PlaylistAccentColors.palette.size],
+                            exporting = exportingPlaylistId == playlist.id,
                             onRename = { renameTarget = playlist },
                             onColor = { colorTarget = playlist },
                             onDelete = { deleteTarget = playlist },
+                            onDuplicate = { duplicateTarget = playlist },
+                            onExport = { exportPlaylistPdf(playlist.id, playlistSongs.size) },
                         )
                     }
                 }
@@ -200,6 +241,36 @@ fun PlaylistsScreen(
             },
         )
     }
+
+    duplicateTarget?.let { playlist ->
+        TextInputDialog(
+            title = stringResource(R.string.duplicate),
+            initialValue = stringResource(R.string.duplicate_default_name, playlist.name),
+            confirmLabel = stringResource(R.string.create),
+            onDismiss = { duplicateTarget = null },
+            onConfirm = { name ->
+                duplicateTarget = null
+                viewModel.duplicatePlaylist(playlist.id, name) { newId ->
+                    onOpenPlaylist(newId)
+                }
+            },
+        )
+    }
+
+    if (exportingPlaylistId != null) {
+        BasicAlertDialog(onDismissRequest = {}) {
+            Surface(shape = MaterialTheme.shapes.large) {
+                Row(
+                    modifier = Modifier.padding(24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    Text(stringResource(R.string.export_playlist_working))
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -207,9 +278,12 @@ private fun PlaylistBlock(
     playlist: Playlist,
     songCount: Int,
     fallbackColor: Int,
+    exporting: Boolean,
     onRename: () -> Unit,
     onColor: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onExport: () -> Unit,
 ) {
     val bg = Color(playlist.colorArgb ?: fallbackColor)
     val onBg = if (bg.luminance() > 0.5f) Color.Black else Color.White
@@ -239,30 +313,16 @@ private fun PlaylistBlock(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = onRename) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.rename_playlist),
-                    tint = onBg,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            IconButton(onClick = onColor) {
-                Icon(
-                    Icons.Default.Palette,
-                    contentDescription = stringResource(R.string.playlist_color),
-                    tint = onBg,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.delete_playlist),
-                    tint = onBg,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+            PlaylistActionsMenu(
+                iconTint = onBg,
+                iconSize = 20.dp,
+                exportEnabled = songCount > 0 && !exporting,
+                onRename = onRename,
+                onColor = onColor,
+                onDelete = onDelete,
+                onDuplicate = onDuplicate,
+                onExport = onExport,
+            )
         }
     }
 }

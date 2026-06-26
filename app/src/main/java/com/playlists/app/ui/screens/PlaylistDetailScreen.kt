@@ -17,20 +17,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,6 +64,7 @@ import com.playlists.app.remote.RemotePlayMode
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
+import com.playlists.app.ui.components.PlaylistActionsMenu
 import com.playlists.app.ui.components.PlaylistColorDialog
 import com.playlists.app.ui.components.RemotePlayIconButton
 import com.playlists.app.ui.components.TextInputDialog
@@ -109,7 +104,6 @@ fun PlaylistDetailScreen(
     var remoteFlow by remember { mutableStateOf<RemotePlayFlowState?>(null) }
     var remoteStartGeneration by remember { mutableIntStateOf(0) }
     var showRemoteDebug by remember { mutableStateOf(false) }
-    var showOverflowMenu by remember { mutableStateOf(false) }
     var exporting by remember { mutableStateOf(false) }
 
     fun exportPlaylistPdf() {
@@ -272,37 +266,14 @@ fun PlaylistDetailScreen(
                                 null
                             },
                         )
-                        IconButton(onClick = { showRename = true }) {
-                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.rename_playlist))
-                        }
-                        IconButton(onClick = { showDuplicate = true }) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.duplicate))
-                        }
-                        IconButton(onClick = { showColor = true }) {
-                            Icon(
-                                Icons.Default.Palette,
-                                contentDescription = stringResource(R.string.playlist_color),
-                            )
-                        }
-                        IconButton(onClick = { showDelete = true }) {
-                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete_playlist))
-                        }
-                        IconButton(onClick = { showOverflowMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.export_playlist))
-                        }
-                        DropdownMenu(
-                            expanded = showOverflowMenu,
-                            onDismissRequest = { showOverflowMenu = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.export_playlist)) },
-                                onClick = {
-                                    showOverflowMenu = false
-                                    exportPlaylistPdf()
-                                },
-                                enabled = entries.isNotEmpty() && !exporting,
-                            )
-                        }
+                        PlaylistActionsMenu(
+                            onRename = { showRename = true },
+                            onColor = { showColor = true },
+                            onDelete = { showDelete = true },
+                            onDuplicate = { showDuplicate = true },
+                            onExport = { exportPlaylistPdf() },
+                            exportEnabled = entries.isNotEmpty() && !exporting,
+                        )
                     }
                 }
             }

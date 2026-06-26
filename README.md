@@ -29,13 +29,13 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 
 ### Playlists
 
-- **Create / rename** — New playlists get an editable name. The **Playlists** tab shows each playlist as a **colorful block** (NoTube-style folder colors) with inline **pencil** (rename), **palette** (color), and **delete**.
+- **Create / rename** — New playlists get an editable name. The **Playlists** tab shows each playlist as a **colorful block** (NoTube-style folder colors) with a **pencil** menu for rename, color, delete, duplicate, and export PDF.
 - **Ordered sequences** — A playlist is an ordered list of songs from the archive.
 - **Add songs** — Search dialog with full-text match across title, key, and notes. If a title is not in the archive, tap **Add placeholder page** to create a synthetic sheet with just the title (stored in the archive with a 🚧 marker).
 - **Drag reorder** — Long-press and drag rows in the Songs tab, Playlists tab, or playlist detail screen. Uses the same center-vs-center swap logic as NoTube (`DraggableItem` + `ReorderLogic`).
 - **Duplicate playlist** — Copies name (with “(copy)”) and full song order.
-- **Export PDF** — Overflow menu (**⋮**) on playlist detail builds one combined PDF: a set-list table of contents (playlist name + song titles with keys, no page numbers) followed by every chart page in playlist order. PDF charts are merged as **vector pages** (original page size preserved); photos and placeholders are embedded on letter-size pages at full resolution. If a PDF cannot be merged, that page falls back to raster. Opens the system share sheet to save or send the file.
-- **Playlist detail** — Two-line header: **back + title** on a **colored background** (playlist accent color) on line 1; **tools** on line 2 (+ add, **mic** find chart, play, remote, rename, duplicate, palette color, delete, **⋮** export). Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. Tap the highlighted **Wi‑Fi** icon again to stop remote play (a pulsing green dot shows while it is active), **long-press** it for connection status and debug info, or use the system notification.
+- **Export PDF** — **Pencil** menu on playlist detail or the Playlists tab builds one combined PDF: a set-list table of contents (playlist name + song titles with keys, no page numbers) followed by every chart page in playlist order. PDF charts are merged as **vector pages** (original page size preserved); photos and placeholders are embedded on letter-size pages at full resolution. If a PDF cannot be merged, that page falls back to raster. Opens the system share sheet to save or send the file.
+- **Playlist detail** — Two-line header: **back + title** on a **colored background** (playlist accent color) on line 1; **tools** on line 2 (+ add, **mic** find chart, play, remote, **pencil** menu). The pencil menu offers rename, color, delete, duplicate, and export PDF. Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. Tap the highlighted **Wi‑Fi** icon again to stop remote play (a pulsing green dot shows while it is active), **long-press** it for connection status and debug info, or use the system notification.
 - **AI find chart** — Voice search for chords/lyrics on the web, one-page PDF preview, transpose to your key, add to the current playlist. See **AI chart assistant** below.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs). **↻** in the top bar jumps to the first song and page.
 - **Settings** — **Gear** icon on the main tabs opens **Settings**: under **Remote play**, set one **5-digit code** used as the Cloudflare PIN and the LAN port. Under **AI chart assistant**, paste your **OpenAI API key** (never stored in git); a **green check** confirms the key works. Tap **OpenAI billing overview** to open your account balance on platform.openai.com. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Shows the **installed app version** and a **Check for updates** button (same GitHub Release flow as the launch snackbar). At the bottom, **Storage** shows how much space the library uses under `Music/StageManager` (song files, chart sidecars, database, and state).
@@ -90,7 +90,7 @@ Sketch of the main flows (not to scale):
 ┌─────────────────────────────────────┐
 │ ← Sunday set                        │  ← line 1: back + title on accent-color background
 ├─────────────────────────────────────┤
-│  +   🎤   ▶   📶   ✎   ⧉   🎨   🗑   │  ← 🎤 = voice find chart
+│  +   🎤   ▶   📶   ✎               │  ← ✎ = rename, color, delete, dup, export
 ├─────────────────────────────────────┤
 │  Amazing Grace (G)              🗑  │
 │  intro notes                        │
@@ -104,10 +104,10 @@ PLAYLISTS TAB
 │ [ New playlist ]  [ Quickstart ]    │
 ├─────────────────────────────────────┤
 │ ┌─────────────────────────────────┐ │
-│ │ Sunday set            ✎  🎨  🗑 │ │  ← colorful block; tap to open
+│ │ Sunday set                     ✎ │ │  ← colorful block; tap to open; ✎ = actions menu
 │ └─────────────────────────────────┘ │
 │ ┌─────────────────────────────────┐ │
-│ │ Rehearsal             ✎  🎨  🗑 │ │
+│ │ Rehearsal                      ✎ │ │
 │ └─────────────────────────────────┘ │
 └─────────────────────────────────────┘
 
@@ -160,7 +160,7 @@ REMOTE PLAY ACTIVE (notification shade)
 
 1. **Import a song** — Gallery or browser → Share → Stage Manager → fill Title, Key, Notes → Save.
 2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **Sort: A-Z / Added / Viewed** — tap again on the same button to reverse order.
-3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete from the colorful blocks on the list.
+3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete / duplicate / export from the **pencil** menu on each colorful block.
 4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (🚧) to add a title-only stand-in sheet.
 5. **Find chart (voice)** — Open a playlist → **mic** → hold and speak → pick a web result → confirm the PDF preview. See **AI chart assistant** below.
 6. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).

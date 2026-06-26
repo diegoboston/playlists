@@ -26,6 +26,7 @@
     <string name="no_songs_match_search">No songs match your search.</string>
     <string name="add_placeholder">Add placeholder page: “%1$s”</string>
     <string name="placeholder_song">Placeholder — sheet music not yet added</string>
+    <string name="playlist_actions">Playlist actions</string>
     <string name="rename_playlist">Rename playlist</string>
     <string name="playlist_color">Playlist color</string>
     <string name="playlist_color_title">Choose a color</string>

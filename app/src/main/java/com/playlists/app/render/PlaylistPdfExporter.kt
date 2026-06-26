@@ -28,6 +28,26 @@ object PlaylistPdfExporter {
         val skippedMissing: Int,
     )
 
+    /** Keeps source PDFs open until the destination is saved — importPage shares their COS streams. */
+    private class OpenPdfSources : AutoCloseable {
+        private val documents = mutableListOf<PDDocument>()
+        private val byPath = mutableMapOf<String, PDDocument>()
+
+        fun load(file: File): PDDocument {
+            byPath[file.absolutePath]?.let { return it }
+            val document = PDDocument.load(file)
+            documents.add(document)
+            byPath[file.absolutePath] = document
+            return document
+        }
+
+        override fun close() {
+            documents.forEach { runCatching { it.close() } }
+            documents.clear()
+            byPath.clear()
+        }
+    }
+
     fun export(
         cacheDir: File,
         playlistName: String,
@@ -37,12 +57,13 @@ object PlaylistPdfExporter {
 
         val tocFile = File(cacheDir, "export-toc-${UUID.randomUUID()}.pdf")
         val document = PDDocument()
+        val sources = OpenPdfSources()
         try {
             val tocPages = PlaylistTocRenderer.renderToFile(tocFile, playlistName, buildTocEntries(entries))
-            appendPagesFromFile(document, tocFile)
+            appendPagesFromFile(document, tocFile, sources)
 
             val frames = buildPlaybackFrames(entries)
-            frames.forEach { frame -> appendMediaPage(document, frame) }
+            frames.forEach { frame -> appendMediaPage(document, frame, sources) }
 
             val exportsDir = File(cacheDir, "exports").also { it.mkdirs() }
             val file = File(exportsDir, "${sanitizeExportFilename(playlistName)}.pdf")
@@ -55,26 +76,26 @@ object PlaylistPdfExporter {
                 skippedMissing = countMissingPlaylistFiles(entries),
             )
         } finally {
+            sources.close()
             document.close()
             tocFile.delete()
         }
     }
 
-    private fun appendPagesFromFile(destination: PDDocument, sourceFile: File) {
-        PDDocument.load(sourceFile).use { source ->
-            for (pageIndex in 0 until source.numberOfPages) {
-                destination.importPage(source.getPage(pageIndex))
-            }
+    private fun appendPagesFromFile(destination: PDDocument, sourceFile: File, sources: OpenPdfSources) {
+        val source = sources.load(sourceFile)
+        for (pageIndex in 0 until source.numberOfPages) {
+            destination.importPage(source.getPage(pageIndex))
         }
     }
 
-    private fun appendMediaPage(document: PDDocument, frame: PlaybackFrame) {
+    private fun appendMediaPage(document: PDDocument, frame: PlaybackFrame, sources: OpenPdfSources) {
         val file = SongStoragePaths.resolve(frame.entry.filePath)
         val fileType = runCatching { FileType.valueOf(frame.entry.fileType) }
             .getOrDefault(FileType.IMAGE)
         when (fileType) {
             FileType.PDF -> {
-                if (!appendPdfPageVector(document, file, frame.pageIndex)) {
+                if (!appendPdfPageVector(document, file, frame.pageIndex, sources)) {
                     appendPdfPageRaster(document, file, frame.pageIndex)
                 }
             }
@@ -82,13 +103,17 @@ object PlaylistPdfExporter {
         }
     }
 
-    private fun appendPdfPageVector(document: PDDocument, file: File, pageIndex: Int): Boolean {
+    private fun appendPdfPageVector(
+        document: PDDocument,
+        file: File,
+        pageIndex: Int,
+        sources: OpenPdfSources,
+    ): Boolean {
         return try {
-            PDDocument.load(file).use { source ->
-                if (pageIndex !in 0 until source.numberOfPages) return false
-                document.importPage(source.getPage(pageIndex))
-                true
-            }
+            val source = sources.load(file)
+            if (pageIndex !in 0 until source.numberOfPages) return false
+            document.importPage(source.getPage(pageIndex))
+            true
         } catch (_: Exception) {
             false
         }
