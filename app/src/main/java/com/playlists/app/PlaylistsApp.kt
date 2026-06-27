@@ -5,6 +5,7 @@ import android.util.Log
 import com.playlists.app.data.AppDatabase
 import com.playlists.app.data.PlaylistRepository
 import com.playlists.app.data.SongRepository
+import com.playlists.app.util.AppIconManager
 import com.playlists.app.util.AppUpdate
 import com.playlists.app.util.StageManagerState
 import com.playlists.app.util.StageManagerStorage
@@ -26,6 +27,7 @@ class PlaylistsApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppIconManager.applySaved(this)
         applicationScope.launch {
             runCatching {
                 val installed = AppUpdate.installedVersionCode(this@PlaylistsApp)

@@ -63,6 +63,10 @@
     <string name="settings_remote_pin_hint">This is also the port for LAN server. Use range 49152-65535</string>
     <string name="settings_remote_code_invalid">Enter exactly 5 digits from 49152 to 65535.</string>
     <string name="settings_saved">Settings saved</string>
+    <string name="settings_app_icon">App icon</string>
+    <string name="settings_app_icon_default">Original</string>
+    <string name="settings_app_icon_alt">Guido</string>
+    <string name="settings_app_icon_changed">App icon updated — your launcher may take a moment to refresh.</string>
     <string name="settings_app_version">App version</string>
     <string name="settings_app_version_value">%1$s</string>
     <string name="settings_check_for_updates">Check for updates</string>

@@ -4,13 +4,20 @@ import android.content.Intent
 import android.net.Uri
 import android.text.format.Formatter
 import android.widget.Toast
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -34,9 +41,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -49,6 +60,8 @@ import com.playlists.app.ui.AppUpdateUiState
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.components.AppUpdateBanner
 import com.playlists.app.util.AiCredentialStore
+import com.playlists.app.util.AppIcon
+import com.playlists.app.util.AppIconManager
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.AppUpdate
 import kotlinx.coroutines.Dispatchers
@@ -87,6 +100,7 @@ fun SettingsScreen(
     }
     var openAiKeyStatus by remember { mutableStateOf<OpenAiKeyStatus>(OpenAiKeyStatus.Unknown) }
     var librarySizeLabel by remember { mutableStateOf<String?>(null) }
+    var selectedAppIcon by remember { mutableStateOf(AppIconManager.getSelected(context)) }
 
     LaunchedEffect(Unit) {
         librarySizeLabel = withContext(Dispatchers.IO) {
@@ -217,6 +231,20 @@ fun SettingsScreen(
                 Text(stringResource(R.string.save))
             }
             Text(
+                text = stringResource(R.string.settings_app_icon),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 32.dp, bottom = 8.dp),
+            )
+            AppIconPicker(
+                selected = selectedAppIcon,
+                onSelect = { icon ->
+                    if (icon == selectedAppIcon) return@AppIconPicker
+                    AppIconManager.setSelected(context, icon)
+                    selectedAppIcon = icon
+                    Toast.makeText(context, R.string.settings_app_icon_changed, Toast.LENGTH_SHORT).show()
+                },
+            )
+            Text(
                 text = stringResource(R.string.settings_app_version),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 32.dp, bottom = 8.dp),
@@ -257,6 +285,73 @@ fun SettingsScreen(
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun AppIconPicker(
+    selected: AppIcon,
+    onSelect: (AppIcon) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        AppIconOption(
+            label = stringResource(R.string.settings_app_icon_default),
+            previewRes = R.drawable.ic_launcher_foreground,
+            selected = selected == AppIcon.Default,
+            onClick = { onSelect(AppIcon.Default) },
+        )
+        AppIconOption(
+            label = stringResource(R.string.settings_app_icon_alt),
+            previewRes = R.drawable.ic_launcher_alt_foreground,
+            selected = selected == AppIcon.Alt,
+            onClick = { onSelect(AppIcon.Alt) },
+        )
+    }
+}
+
+@Composable
+private fun AppIconOption(
+    label: String,
+    previewRes: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(20.dp)
+    val borderColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable(onClick = onClick),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(88.dp)
+                .border(
+                    width = if (selected) 3.dp else 1.dp,
+                    color = borderColor,
+                    shape = shape,
+                )
+                .clip(shape)
+                .background(Color.White),
+        ) {
+            Image(
+                painter = painterResource(previewRes),
+                contentDescription = label,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 8.dp),
+        )
     }
 }
 
