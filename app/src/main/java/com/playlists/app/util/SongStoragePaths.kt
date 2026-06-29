@@ -4,7 +4,7 @@ import java.io.File
 
 /**
  * Song [filePath] values in the database are stored relative to shared storage, e.g.
- * `Music/StageManager/songs/Amazing_Grace-G-42.pdf` — never `/sdcard/...` or
+ * `Music/StageManager/songs/Amazing_Grace-42.pdf` — never `/sdcard/...` or
  * `/storage/emulated/0/...`.
  */
 object SongStoragePaths {

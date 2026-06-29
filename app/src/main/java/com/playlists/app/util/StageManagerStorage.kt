@@ -16,10 +16,19 @@ object StageManagerStorage {
     const val DB_FILE_NAME = "playlists.db"
     const val STATE_FILE_NAME = "state.json"
 
-    fun root(): File =
-        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), ROOT_DIR_NAME)
+    @Volatile
+    private var songsDirOverride: File? = null
 
-    fun songsDir(): File = File(root(), SONGS_DIR_NAME)
+    /** Test hook — redirect [songsDir] to a temp folder. */
+    internal fun setSongsDirForTests(dir: File?) {
+        songsDirOverride = dir
+    }
+
+    fun root(): File =
+        songsDirOverride?.parentFile
+            ?: File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), ROOT_DIR_NAME)
+
+    fun songsDir(): File = songsDirOverride ?: File(root(), SONGS_DIR_NAME)
 
     fun dbFile(): File = File(root(), DB_FILE_NAME)
 

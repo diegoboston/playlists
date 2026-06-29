@@ -4,8 +4,8 @@ import com.playlists.app.ui.SongDisplay
 import com.playlists.app.util.ChartDraftStore
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.PlaceholderImageGenerator
+import com.playlists.app.util.SongFileOps
 import com.playlists.app.util.SongStoragePaths
-import java.io.File
 import kotlinx.coroutines.flow.Flow
 
 class SongRepository(private val songDao: SongDao) {
@@ -15,10 +15,18 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun getById(id: Long): Song? = songDao.getById(id)
 
-    suspend fun insert(song: Song): Long = songDao.insertAtTop(song)
+    suspend fun insert(song: Song): Long {
+        val id = songDao.insertAtTop(song)
+        finalizeCanonicalFile(song.copy(id = id))
+        return id
+    }
 
     suspend fun update(song: Song) {
+        val previous = songDao.getById(song.id) ?: return
         songDao.update(song)
+        if (previous.title != song.title) {
+            renameForTitleChange(previous, song)
+        }
     }
 
     suspend fun delete(id: Long) {
@@ -101,18 +109,30 @@ class SongRepository(private val songDao: SongDao) {
                 fileType = FileType.IMAGE.name,
             ),
         )
-        renamePlaceholderFile(id)
         return id
     }
 
-    private suspend fun renamePlaceholderFile(songId: Long) {
-        val song = songDao.getById(songId) ?: return
+    private suspend fun finalizeCanonicalFile(song: Song) {
         val current = SongStoragePaths.resolve(song.filePath)
         if (!current.isFile) return
-        val target = File(current.parentFile, "placeholder-$songId.png")
-        if (target.exists() && target.absolutePath != current.absolutePath) return
-        if (!current.renameTo(target)) return
-        songDao.update(song.copy(filePath = SongStoragePaths.toStoredPath(target)))
+        val target = SongFileOps.canonicalMediaFile(song)
+        if (current.absolutePath == target.absolutePath) return
+        if (SongFileOps.renameMediaAndSidecar(current, target, song.filePath)) {
+            songDao.update(song.copy(filePath = SongStoragePaths.toStoredPath(target)))
+        }
+    }
+
+    private suspend fun renameForTitleChange(previous: Song, updated: Song) {
+        val storedPath = previous.filePath
+        val otherRefs = songDao.getAll().count { it.filePath == storedPath && it.id != updated.id }
+        if (otherRefs > 0) return
+        val current = SongStoragePaths.resolve(storedPath)
+        if (!current.isFile) return
+        val target = SongFileOps.canonicalMediaFile(updated)
+        if (current.absolutePath == target.absolutePath) return
+        if (SongFileOps.renameMediaAndSidecar(current, target, storedPath)) {
+            songDao.update(updated.copy(filePath = SongStoragePaths.toStoredPath(target)))
+        }
     }
 }
 
