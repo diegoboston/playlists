@@ -58,6 +58,16 @@ var RemoteCompat = (function() {
     return list && list.length ? list[0] : null;
   }
 
+  function triggerDownload(url) {
+    var iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    setTimeout(function() {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 120000);
+  }
+
   return {
     xhr: xhr,
     get: function(url, cb) {
@@ -72,6 +82,7 @@ var RemoteCompat = (function() {
     getQueryParam: getQueryParam,
     setHidden: setHidden,
     hypot: hypot,
-    firstFile: firstFile
+    firstFile: firstFile,
+    triggerDownload: triggerDownload
   };
 })();

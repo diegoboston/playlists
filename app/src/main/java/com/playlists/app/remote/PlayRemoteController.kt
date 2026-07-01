@@ -8,7 +8,9 @@ import com.playlists.app.data.Song
 import com.playlists.app.ui.PdfHelper
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.FileStorage
+import com.playlists.app.util.QuickstartMatcher
 import com.playlists.app.util.SongStoragePaths
+import com.playlists.app.util.SongTitleMigration
 import com.playlists.app.ui.SongSortCriterion
 import com.playlists.app.ui.SongSortState
 import fi.iki.elonen.NanoHTTPD
@@ -178,6 +180,12 @@ object PlayRemoteController {
             },
             onDeletePlaylist = { id ->
                 runBlocking { deletePlaylist(id) }
+            },
+            onMatchQuickstart = { text ->
+                runBlocking { matchQuickstart(text) }
+            },
+            onCreateQuickstart = { name, text, withPlaceholders ->
+                runBlocking { createQuickstart(name, text, withPlaceholders) }
             },
         )
         return try {
@@ -474,6 +482,53 @@ object PlayRemoteController {
         val app = PlaylistsApp.from(ctx as android.app.Application)
         return try {
             Result.success(app.playlistRepository.create(name))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun matchQuickstart(text: String): List<PlayRemoteServer.QuickstartMatchJson> {
+        val ctx = appContext ?: return emptyList()
+        val app = PlaylistsApp.from(ctx as android.app.Application)
+        val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val archive = app.songRepository.getAll()
+        return QuickstartMatcher.matchLines(lines, archive).map { result ->
+            PlayRemoteServer.QuickstartMatchJson(
+                line = result.line,
+                songId = result.song?.id,
+                title = result.song?.title,
+                key = result.song?.keySignature,
+            )
+        }
+    }
+
+    private suspend fun createQuickstart(
+        name: String,
+        text: String,
+        withPlaceholders: Boolean,
+    ): Result<Long> {
+        val ctx = appContext ?: return Result.failure(IllegalStateException("Server not ready"))
+        val app = PlaylistsApp.from(ctx as android.app.Application)
+        return try {
+            val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+            val archive = app.songRepository.getAll()
+            val results = QuickstartMatcher.matchLines(lines, archive)
+            val playlistId = app.playlistRepository.create(name)
+            val songIds = if (withPlaceholders) {
+                results.map { result ->
+                    result.song?.id ?: run {
+                        val parsed = SongTitleMigration.parse(result.line)
+                        app.songRepository.createPlaceholder(
+                            title = parsed.title,
+                            keySignature = parsed.keySignature,
+                        )
+                    }
+                }
+            } else {
+                QuickstartMatcher.matchedSongIds(results)
+            }
+            app.playlistRepository.setSongs(playlistId, songIds)
+            Result.success(playlistId)
         } catch (e: Exception) {
             Result.failure(e)
         }

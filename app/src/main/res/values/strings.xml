@@ -155,6 +155,7 @@
     <string name="song_new_key_prompt">Choose a key for “%1$s”</string>
     <string name="export_playlist">Export PDF</string>
     <string name="export_playlist_share">Share playlist PDF</string>
+    <string name="share_song">Share song</string>
     <string name="export_playlist_working">Building PDF…</string>
     <string name="export_playlist_failed">Could not export playlist PDF</string>
     <string name="export_playlist_skipped_missing">Exported %1$d pages; %2$d songs had no file.</string>

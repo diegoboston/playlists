@@ -11,15 +11,20 @@
     #bar { background: rgba(0,0,0,.8); padding: 10px 12px; text-align: center; font-size: 14px; line-height: 1.4; }
     #barTop { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center; }
     #title { font-weight: 700; color: inherit; text-decoration: none; margin-right: 10px; }
-    #editBtn, #restartBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; margin-left: 10px; }
-    #editBtn:disabled, #restartBtn:disabled { opacity: .35; cursor: default; }
-    #editBtn svg, #restartBtn svg { width: 22px; height: 22px; fill: currentColor; }
+    #editBtn, #restartBtn, #twoUpBtn, #downloadBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; margin-left: 10px; }
+    #editBtn:disabled, #restartBtn:disabled, #twoUpBtn:disabled, #downloadBtn:disabled { opacity: .35; cursor: default; }
+    #editBtn svg, #restartBtn svg, #downloadBtn svg { width: 22px; height: 22px; fill: currentColor; }
+    #twoUpBtn { font-size: 13px; font-weight: 700; line-height: 1; width: auto; height: 30px; padding: 4px 8px; border: 1px solid rgba(255,255,255,.35); }
+    #twoUpBtn.active { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.65); }
     #uploadBtn { background: none; border: none; color: #fff; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; font-size: 22px; font-weight: 700; width: 30px; height: 30px; margin-left: 10px; }
     #uploadBtn:disabled { opacity: .35; cursor: default; }
     #meta { opacity: .85; font-size: 13px; margin-top: 2px; }
     #stage { position: absolute; top: 56px; left: 0; right: 0; bottom: 0; display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center; overflow: hidden; }
     #zoomWrap { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center; width: 100%; height: 100%; -webkit-transform-origin: center center; transform-origin: center center; }
-    #media { max-width: 100%; max-height: 100%; object-fit: contain; -webkit-user-select: none; user-select: none; pointer-events: none; }
+    #mediaRow { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center; width: 100%; height: 100%; }
+    .mediaPage { max-width: 100%; max-height: 100%; object-fit: contain; -webkit-user-select: none; user-select: none; pointer-events: none; }
+    #mediaRow.two-up .mediaPage { max-width: 50%; }
+    #mediaRight[hidden] { display: none !important; }
     #hint { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; opacity: .55; font-size: 12px; pointer-events: none; }
     #empty { padding: 24px; text-align: center; opacity: .8; }
     #zoomWrap[hidden], #empty[hidden] { display: none !important; }
@@ -30,8 +35,12 @@
     <div id="barTop">
       <a id="title" href="/">Stage Manager</a>
       <button id="uploadBtn" type="button" aria-label="Upload song" title="Upload song">+</button>
+      <button id="twoUpBtn" type="button" aria-label="Two-page spread" title="Show two pages">2-up</button>
       <button id="restartBtn" type="button" aria-label="Start over" title="Start over">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+      </button>
+      <button id="downloadBtn" type="button" aria-label="Download song" title="Download song">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
       </button>
       <button id="editBtn" type="button" aria-label="Edit playlist" title="Edit playlist">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>
@@ -41,7 +50,10 @@
   </div>
   <div id="stage">
     <div id="zoomWrap" hidden>
-      <img id="media" alt="" />
+      <div id="mediaRow">
+        <img id="mediaLeft" class="mediaPage" alt="" />
+        <img id="mediaRight" class="mediaPage" alt="" hidden />
+      </div>
     </div>
     <div id="empty" hidden>No songs in this playlist.</div>
     <div id="hint">Tap left/right · pinch to zoom · swipe · arrow keys</div>
@@ -68,12 +80,16 @@
     }
 
     var zoomWrap = document.getElementById('zoomWrap');
-    var media = document.getElementById('media');
+    var mediaRow = document.getElementById('mediaRow');
+    var mediaLeft = document.getElementById('mediaLeft');
+    var mediaRight = document.getElementById('mediaRight');
     var metaEl = document.getElementById('meta');
     var emptyEl = document.getElementById('empty');
     var stage = document.getElementById('stage');
     var editBtn = document.getElementById('editBtn');
     var restartBtn = document.getElementById('restartBtn');
+    var downloadBtn = document.getElementById('downloadBtn');
+    var twoUpBtn = document.getElementById('twoUpBtn');
     var uploadBtn = document.getElementById('uploadBtn');
 
     var touchStartX = 0;
@@ -82,6 +98,8 @@
     var connectionLost = false;
     var lastSongIndex = -1;
     var lastPageIndex = -1;
+    var currentSongIndex = -1;
+    var twoUp = false;
     var scale = 1;
     var offsetX = 0;
     var offsetY = 0;
@@ -114,6 +132,22 @@
     }
 
     restartBtn.addEventListener('click', restart);
+    downloadBtn.addEventListener('click', function() {
+      if (busy || !playlistApi || currentSongIndex < 0) return;
+      RemoteCompat.triggerDownload(playlistApi + '/download?song=' + currentSongIndex);
+    });
+    twoUpBtn.addEventListener('click', function() {
+      if (busy) return;
+      twoUp = !twoUp;
+      if (twoUp) {
+        twoUpBtn.className = 'active';
+        mediaRow.className = 'two-up';
+      } else {
+        twoUpBtn.className = '';
+        mediaRow.className = '';
+      }
+      refresh();
+    });
     editBtn.addEventListener('click', function() {
       if (busy || !playlistApi) return;
       window.location.href = '/edit' + playlistQuery();
@@ -145,6 +179,21 @@
       return RemoteCompat.hypot(dx, dy);
     }
 
+    function mediaUrl(songIndex, pageIndex) {
+      return playlistApi + '/media?song=' + songIndex + '&page=' + pageIndex;
+    }
+
+    function updateMedia(s, song, pageCount) {
+      mediaLeft.src = mediaUrl(s.songIndex, s.pageIndex);
+      if (twoUp && s.pageIndex + 1 < pageCount) {
+        mediaRight.src = mediaUrl(s.songIndex, s.pageIndex + 1);
+        RemoteCompat.setHidden(mediaRight, false);
+      } else {
+        mediaRight.removeAttribute('src');
+        RemoteCompat.setHidden(mediaRight, true);
+      }
+    }
+
     function refresh() {
       if (!playlistApi) {
         window.location.replace('/');
@@ -152,6 +201,7 @@
       }
       uploadBtn.disabled = false;
       restartBtn.disabled = false;
+      downloadBtn.disabled = false;
       editBtn.disabled = false;
       RemoteCompat.get(playlistApi + '/state', function(ok, s) {
         if (!ok || !s) {
@@ -171,6 +221,7 @@
         RemoteCompat.setHidden(emptyEl, true);
         RemoteCompat.setHidden(zoomWrap, false);
         var song = s.songs[s.songIndex];
+        currentSongIndex = s.songIndex;
         var pageCount = song.pageCount || 1;
         var pageLabel = pageCount > 1 ? ' \u00b7 page ' + (s.pageIndex + 1) + '/' + pageCount : '';
         metaEl.textContent = (s.playlistName || 'Playlist') + ' \u00b7 ' + (s.songIndex + 1) + '/' + s.songs.length + ': ' +
@@ -181,8 +232,8 @@
           resetZoom();
           lastSongIndex = s.songIndex;
           lastPageIndex = s.pageIndex;
-          media.src = playlistApi + '/media?song=' + s.songIndex + '&page=' + s.pageIndex;
         }
+        updateMedia(s, song, pageCount);
       });
     }
 

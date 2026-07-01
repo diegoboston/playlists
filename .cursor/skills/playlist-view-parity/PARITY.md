@@ -31,6 +31,8 @@ Update this file when adding features or recording **intentional** differences.
 | Record song view | `recordSongView` on change | — | **Intentional** (local analytics) |
 | Upload new song | Share intent / import flow | `+` on play/edit → playlist upload; `/songs` → catalog upload | **Intentional** (remote only) |
 | Browse song archive | Songs tab — search + sort | `/songs` — search + same sort buttons | Aligned |
+| Quickstart playlist | Quickstart screen | `/` index — paste, match, create | Aligned (remote only UI on index) |
+| 2-up page spread | — | **2-up** toggle on play view | **Intentional** (remote only) |
 | Open playlist editor | In-app detail screen | Pencil → `/edit` | Aligned entry points |
 
 ## Server / data
@@ -45,6 +47,8 @@ Update this file when adding features or recording **intentional** differences.
 | `GET /api/parse-filename` | Suggest title/key/notes on upload |
 | `GET /api/playlists` | All playlists (id, name, color, songCount) |
 | `POST /api/playlists/create` | Create playlist |
+| `POST /api/playlists/quickstart/match` | Match quickstart lines against archive |
+| `POST /api/playlists/quickstart/create` | Create playlist from quickstart paste |
 | `POST /api/playlists/reorder` | Reorder playlists (library order) |
 | `POST /api/playlists/{id}/rename` | Rename playlist |
 | `POST /api/playlists/{id}/color` | Set or clear playlist accent color |

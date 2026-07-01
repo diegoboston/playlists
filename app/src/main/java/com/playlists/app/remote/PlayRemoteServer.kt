@@ -2,6 +2,7 @@ package com.playlists.app.remote
 
 import android.graphics.Bitmap
 import com.playlists.app.ui.PdfHelper
+import com.playlists.app.util.SongFileNames
 import com.playlists.app.util.SongTitleMigration
 import com.playlists.app.util.SongStoragePaths
 import fi.iki.elonen.NanoHTTPD
@@ -47,6 +48,8 @@ class PlayRemoteServer(
     private val onReorderPlaylists: ((playlistIds: List<Long>) -> Result<Unit>)? = null,
     private val onCreatePlaylist: ((name: String) -> Result<Long>)? = null,
     private val onDeletePlaylist: ((id: Long) -> Result<Unit>)? = null,
+    private val onMatchQuickstart: ((text: String) -> List<QuickstartMatchJson>)? = null,
+    private val onCreateQuickstart: ((name: String, text: String, withPlaceholders: Boolean) -> Result<Long>)? = null,
 ) : NanoHTTPD(hostname, port) {
 
     private val sessionToken: String = UUID.randomUUID().toString()
@@ -96,6 +99,13 @@ class PlayRemoteServer(
         val songCount: Int,
     )
 
+    data class QuickstartMatchJson(
+        val line: String,
+        val songId: Long?,
+        val title: String?,
+        val key: String?,
+    )
+
     private data class PlaybackState(
         var songIndex: Int = 0,
         var pageIndex: Int = 0,
@@ -123,6 +133,7 @@ class PlayRemoteServer(
                 sub == "/entries" -> handleEntries(playlistId)
                 sub == "/navigate" && session.method == Method.POST -> handleNavigate(playlistId, session)
                 sub == "/media" -> serveMedia(playlistId, session)
+                sub == "/download" -> serveDownload(playlistId, session)
                 sub == "/reorder" && session.method == Method.POST -> handleReorder(playlistId, session)
                 sub == "/remove" && session.method == Method.POST -> handleRemove(playlistId, session)
                 sub == "/add" && session.method == Method.POST -> handleAdd(playlistId, session)
@@ -151,6 +162,10 @@ class PlayRemoteServer(
             uri == "/api/playlists" && session.method == Method.GET -> handleListPlaylists()
             uri == "/api/playlists/reorder" && session.method == Method.POST -> handleReorderPlaylists(session)
             uri == "/api/playlists/create" && session.method == Method.POST -> handleCreatePlaylist(session)
+            uri == "/api/playlists/quickstart/match" && session.method == Method.POST ->
+                handleMatchQuickstart(session)
+            uri == "/api/playlists/quickstart/create" && session.method == Method.POST ->
+                handleCreateQuickstart(session)
             uri == "/api/parse-filename" -> handleParseFilename(session)
             uri == "/api/songs/search" -> handleSearch(session)
             else -> notFound()
@@ -439,6 +454,41 @@ class PlayRemoteServer(
         }
     }
 
+    private fun handleMatchQuickstart(session: IHTTPSession): Response {
+        val handler = onMatchQuickstart ?: return jsonError("Quickstart match not available")
+        val raw = readPostBody(session)
+        val text = parseStringField(raw, "text") ?: return jsonError("Missing text")
+        val results = handler(text)
+        val sb = StringBuilder("""{"results":[""")
+        results.forEachIndexed { i, result ->
+            if (i > 0) sb.append(',')
+            val songIdJson = result.songId?.toString() ?: "null"
+            val titleJson = result.title?.let { jsonStr(it) } ?: "null"
+            val keyJson = result.key?.let { jsonStr(it) } ?: "null"
+            sb.append(
+                """{"line":${jsonStr(result.line)},"songId":$songIdJson,"title":$titleJson,"key":$keyJson}""",
+            )
+        }
+        sb.append("]}")
+        return jsonResponse(sb.toString())
+    }
+
+    private fun handleCreateQuickstart(session: IHTTPSession): Response {
+        val handler = onCreateQuickstart ?: return jsonError("Quickstart create not available")
+        val raw = readPostBody(session)
+        val name = parseStringField(raw, "name") ?: return jsonError("Missing name")
+        if (name.isBlank()) return jsonError("Missing name")
+        val text = parseStringField(raw, "text") ?: return jsonError("Missing text")
+        val withPlaceholders = Regex(""""withPlaceholders"\s*:\s*true""").containsMatchIn(raw)
+        val result = handler(name, text, withPlaceholders)
+        return if (result.isSuccess) {
+            val id = result.getOrThrow()
+            jsonResponse("""{"id":$id,"name":${jsonStr(name)}}""")
+        } else {
+            jsonError(result.exceptionOrNull()?.message ?: "Quickstart create failed")
+        }
+    }
+
     private fun handleDeletePlaylist(playlistId: Long): Response {
         val handler = onDeletePlaylist ?: return jsonError("Playlist delete not available")
         return if (handler(playlistId).isSuccess) {
@@ -668,6 +718,43 @@ class PlayRemoteServer(
                 )
             }
         }
+    }
+
+    private fun serveDownload(playlistId: Long, session: IHTTPSession): Response {
+        val loaded = loadPlaylist(playlistId) ?: return jsonNotFound("Playlist not found")
+        val songs = loaded.songs
+        if (songs.isEmpty()) {
+            return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "No songs")
+        }
+        val state = playback(playlistId)
+        clampPlayback(songs, state)
+        val params = session.parameters
+        val sIdx = params["song"]?.firstOrNull()?.toIntOrNull()?.coerceIn(0, songs.lastIndex)
+            ?: state.songIndex
+        val song = songs[sIdx]
+        val file = SongStoragePaths.resolve(song.filePath)
+        if (!file.exists()) {
+            return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "File missing")
+        }
+        val ext = SongFileNames.extensionOf(file.name)
+        val downloadName = SongFileNames.mediaFileName(song.title, song.songId, ext)
+        val mime = when (song.fileType) {
+            "PDF" -> "application/pdf"
+            else -> when (ext) {
+                "png" -> "image/png"
+                "gif" -> "image/gif"
+                "webp" -> "image/webp"
+                else -> "image/jpeg"
+            }
+        }
+        val response = newFixedLengthResponse(
+            Response.Status.OK,
+            mime,
+            FileInputStream(file),
+            file.length(),
+        )
+        response.addHeader("Content-Disposition", "attachment; filename=\"$downloadName\"")
+        return response
     }
 
     private fun jsonNotFound(message: String): Response =

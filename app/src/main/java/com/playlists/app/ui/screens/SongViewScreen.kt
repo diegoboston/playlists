@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.playlists.app.R
 import com.playlists.app.data.FileType
@@ -36,6 +38,7 @@ import com.playlists.app.ui.components.EditSongDialog
 import com.playlists.app.ui.components.PlaybackSongMedia
 import com.playlists.app.ui.components.PlaybackStage
 import com.playlists.app.util.ChartDraftStore
+import com.playlists.app.util.SongShare
 import com.playlists.app.util.SongStoragePaths
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,6 +56,7 @@ fun SongViewScreen(
     var showEdit by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<SongDeletePrompt?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     LaunchedEffect(songId) {
         song = viewModel.getSong(songId)
@@ -170,6 +174,11 @@ fun SongViewScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        SongShare.share(context, file, loaded.title, fileType)
+                    }) {
+                        Icon(Icons.Default.Download, contentDescription = stringResource(R.string.share_song))
+                    }
                     IconButton(onClick = { showEdit = true }) {
                         Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit_song))
                     }

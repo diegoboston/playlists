@@ -10,6 +10,8 @@
     #header { padding: 20px 16px 12px; text-align: center; }
     #header h1 { font-size: 22px; margin-bottom: 6px; }
     #header p { opacity: .7; font-size: 14px; }
+    #navLinks { margin-top: 10px; font-size: 14px; }
+    #navLinks a { color: #7ecbff; text-decoration: none; }
     #content { padding: 8px 16px 32px; max-width: 640px; margin: 0 auto; }
     #error { color: #ff8a80; font-size: 14px; margin-bottom: 12px; min-height: 1.2em; text-align: center; }
     #empty { text-align: center; opacity: .75; padding: 32px 16px; }
@@ -26,30 +28,60 @@
     .btn-play:disabled { opacity: .45; cursor: default; }
     .btn-edit { background: rgba(0,0,0,.15); color: inherit; border: 1px solid rgba(255,255,255,.2); font-weight: 500; }
     #content.busy { opacity: .6; pointer-events: none; }
+    #quickstart { border: 1px solid rgba(255,255,255,.15); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+    #quickstart h2 { font-size: 16px; margin-bottom: 10px; }
+    #quickstartText { width: 100%; min-height: 120px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.06); color: inherit; font-family: inherit; font-size: 14px; padding: 10px; resize: vertical; }
+    #quickstartActions { margin-top: 10px; display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; }
+    #quickstartActions .btn { margin-left: 0; margin-right: 8px; margin-bottom: 8px; background: rgba(255,255,255,.12); color: inherit; border: 1px solid rgba(255,255,255,.25); }
+    #quickstartActions .btn-primary { background: #1976d2; border-color: #1976d2; color: #fff; }
+    #quickstartSummary { margin-top: 12px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; opacity: .9; }
+    #quickstartSummary[hidden] { display: none !important; }
+    #quickstartCreate[hidden], #quickstartPlaceholders[hidden] { display: none !important; }
   </style>
 </head>
 <body>
   <div id="header">
     <h1>Playlists</h1>
     <p>Choose a playlist to play on this device.</p>
-    <p style="margin-top: 10px;"><a href="/songs" style="color: #7ecbff; font-size: 14px; text-decoration: none;">Song archive</a></p>
+    <p id="navLinks"><a href="/songs">Song archive</a></p>
   </div>
   <div id="content">
     <div id="error"></div>
+    <section id="quickstart">
+      <h2>Quickstart playlist</h2>
+      <textarea id="quickstartText" placeholder="Paste a set list or song titles (one per line)…"></textarea>
+      <div id="quickstartActions">
+        <button class="btn btn-primary" id="quickstartMatchBtn" type="button">Match songs</button>
+        <button class="btn btn-primary" id="quickstartCreate" type="button" hidden>Create</button>
+        <button class="btn" id="quickstartPlaceholders" type="button" hidden>Create with placeholders</button>
+      </div>
+      <div id="quickstartSummary" hidden></div>
+    </section>
     <ul id="list"></ul>
-    <div id="empty" hidden>No playlists yet. Create one in the app.</div>
+    <div id="empty" hidden>No playlists yet. Create one in the app or use Quickstart above.</div>
   </div>
   <script src="/compat.js"></script>
+  <script src="/song-display.js"></script>
   <script>
     var PALETTE = [
       0xE57373, 0xFFB74D, 0xFFF176, 0xAED581, 0x4DD0E1,
       0x64B5F6, 0x9575CD, 0xF06292, 0x90A4AE, 0x8D6E63
     ];
+    var NO_MATCH_LABEL = '(no match)';
+    var DEFAULT_QUICKSTART_NAME = 'Quickstart';
 
     var listEl = document.getElementById('list');
     var emptyEl = document.getElementById('empty');
     var errorEl = document.getElementById('error');
     var contentEl = document.getElementById('content');
+    var quickstartTextEl = document.getElementById('quickstartText');
+    var quickstartSummaryEl = document.getElementById('quickstartSummary');
+    var quickstartMatchBtn = document.getElementById('quickstartMatchBtn');
+    var quickstartCreateBtn = document.getElementById('quickstartCreate');
+    var quickstartPlaceholdersBtn = document.getElementById('quickstartPlaceholders');
+
+    var matchResults = [];
+    var quickstartBusy = false;
 
     function argbToCss(argb) {
       if (argb == null) return null;
@@ -70,6 +102,79 @@
     function songCountLabel(n) {
       return n === 1 ? '1 song' : n + ' songs';
     }
+
+    function formatQuickstartSummary(results) {
+      var lines = [];
+      for (var i = 0; i < results.length; i++) {
+        var result = results[i];
+        var target;
+        if (result.songId != null && result.title != null) {
+          target = SongDisplay.adjustedSongTitle(result.title, result.key || '');
+        } else {
+          target = NO_MATCH_LABEL;
+        }
+        lines.push('\u2022 ' + result.line + ' \u2192 ' + target);
+      }
+      return lines.join('\n');
+    }
+
+    function updateQuickstartActions() {
+      var matched = 0;
+      var unmatched = 0;
+      for (var i = 0; i < matchResults.length; i++) {
+        if (matchResults[i].songId != null) matched++;
+        else unmatched++;
+      }
+      RemoteCompat.setHidden(quickstartCreateBtn, matched === 0);
+      RemoteCompat.setHidden(quickstartPlaceholdersBtn, unmatched === 0);
+    }
+
+    function runQuickstartMatch() {
+      if (quickstartBusy) return;
+      var text = quickstartTextEl.value.replace(/^\s+|\s+$/g, '');
+      if (!text) return;
+      quickstartBusy = true;
+      errorEl.textContent = '';
+      RemoteCompat.postJson('/api/playlists/quickstart/match', { text: text }, function(ok, data) {
+        quickstartBusy = false;
+        if (!ok || !data || !data.results) {
+          errorEl.textContent = 'Could not match songs';
+          return;
+        }
+        matchResults = data.results;
+        quickstartSummaryEl.textContent = formatQuickstartSummary(matchResults);
+        RemoteCompat.setHidden(quickstartSummaryEl, false);
+        updateQuickstartActions();
+      });
+    }
+
+    function runQuickstartCreate(withPlaceholders) {
+      if (quickstartBusy) return;
+      var text = quickstartTextEl.value.replace(/^\s+|\s+$/g, '');
+      if (!text) return;
+      var name = window.prompt('Playlist name', DEFAULT_QUICKSTART_NAME);
+      if (name == null) return;
+      name = name.replace(/^\s+|\s+$/g, '');
+      if (!name) name = DEFAULT_QUICKSTART_NAME;
+      quickstartBusy = true;
+      errorEl.textContent = '';
+      RemoteCompat.postJson('/api/playlists/quickstart/create', {
+        name: name,
+        text: text,
+        withPlaceholders: withPlaceholders
+      }, function(ok, data) {
+        quickstartBusy = false;
+        if (!ok || !data || data.id == null) {
+          errorEl.textContent = 'Could not create playlist';
+          return;
+        }
+        window.location.href = '/edit?playlist=' + data.id;
+      });
+    }
+
+    quickstartMatchBtn.addEventListener('click', runQuickstartMatch);
+    quickstartCreateBtn.addEventListener('click', function() { runQuickstartCreate(false); });
+    quickstartPlaceholdersBtn.addEventListener('click', function() { runQuickstartCreate(true); });
 
     function load() {
       contentEl.className = 'busy';
