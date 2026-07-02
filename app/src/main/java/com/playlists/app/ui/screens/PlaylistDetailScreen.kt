@@ -145,7 +145,7 @@ fun PlaylistDetailScreen(
     }
 
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
-    val remoteActiveHere = remoteRunning && PlayRemoteController.isRunningFor(playlistId)
+    val remoteSessionHere = remoteRunning && PlayRemoteController.isSessionFor(playlistId)
 
     LaunchedEffect(entries, dragState.draggingKey) {
         syncDisplayedKeys(displayedKeys, dragState.draggingKey, entries.map { "e:${it.id}" })
@@ -249,9 +249,9 @@ fun PlaylistDetailScreen(
                             Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.play))
                         }
                         RemotePlayIconButton(
-                            active = remoteActiveHere,
+                            active = remoteSessionHere,
                             onClick = {
-                                if (remoteActiveHere) {
+                                if (remoteSessionHere) {
                                     scope.launch(Dispatchers.IO) {
                                         PlayRemoteController.stop()
                                     }
@@ -260,7 +260,7 @@ fun PlaylistDetailScreen(
                                     remoteFlow = RemotePlayFlowState.ChooseMode
                                 }
                             },
-                            onLongClick = if (remoteActiveHere) {
+                            onLongClick = if (remoteSessionHere) {
                                 { showRemoteDebug = true }
                             } else {
                                 null
@@ -391,7 +391,7 @@ fun PlaylistDetailScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showDelete = false
-                    if (PlayRemoteController.isRunningFor(playlistId)) {
+                    if (PlayRemoteController.isSessionFor(playlistId)) {
                         scope.launch(Dispatchers.IO) { PlayRemoteController.stop() }
                     }
                     viewModel.deletePlaylist(playlistId)

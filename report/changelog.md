@@ -1,6 +1,52 @@
 # Changelog
 
-**Stage Manager (playlists)** — commit-by-commit release log (newest first).
+**Stage Manager** — commit-by-commit release log (newest first).
+
+---
+
+## `7c350d5` — song download/playlist quicklist
+
+**2026-07-01 (7:21 AM EDT)** · [commit](https://github.com/diegoboston/playlists/commit/7c350d57d5e6f5e392afc1336fec082c754282f5)
+
+- Song viewer and playlist playback: **↓** opens the system share sheet to save or send the original image or PDF.
+- Remote play: **↓** in the browser downloads the current song file (`GET /api/playlists/{id}/download?song=`).
+- Remote playlist picker (`/`) adds **Quickstart playlist** — paste a set list, **Match songs**, then **Create** or **Create with placeholders** (same flow as the app).
+
+---
+
+## 1.0.56 · `9b920d0` — human filenames/better Guido/NFC report
+
+**Released:** 2026-06-29 (6:52 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/9b920d099f3a8bdabf12f9d643b1994d6373e677)
+
+- Song files on disk use `{Title}-{songId}.{ext}` (migration renames existing media and chart sidecars on first launch).
+- Refreshed **Guido** alternate launcher icon artwork.
+- Planning doc for NFC playlist sharing (`report/nfc-playlist-sharing.md`).
+
+---
+
+## 1.0.55 · `36d3ab1` — Guido icon
+
+**Released:** 2026-06-27 (2:02 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/36d3ab1dce75b81ca3c9e5eb5957304c33f48ba2)
+
+- Settings **App icon**: pick **Original** or **Guido** launcher icon (home screen may take a moment to refresh).
+
+---
+
+## 1.0.54 · `cde371f` — reorg pencil/fix export
+
+**Released:** 2026-06-26 (12:29 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/cde371f3f6823c259ab59fb7ba8988b3f7fd8f21)
+
+- Playlist **pencil** menu extracted to a shared component on the Playlists tab and playlist detail (rename, color, delete, duplicate, export PDF).
+- **Export PDF** keeps source PDFs open during merge so vector page import is reliable.
+
+---
+
+## 1.0.53 · `b809186` — combined page views
+
+**Released:** 2026-06-26 (12:19 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/b8091860e2feed8f63db87e9e27f5b321b82ff17)
+
+- Song viewer reuses **PlaybackStage** — tap/swipe between PDF pages, pinch zoom on images and single-page PDFs (same gestures as playlist playback).
+- Shared `PlaybackSongMedia` composable for playback and archive song view.
 
 ---
 

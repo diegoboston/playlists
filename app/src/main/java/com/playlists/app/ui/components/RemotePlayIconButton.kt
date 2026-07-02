@@ -21,7 +21,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -44,6 +46,7 @@ fun RemotePlayIconButton(
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    var suppressNextClick by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
             .size(48.dp)
@@ -51,8 +54,19 @@ fun RemotePlayIconButton(
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = ripple(bounded = false, radius = 24.dp),
-                onClick = onClick,
-                onLongClick = onLongClick,
+                onClick = {
+                    if (suppressNextClick) {
+                        suppressNextClick = false
+                        return@combinedClickable
+                    }
+                    onClick()
+                },
+                onLongClick = onLongClick?.let { handler ->
+                    {
+                        suppressNextClick = true
+                        handler()
+                    }
+                },
             ),
         contentAlignment = Alignment.Center,
     ) {

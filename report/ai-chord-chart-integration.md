@@ -1,6 +1,6 @@
 # AI chord chart integration — implementation plan
 
-**Stage Manager (playlists)** · June 2026  
+**Stage Manager** · June 2026  
 **Status:** Proposed (not implemented)  
 **Audience:** Personal demo — not production. Copyright/licensing UX (disclaimers, lyric truncation) is **out of scope** for v0.1; extract full chords and lyrics from web sources for the author’s own use. Revisit if the app is shared or published broadly.
 

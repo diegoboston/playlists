@@ -183,11 +183,28 @@
       return playlistApi + '/media?song=' + songIndex + '&page=' + pageIndex;
     }
 
-    function updateMedia(s, song, pageCount) {
+    function nextPageRef(songs, songIndex, pageIndex) {
+      var pageCount = songs[songIndex].pageCount || 1;
+      if (pageIndex + 1 < pageCount) {
+        return { songIndex: songIndex, pageIndex: pageIndex + 1 };
+      }
+      if (songIndex + 1 < songs.length) {
+        return { songIndex: songIndex + 1, pageIndex: 0 };
+      }
+      return null;
+    }
+
+    function updateMedia(s, songs) {
       mediaLeft.src = mediaUrl(s.songIndex, s.pageIndex);
-      if (twoUp && s.pageIndex + 1 < pageCount) {
-        mediaRight.src = mediaUrl(s.songIndex, s.pageIndex + 1);
-        RemoteCompat.setHidden(mediaRight, false);
+      if (twoUp) {
+        var next = nextPageRef(songs, s.songIndex, s.pageIndex);
+        if (next) {
+          mediaRight.src = mediaUrl(next.songIndex, next.pageIndex);
+          RemoteCompat.setHidden(mediaRight, false);
+        } else {
+          mediaRight.removeAttribute('src');
+          RemoteCompat.setHidden(mediaRight, true);
+        }
       } else {
         mediaRight.removeAttribute('src');
         RemoteCompat.setHidden(mediaRight, true);
@@ -233,7 +250,7 @@
           lastSongIndex = s.songIndex;
           lastPageIndex = s.pageIndex;
         }
-        updateMedia(s, song, pageCount);
+        updateMedia(s, s.songs);
       });
     }
 

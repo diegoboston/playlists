@@ -33,7 +33,7 @@ private val DarkColors = darkColorScheme(
 )
 
 @Composable
-fun PlaylistsTheme(
+fun StageManagerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,

@@ -37,7 +37,10 @@ fun RemotePlayDebugDialog(
     var refreshTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(refreshTick) {
-        val info = withContext(Dispatchers.IO) { PlayRemoteController.collectDebugInfo() }
+        val info = withContext(Dispatchers.IO) {
+            PlayRemoteController.syncAfterForeground()
+            PlayRemoteController.collectDebugInfo()
+        }
         if (isActive) {
             debug = info
         }
@@ -53,18 +56,19 @@ fun RemotePlayDebugDialog(
                     .heightIn(max = 480.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
-                val url = debug?.publicUrl ?: PlayRemoteController.currentUrl()
+                val url = debug?.publicUrl ?: PlayRemoteController.displayUrl()
                 if (url != null) {
                     RemotePlayUrlSection(url = url)
                     Spacer(Modifier.height(12.dp))
                 }
                 val info = debug
-                if (info == null) {
-                    if (url == null) {
+                when {
+                    info == null && url == null -> {
                         Text(stringResource(R.string.remote_debug_unavailable))
                     }
-                } else if (info.hasIssues()) {
-                    RemotePlayDebugPanel(info = info, onRefresh = { refreshTick++ })
+                    info != null -> {
+                        RemotePlayDebugPanel(info = info, onRefresh = { refreshTick++ })
+                    }
                 }
             }
         },

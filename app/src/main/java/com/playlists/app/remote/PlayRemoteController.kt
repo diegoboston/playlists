@@ -48,10 +48,37 @@ object PlayRemoteController {
     fun isRunningFor(playlistId: Long): Boolean =
         isRunning() && activePlaylistId == playlistId
 
+    fun isSessionFor(playlistId: Long): Boolean =
+        _running.value && activePlaylistId == playlistId
+
     fun currentUrl(): String? = if (isRunning()) publicUrl else null
 
+    /** URL for status/debug UI — kept after the HTTP server dies until the session is cleared. */
+    fun displayUrl(): String? = session?.publicUrl ?: currentUrl()
+
+    /** Clear stale UI state after backgrounding (e.g. service died but [running] was frozen). */
+    fun syncAfterForeground() {
+        synchronized(stopLock) {
+            if (_running.value && session == null) {
+                _running.value = false
+            }
+        }
+    }
+
+    internal fun shouldClearRunningFlag(running: Boolean, hasSession: Boolean): Boolean =
+        running && !hasSession
+
     fun collectDebugInfo(): RemotePlayDebugInfo? {
+        syncAfterForeground()
         val active = session ?: return null
+        return try {
+            collectDebugInfoForSession(active)
+        } catch (e: Exception) {
+            debugInfoAfterFailure(active, e)
+        }
+    }
+
+    private fun collectDebugInfoForSession(active: RemotePlaySession): RemotePlayDebugInfo {
         val localUrl = "http://127.0.0.1:${active.localPort}/"
         val localProbe = RemotePlayHealth.probeGet(localUrl, timeoutMs = 4_000)
         val cloudflaredRunning = CloudflareTunnel.isRunning()
@@ -89,6 +116,27 @@ object PlayRemoteController {
             tunnelProbe = tunnelProbe,
             cloudflaredLog = CloudflareTunnel.recentLogs(),
             warnings = warnings,
+            checkedAtMs = System.currentTimeMillis(),
+        )
+    }
+
+    private fun debugInfoAfterFailure(active: RemotePlaySession, error: Exception): RemotePlayDebugInfo {
+        val localUrl = "http://127.0.0.1:${active.localPort}/"
+        val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
+        val failedProbe = RemotePlayHealth.ProbeResult(localUrl, ok = false, detail = detail)
+        return RemotePlayDebugInfo(
+            mode = active.mode,
+            localPort = active.localPort,
+            localUrl = localUrl,
+            tunnelBaseUrl = active.tunnelBaseUrl,
+            publicUrl = active.publicUrl,
+            serverAlive = server?.isAlive == true,
+            tunnelProcessAlive = CloudflareTunnel.isRunning(),
+            tunnelExitCode = CloudflareTunnel.lastExitCode(),
+            localProbe = failedProbe,
+            tunnelProbe = null,
+            cloudflaredLog = CloudflareTunnel.recentLogs(),
+            warnings = listOf("Debug check failed ($detail)."),
             checkedAtMs = System.currentTimeMillis(),
         )
     }
@@ -253,7 +301,9 @@ object PlayRemoteController {
 
     fun refreshSongs(entries: List<PlaylistSongWithDetails>) {
         val playlistId = activePlaylistId ?: return
-        server?.reconcilePlayback(playlistId, entriesToRemoteSongs(entries))
+        val remote = server ?: return
+        if (!remote.isAlive) return
+        remote.reconcilePlayback(playlistId, entriesToRemoteSongs(entries))
     }
 
     fun stop() {

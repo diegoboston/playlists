@@ -1,6 +1,6 @@
 # NFC playlist sharing — implementation plan
 
-**Stage Manager (playlists)** · June 2026  
+**Stage Manager** · June 2026  
 **Status:** Proposed (not implemented)
 
 ## Summary

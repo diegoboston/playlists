@@ -1,6 +1,6 @@
 # Cloudflare Worker stable URL — implementation plan
 
-**Stage Manager (playlists)** · June 2026  
+**Stage Manager** · June 2026  
 **Status:** Proposed (not implemented)
 
 ## Summary
@@ -30,6 +30,34 @@ Authentication is **one-time manual copy/paste** in Settings (Worker URL + write
 | Phone app | Shows ephemeral URL in `RemotePlayStartedDialog` only |
 
 Quick tunnels are intentionally ephemeral. The PIN in Settings still protects access; the missing piece is a **stable pointer** to whichever tunnel is active.
+
+---
+
+## Existing issues (remote play reliability)
+
+Remote play is **designed** to keep running in the background via `RemotePlayService` (foreground notification). In practice, the local HTTP server (`PlayRemoteServer`) and `cloudflared` subprocess live in the **app process**, not in the service process. If Android (or an OEM battery saver) kills or restricts that process shortly after the app is backgrounded, both the server and tunnel stop — even though the UI may still show remote play as active until the app is reopened.
+
+Related symptoms:
+
+| Symptom | Likely cause |
+|---------|----------------|
+| Browser / `multi_upload.py` loses connection a short time after leaving the app | Process trimmed or killed despite foreground service |
+| Stable Worker redirect points at a dead tunnel | Phone stopped publishing; KV still has last URL until next session |
+| Long-press on Wi‑Fi for status/debug misbehaved after reopen | Stale `running` flag vs dead server (partially hardened in app code) |
+
+A stable Worker URL does **not** fix this by itself — it only fixes link rot. The phone must still keep the tunnel alive for bookmarks and scripts to work.
+
+### Potential reliability improvements (not implemented)
+
+If remote play should survive backgrounding more reliably, likely next steps:
+
+1. **Battery optimization** — Document or prompt the user to exempt Stage Manager from battery optimization / “allow unrestricted background” (OEM-dependent).
+2. **Notification permission (Android 13+)** — Ensure `POST_NOTIFICATIONS` is granted so the foreground-service notification can stay up; without it, the service is less reliable.
+3. **Move server/tunnel into the service process** — Run `PlayRemoteServer` and `cloudflared` under `RemotePlayService` (or a dedicated process) so they are not tied to the activity lifecycle.
+4. **Restart / watchdog logic** — While remote play is “active”, periodically probe local server + `cloudflared` and restart them if dead instead of leaving a stale session.
+5. **Partial wake lock during active remote play** — Hold `PARTIAL_WAKE_LOCK` for the session so Doze is less likely to suspend network/CPU while tunneled (trade-off: battery).
+
+These are orthogonal to the Worker stable-URL work but affect whether a stable bookmark remains usable between app interactions.
 
 ---
 

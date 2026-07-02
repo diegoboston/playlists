@@ -22,9 +22,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import com.playlists.app.PlaylistsApp
 import com.playlists.app.R
+import com.playlists.app.remote.PlayRemoteController
 import com.playlists.app.ui.navigation.AppNavigation
 import com.playlists.app.ui.screens.StorageAccessScreen
-import com.playlists.app.ui.theme.PlaylistsTheme
+import com.playlists.app.ui.theme.StageManagerTheme
 import com.playlists.app.util.AppUpdate
 import com.playlists.app.util.ShareImporter
 import com.playlists.app.util.SharePayload
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity() {
         }
         tryEnableStorage()
         setContent {
-            PlaylistsTheme {
+            StageManagerTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     if (storageReady) {
                         AppNavigation(
@@ -90,6 +91,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        PlayRemoteController.syncAfterForeground()
         tryEnableStorage()
         tryLaunchPendingInstall()
     }

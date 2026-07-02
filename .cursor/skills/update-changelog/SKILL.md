@@ -96,7 +96,7 @@ Do **not** duplicate the commit subject in the bullets. Do **not** mention chang
 ```markdown
 # Changelog
 
-**Stage Manager (playlists)** — commit-by-commit release log (newest first).
+**Stage Manager** — commit-by-commit release log (newest first).
 
 ---
 

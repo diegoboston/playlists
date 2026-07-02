@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Playlists"
+rootProject.name = "Stage Manager"
 include(":app")

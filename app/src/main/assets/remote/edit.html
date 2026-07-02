@@ -12,8 +12,10 @@
     #title { font-size: 18px; font-weight: 700; -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px; }
     #doneBtn { background: #7ecbff; color: #000; border: none; border-radius: 8px; padding: 10px 16px; font-size: 15px; font-weight: 600; cursor: pointer; -webkit-flex-shrink: 0; flex-shrink: 0; margin-left: 8px; }
     #doneBtn:disabled { opacity: .5; cursor: default; }
-    #uploadBtn { background: transparent; border: 1px solid #666; color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; -webkit-flex-shrink: 0; flex-shrink: 0; }
-    #uploadBtn:disabled { opacity: .4; cursor: default; }
+    #uploadBtn, #playBtn { background: transparent; border: 1px solid #666; color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    #uploadBtn { margin-left: 8px; }
+    #playBtn { margin-left: 8px; }
+    #uploadBtn:disabled, #playBtn:disabled { opacity: .4; cursor: default; }
     #headerActions { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-flex-shrink: 0; flex-shrink: 0; }
     #content { padding: 12px 16px 32px; max-width: 640px; margin: 0 auto; }
     #empty { text-align: center; opacity: .75; padding: 32px 16px; }
@@ -44,6 +46,7 @@
     <div id="title">Playlist</div>
     <div id="headerActions">
       <button id="uploadBtn" type="button">Upload</button>
+      <button id="playBtn" type="button">Play</button>
       <button id="doneBtn" type="button">Done</button>
     </div>
   </div>
@@ -63,6 +66,7 @@
   <script>
     var titleEl = document.getElementById('title');
     var doneBtn = document.getElementById('doneBtn');
+    var playBtn = document.getElementById('playBtn');
     var uploadBtn = document.getElementById('uploadBtn');
     var listEl = document.getElementById('list');
     var emptyEl = document.getElementById('empty');
@@ -89,6 +93,7 @@
       busy = on;
       contentEl.className = on ? 'busy' : '';
       doneBtn.disabled = on;
+      playBtn.disabled = on;
       uploadBtn.disabled = on;
     }
 
@@ -246,18 +251,20 @@
     }
 
     function runSearch(query) {
-      RemoteCompat.get('/api/songs/search?q=' + encodeURIComponent(query), function(ok, data) {
+      var trimmed = query.replace(/^\s+|\s+$/g, '');
+      if (!trimmed) {
+        searchResults.innerHTML = '';
+        return;
+      }
+      RemoteCompat.get('/api/songs/search?q=' + encodeURIComponent(trimmed), function(ok, data) {
         if (!ok || !data) return;
         searchResults.innerHTML = '';
-        var trimmed = query.replace(/^\s+|\s+$/g, '');
-        if (trimmed) {
-          var phRow = document.createElement('div');
-          phRow.className = 'searchRow placeholder';
-          phRow.innerHTML = '<div class="song-title"></div>';
-          phRow.querySelector('.song-title').textContent = SongDisplay.addPlaceholderPrompt(trimmed);
-          phRow.addEventListener('click', function() { addPlaceholder(trimmed); });
-          searchResults.appendChild(phRow);
-        }
+        var phRow = document.createElement('div');
+        phRow.className = 'searchRow placeholder';
+        phRow.innerHTML = '<div class="song-title"></div>';
+        phRow.querySelector('.song-title').textContent = SongDisplay.addPlaceholderPrompt(trimmed);
+        phRow.addEventListener('click', function() { addPlaceholder(trimmed); });
+        searchResults.appendChild(phRow);
         var songs = data.songs || [];
         for (var i = 0; i < songs.length; i++) {
           (function(song) {
@@ -275,9 +282,12 @@
       });
     }
 
-    doneBtn.addEventListener('click', function() {
+    function goToPlay() {
       window.location.href = playlistId ? '/play?playlist=' + playlistId : '/';
-    });
+    }
+
+    playBtn.addEventListener('click', goToPlay);
+    doneBtn.addEventListener('click', goToPlay);
 
     RemoteUpload.attach({
       trigger: uploadBtn,
@@ -293,7 +303,6 @@
     });
 
     loadPlaylist();
-    runSearch('');
   </script>
 </body>
 </html>
