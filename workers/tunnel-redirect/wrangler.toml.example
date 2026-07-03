@@ -1,0 +1,18 @@
+# Stage Manager — stable redirect for Cloudflare quick tunnels.
+# Copy to wrangler.toml and fill in your KV namespace id (wrangler.toml is gitignored).
+# Deploy: see README.md in this directory.
+
+name = "play"   # → https://play.<account-subdomain>.workers.dev
+main = "src/index.ts"
+compatibility_date = "2025-07-01"
+
+# After: wrangler kv namespace create TUNNEL
+# Paste the returned "id" below (preview_id is optional, for wrangler dev).
+[[kv_namespaces]]
+binding = "TUNNEL"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+# preview_id = "REPLACE_WITH_PREVIEW_KV_NAMESPACE_ID"
+
+[vars]
+# WRITE_SECRET is set via: wrangler secret put WRITE_SECRET
+# Do not commit secrets to this file.

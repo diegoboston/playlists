@@ -1,6 +1,7 @@
 package com.playlists.app.util
 
 import android.content.Context
+import com.playlists.app.remote.TunnelRedirectClient
 
 object AppPrefs {
     const val DEFAULT_REMOTE_CODE = 55555
@@ -27,5 +28,36 @@ object AppPrefs {
 
     fun setLastPlaylistId(context: Context, playlistId: Long) {
         StageManagerState.writeLastPlaylistId(context, playlistId)
+    }
+
+    private val WORKERS_SUBDOMAIN_PATTERN = Regex("""^[a-z0-9-]+$""")
+
+    fun getTunnelRedirectSubdomain(context: Context): String? =
+        StageManagerState.readTunnelRedirectSubdomain(context)
+
+    fun getTunnelRedirectSecret(context: Context): String? =
+        StageManagerState.readTunnelRedirectSecret(context)
+
+    fun isTunnelRedirectConfigured(context: Context): Boolean =
+        buildStableRedirectBase(context) != null && !getTunnelRedirectSecret(context).isNullOrBlank()
+
+    fun isValidWorkersSubdomain(text: String): Boolean {
+        val trimmed = text.trim().lowercase()
+        if (trimmed.isEmpty()) return true
+        return WORKERS_SUBDOMAIN_PATTERN.matches(trimmed)
+    }
+
+    fun buildStableRedirectBase(context: Context): String? {
+        val subdomain = getTunnelRedirectSubdomain(context)?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+            ?: return null
+        if (!WORKERS_SUBDOMAIN_PATTERN.matches(subdomain)) return null
+        return TunnelRedirectClient.buildWorkerBaseUrl(subdomain)
+    }
+
+    fun setTunnelRedirect(context: Context, subdomain: String?, secret: String?) {
+        val normalizedSubdomain = subdomain?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+        val normalizedSecret = secret?.trim()?.takeIf { it.isNotEmpty() }
+        StageManagerState.writeTunnelRedirectSubdomain(context, normalizedSubdomain)
+        StageManagerState.writeTunnelRedirectSecret(context, normalizedSecret)
     }
 }

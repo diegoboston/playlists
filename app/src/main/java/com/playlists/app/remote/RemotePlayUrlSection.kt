@@ -10,12 +10,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,34 +41,66 @@ import com.google.zxing.common.BitMatrix
 import com.playlists.app.R
 
 @Composable
+internal fun RemotePlayUrlList(
+    entries: List<RemotePlayUrlEntry>,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        entries.forEachIndexed { index, entry ->
+            if (index > 0) {
+                Spacer(Modifier.height(16.dp))
+            }
+            RemotePlayUrlSection(
+                label = entry.label,
+                url = entry.url,
+            )
+        }
+    }
+}
+
+@Composable
 internal fun RemotePlayUrlSection(
+    label: String,
     url: String,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by remember(url) { mutableStateOf(false) }
     val qrBitmap = remember(url) { encodeQrBitmap(url) }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
-            Text(
-                text = url,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.primary,
-                    textDecoration = TextDecoration.Underline,
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                    },
-            )
-            IconButton(onClick = { expanded = !expanded }) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Text(
+                    text = url,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clickable {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        },
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.primary,
+                        textDecoration = TextDecoration.Underline,
+                    ),
+                )
+            }
+            IconButton(
+                onClick = { expanded = !expanded },
+                modifier = Modifier.padding(start = 4.dp),
+            ) {
                 Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    imageVector = if (expanded) {
+                        Icons.Default.KeyboardArrowUp
+                    } else {
+                        Icons.Default.KeyboardArrowDown
+                    },
                     contentDescription = stringResource(
                         if (expanded) R.string.remote_url_qr_collapse else R.string.remote_url_qr_expand,
                     ),

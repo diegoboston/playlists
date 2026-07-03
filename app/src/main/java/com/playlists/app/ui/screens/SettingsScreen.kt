@@ -95,6 +95,12 @@ fun SettingsScreen(
     var codeText by remember {
         mutableStateOf(AppPrefs.getRemoteCode(context).toString())
     }
+    var workersSubdomainText by remember {
+        mutableStateOf(AppPrefs.getTunnelRedirectSubdomain(context).orEmpty())
+    }
+    var writeSecretText by remember {
+        mutableStateOf(AppPrefs.getTunnelRedirectSecret(context).orEmpty())
+    }
     var openAiKeyText by remember {
         mutableStateOf(AiCredentialStore.getOpenAiApiKey(context).orEmpty())
     }
@@ -164,6 +170,30 @@ fun SettingsScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
             Text(
+                text = stringResource(R.string.settings_stable_redirect),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 24.dp, bottom = 4.dp),
+            )
+            OutlinedTextField(
+                value = workersSubdomainText,
+                onValueChange = { workersSubdomainText = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' } },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.settings_stable_subdomain)) },
+                placeholder = { Text(stringResource(R.string.settings_stable_subdomain_hint)) },
+            )
+            OutlinedTextField(
+                value = writeSecretText,
+                onValueChange = { writeSecretText = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                label = { Text(stringResource(R.string.settings_stable_secret)) },
+                placeholder = { Text(stringResource(R.string.settings_stable_secret_hint)) },
+            )
+            Text(
                 text = stringResource(R.string.settings_openai_api_key),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
@@ -219,7 +249,16 @@ fun SettingsScreen(
                         Toast.makeText(context, R.string.settings_remote_code_invalid, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
+                    if (!AppPrefs.isValidWorkersSubdomain(workersSubdomainText)) {
+                        Toast.makeText(context, R.string.settings_stable_subdomain_invalid, Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
                     AppPrefs.setRemoteCode(context, codeText.toInt())
+                    AppPrefs.setTunnelRedirect(
+                        context,
+                        subdomain = workersSubdomainText,
+                        secret = writeSecretText,
+                    )
                     AiCredentialStore.setOpenAiApiKey(context, openAiKeyText)
                     Toast.makeText(context, R.string.settings_saved, Toast.LENGTH_SHORT).show()
                     onBack()

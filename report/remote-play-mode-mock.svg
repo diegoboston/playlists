@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="520" viewBox="0 0 390 520">
+  <rect width="390" height="520" fill="#E8E8E8"/>
+  <rect x="24" y="80" width="342" height="360" rx="28" fill="#FFFBFE"/>
+  <text x="48" y="132" font-family="Roboto, Arial, sans-serif" font-size="20" font-weight="500" fill="#1C1B1F">Start remote play</text>
+  <text x="48" y="162" font-family="Roboto, Arial, sans-serif" font-size="14" fill="#49454F">How should other devices reach this phone?</text>
+  <text x="48" y="210" font-family="Roboto, Arial, sans-serif" font-size="16" fill="#6750A4">Stable play URL</text>
+  <text x="48" y="244" font-family="Roboto, Arial, sans-serif" font-size="16" fill="#6750A4">Cloudflare tunnel (internet)</text>
+  <text x="48" y="278" font-family="Roboto, Arial, sans-serif" font-size="16" fill="#6750A4">LAN only (same WiFi)</text>
+  <text x="220" y="400" font-family="Roboto, Arial, sans-serif" font-size="14" fill="#6750A4">Cancel</text>
+</svg>

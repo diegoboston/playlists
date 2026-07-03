@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="620" viewBox="0 0 390 620">
+  <rect width="390" height="620" fill="#FFFBFE"/>
+  <text x="56" y="36" font-family="Roboto, Arial, sans-serif" font-size="22" fill="#1C1B1F">Remote play started</text>
+  <text x="24" y="84" font-family="Roboto, Arial, sans-serif" font-size="14" fill="#49454F">Bookmark the stable URL  it keeps working across sessions&</text>
+  <text x="24" y="118" font-family="Roboto, Arial, sans-serif" font-size="24" font-weight="500" fill="#1C1B1F">PIN: 55555</text>
+  <text x="24" y="156" font-family="Roboto, Arial, sans-serif" font-size="14" font-weight="500" fill="#1C1B1F">Available URLs</text>
+  <text x="24" y="184" font-family="Roboto, Arial, sans-serif" font-size="12" font-weight="500" fill="#49454F">Stable URL</text>
+  <text x="24" y="206" font-family="Roboto, Arial, sans-serif" font-size="14" fill="#6750A4" text-decoration="underline">https://play.diegoppp.workers.dev/?playlist=1</text>
+  <text x="24" y="244" font-family="Roboto, Arial, sans-serif" font-size="12" font-weight="500" fill="#49454F">Cloudflare (this session)</text>
+  <text x="24" y="266" font-family="Roboto, Arial, sans-serif" font-size="14" fill="#6750A4" text-decoration="underline">https://abc-def.trycloudflare.com/?playlist=1</text>
+  <text x="24" y="304" font-family="Roboto, Arial, sans-serif" font-size="12" font-weight="500" fill="#49454F">LAN</text>
+  <text x="24" y="326" font-family="Roboto, Arial, sans-serif" font-size="14" fill="#6750A4" text-decoration="underline">http://192.168.1.42:55555/?playlist=1</text>
+  <text x="24" y="364" font-family="Roboto, Arial, sans-serif" font-size="12" font-weight="500" fill="#49454F">LAN 2 (hotspot)</text>
+  <text x="24" y="386" font-family="Roboto, Arial, sans-serif" font-size="14" fill="#6750A4" text-decoration="underline">http://10.42.0.1:55555/?playlist=1</text>
+  <text x="250" y="560" font-family="Roboto, Arial, sans-serif" font-size="14" fill="#6750A4">OK</text>
+  <text x="24" y="560" font-family="Roboto, Arial, sans-serif" font-size="14" fill="#6750A4">STOP =Ñ</text>
+</svg>

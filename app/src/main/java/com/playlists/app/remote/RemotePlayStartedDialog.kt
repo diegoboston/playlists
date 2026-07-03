@@ -1,89 +1,18 @@
 package com.playlists.app.remote
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.playlists.app.R
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withContext
-
-@Composable
-fun RemotePlayDebugDialog(
-    onDismiss: () -> Unit,
-) {
-    var debug by remember { mutableStateOf<RemotePlayDebugInfo?>(null) }
-    var refreshTick by remember { mutableIntStateOf(0) }
-
-    LaunchedEffect(refreshTick) {
-        val info = withContext(Dispatchers.IO) {
-            PlayRemoteController.syncAfterForeground()
-            PlayRemoteController.collectDebugInfo()
-        }
-        if (isActive) {
-            debug = info
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.remote_debug_title)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 480.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                val url = debug?.publicUrl ?: PlayRemoteController.displayUrl()
-                if (url != null) {
-                    RemotePlayUrlSection(url = url)
-                    Spacer(Modifier.height(12.dp))
-                }
-                val info = debug
-                when {
-                    info == null && url == null -> {
-                        Text(stringResource(R.string.remote_debug_unavailable))
-                    }
-                    info != null -> {
-                        RemotePlayDebugPanel(info = info, onRefresh = { refreshTick++ })
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { refreshTick++ }) {
-                Text(stringResource(R.string.remote_debug_refresh))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(android.R.string.ok))
-            }
-        },
-    )
-}
 
 @Composable
 internal fun RemotePlayDebugPanel(
@@ -91,7 +20,7 @@ internal fun RemotePlayDebugPanel(
     onRefresh: () -> Unit,
 ) {
     val context = LocalContext.current
-    val cloudflare = info.mode == RemotePlayMode.CLOUDFLARE
+    val cloudflare = info.mode == RemotePlayMode.CLOUDFLARE || info.mode == RemotePlayMode.STABLE
     Text(
         stringResource(R.string.remote_debug_heading),
         style = MaterialTheme.typography.titleSmall,
@@ -130,7 +59,7 @@ internal fun RemotePlayDebugPanel(
         stringResource(R.string.remote_debug_server, if (info.serverAlive) "up" else "down"),
         style = MaterialTheme.typography.bodySmall,
     )
-    if (cloudflare && info.cloudflaredLog.isNotBlank()) {
+    if (cloudflare && info.hasIssues() && info.cloudflaredLog.isNotBlank()) {
         Spacer(Modifier.height(8.dp))
         Text(
             stringResource(R.string.remote_debug_log),

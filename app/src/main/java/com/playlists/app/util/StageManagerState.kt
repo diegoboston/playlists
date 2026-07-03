@@ -9,6 +9,8 @@ object StageManagerState {
     private const val KEY_REMOTE_CODE = "remote_code"
     private const val KEY_REMOTE_PORT = "remote_port"
     private const val KEY_LAST_PLAYLIST_ID = "last_playlist_id"
+    private const val KEY_TUNNEL_REDIRECT_SUBDOMAIN = "tunnel_redirect_subdomain"
+    private const val KEY_TUNNEL_REDIRECT_SECRET = "tunnel_redirect_secret"
 
     fun readRemoteCode(context: Context): Int {
         readFromFile()?.let { json ->
@@ -59,6 +61,70 @@ object StageManagerState {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putLong(KEY_LAST_PLAYLIST_ID, playlistId)
+            .apply()
+    }
+
+    fun readTunnelRedirectSubdomain(context: Context): String? {
+        readFromFile()?.let { json ->
+            if (json.has(KEY_TUNNEL_REDIRECT_SUBDOMAIN)) {
+                return json.optString(KEY_TUNNEL_REDIRECT_SUBDOMAIN).takeIf { it.isNotBlank() }
+            }
+        }
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_TUNNEL_REDIRECT_SUBDOMAIN, null)
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    fun writeTunnelRedirectSubdomain(context: Context, subdomain: String?) {
+        val json = readFromFile() ?: JSONObject()
+        val trimmed = subdomain?.trim()?.takeIf { it.isNotEmpty() }
+        if (trimmed == null) {
+            json.remove(KEY_TUNNEL_REDIRECT_SUBDOMAIN)
+        } else {
+            json.put(KEY_TUNNEL_REDIRECT_SUBDOMAIN, trimmed)
+        }
+        writeToFile(json)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .apply {
+                if (trimmed == null) {
+                    remove(KEY_TUNNEL_REDIRECT_SUBDOMAIN)
+                } else {
+                    putString(KEY_TUNNEL_REDIRECT_SUBDOMAIN, trimmed)
+                }
+            }
+            .apply()
+    }
+
+    fun readTunnelRedirectSecret(context: Context): String? {
+        readFromFile()?.let { json ->
+            if (json.has(KEY_TUNNEL_REDIRECT_SECRET)) {
+                return json.optString(KEY_TUNNEL_REDIRECT_SECRET).takeIf { it.isNotBlank() }
+            }
+        }
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_TUNNEL_REDIRECT_SECRET, null)
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    fun writeTunnelRedirectSecret(context: Context, secret: String?) {
+        val json = readFromFile() ?: JSONObject()
+        val trimmed = secret?.trim()?.takeIf { it.isNotEmpty() }
+        if (trimmed == null) {
+            json.remove(KEY_TUNNEL_REDIRECT_SECRET)
+        } else {
+            json.put(KEY_TUNNEL_REDIRECT_SECRET, trimmed)
+        }
+        writeToFile(json)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .apply {
+                if (trimmed == null) {
+                    remove(KEY_TUNNEL_REDIRECT_SECRET)
+                } else {
+                    putString(KEY_TUNNEL_REDIRECT_SECRET, trimmed)
+                }
+            }
             .apply()
     }
 

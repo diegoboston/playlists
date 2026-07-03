@@ -55,7 +55,7 @@ import com.playlists.app.R
 import com.playlists.app.data.Playlist
 import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.remote.PlayRemoteController
-import com.playlists.app.remote.RemotePlayDebugDialog
+import com.playlists.app.remote.RemotePlayStartedDialog
 import com.playlists.app.remote.RemotePlayErrorDialog
 import com.playlists.app.remote.RemotePlayErrors
 import com.playlists.app.remote.RemotePlayFlowDialog
@@ -431,7 +431,16 @@ fun PlaylistDetailScreen(
     }
 
     if (showRemoteDebug) {
-        RemotePlayDebugDialog(onDismiss = { showRemoteDebug = false })
+        val statusMode = PlayRemoteController.sessionSnapshot()?.mode ?: RemotePlayMode.CLOUDFLARE
+        RemotePlayStartedDialog(
+            mode = statusMode,
+            titleRes = R.string.remote_debug_title,
+            onDismiss = { showRemoteDebug = false },
+            onStop = {
+                showRemoteDebug = false
+                stopRemoteFlow()
+            },
+        )
     }
 }
 

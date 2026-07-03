@@ -19,7 +19,7 @@ data class RemotePlayDebugInfo(
     fun hasIssues(): Boolean {
         if (warnings.isNotEmpty()) return true
         if (!serverAlive || !localProbe.ok) return true
-        if (mode == RemotePlayMode.CLOUDFLARE) {
+        if (mode == RemotePlayMode.CLOUDFLARE || mode == RemotePlayMode.STABLE) {
             if (!tunnelProcessAlive) return true
             if (tunnelProbe?.ok == false) return true
         }

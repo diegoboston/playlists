@@ -33,6 +33,7 @@ confirm() {
 cd "$(dirname "$0")"
 
 RSYNC_EXCLUDES=(
+    --exclude='node_modules/'
     --exclude='.gradle/'
     --exclude='.kotlin/'
     --exclude='.tmp/'

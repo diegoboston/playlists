@@ -1,6 +1,5 @@
 package com.playlists.app.remote
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +42,8 @@ fun RemotePlayFlowDialog(
 ) {
     when (state) {
         RemotePlayFlowState.ChooseMode -> {
+            val context = LocalContext.current
+            val stableConfigured = remember { AppPrefs.isTunnelRedirectConfigured(context) }
             AlertDialog(
                 onDismissRequest = onCancel,
                 title = { Text(stringResource(R.string.remote_mode_title)) },
@@ -53,10 +54,25 @@ fun RemotePlayFlowDialog(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         TextButton(
-                            onClick = { onSelectMode(RemotePlayMode.CLOUDFLARE) },
+                            onClick = { onSelectMode(RemotePlayMode.STABLE) },
+                            enabled = stableConfigured,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 8.dp),
+                        ) {
+                            Text(stringResource(R.string.remote_mode_stable))
+                        }
+                        if (!stableConfigured) {
+                            Text(
+                                stringResource(R.string.remote_mode_stable_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 12.dp, bottom = 4.dp),
+                            )
+                        }
+                        TextButton(
+                            onClick = { onSelectMode(RemotePlayMode.CLOUDFLARE) },
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(stringResource(R.string.remote_mode_cloudflare))
                         }
@@ -83,12 +99,12 @@ fun RemotePlayFlowDialog(
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
                     ) {
                         CircularProgressIndicator()
                         Text(
                             stringResource(
                                 when (state.mode) {
+                                    RemotePlayMode.STABLE -> R.string.remote_starting_stable
                                     RemotePlayMode.CLOUDFLARE -> R.string.remote_starting_cloudflare
                                     RemotePlayMode.LAN -> R.string.remote_starting_lan
                                 },
@@ -108,7 +124,6 @@ fun RemotePlayFlowDialog(
         }
         is RemotePlayFlowState.Started -> {
             RemotePlayStartedDialog(
-                url = state.url,
                 mode = state.mode,
                 onDismiss = onCloseStarted,
                 onStop = onStopRemote,
@@ -119,25 +134,24 @@ fun RemotePlayFlowDialog(
 
 @Composable
 fun RemotePlayStartedDialog(
-    url: String,
     mode: RemotePlayMode,
     onDismiss: () -> Unit,
     onStop: () -> Unit,
+    titleRes: Int = R.string.remote_started,
 ) {
     val context = LocalContext.current
     var debug by remember { mutableStateOf<RemotePlayDebugInfo?>(null) }
     var refreshTick by remember { mutableIntStateOf(0) }
     val pin = remember(mode) {
-        if (mode == RemotePlayMode.CLOUDFLARE) AppPrefs.getRemotePin(context) else null
+        if (mode != RemotePlayMode.LAN) AppPrefs.getRemotePin(context) else null
     }
 
     LaunchedEffect(mode, refreshTick) {
-        if (mode != RemotePlayMode.CLOUDFLARE) return@LaunchedEffect
+        if (mode == RemotePlayMode.LAN) return@LaunchedEffect
         val info = withContext(Dispatchers.IO) { PlayRemoteController.collectDebugInfo() }
         if (!isActive) return@LaunchedEffect
         debug = info
         if (info?.hasIssues() != false) {
-            // Quick tunnels need DNS propagation; polling every few seconds can negative-cache NXDOMAIN.
             delay(15_000)
             refreshTick++
         }
@@ -145,10 +159,9 @@ fun RemotePlayStartedDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.remote_started)) },
+        title = { Text(stringResource(titleRes)) },
         text = {
             RemotePlayStartedDialogContent(
-                url = url,
                 mode = mode,
                 pin = pin,
                 debug = debug,
@@ -170,12 +183,15 @@ fun RemotePlayStartedDialog(
 
 @Composable
 internal fun RemotePlayStartedDialogContent(
-    url: String,
     mode: RemotePlayMode,
     pin: String?,
     debug: RemotePlayDebugInfo?,
     onRefreshDebug: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val playlistId = PlayRemoteController.activePlaylistId
+    val urlEntries = RemotePlayUrls.collect(context, playlistId)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -185,25 +201,39 @@ internal fun RemotePlayStartedDialogContent(
         Text(
             stringResource(
                 when (mode) {
+                    RemotePlayMode.STABLE -> R.string.remote_started_message_stable
                     RemotePlayMode.CLOUDFLARE -> R.string.remote_started_message_cloudflare
                     RemotePlayMode.LAN -> R.string.remote_started_message_lan
                 },
             ),
             style = MaterialTheme.typography.bodyMedium,
         )
-        if (mode == RemotePlayMode.CLOUDFLARE && pin != null) {
+        if (mode != RemotePlayMode.LAN && pin != null) {
             Text(
                 stringResource(R.string.remote_started_pin, pin),
                 modifier = Modifier.padding(top = 12.dp),
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
-        RemotePlayUrlSection(
-            url = url,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-        if (mode == RemotePlayMode.CLOUDFLARE) {
-            debug?.takeIf { it.hasIssues() }?.let { info ->
+        if (urlEntries.isEmpty()) {
+            Text(
+                stringResource(R.string.remote_debug_unavailable),
+                modifier = Modifier.padding(top = 12.dp),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        } else {
+            Text(
+                stringResource(R.string.remote_urls_heading),
+                modifier = Modifier.padding(top = 12.dp),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            RemotePlayUrlList(
+                entries = urlEntries,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        if (mode != RemotePlayMode.LAN) {
+            debug?.let { info ->
                 Spacer(Modifier.height(16.dp))
                 RemotePlayDebugPanel(
                     info = info,

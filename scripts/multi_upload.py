@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import http.cookiejar
 import json
 import re
 import sys
@@ -20,9 +19,7 @@ except ImportError:
     print("multi_upload: pymupdf is required (pip install pymupdf)", file=sys.stderr)
     sys.exit(1)
 
-
-DEFAULT_PIN = "44444"
-DEFAULT_URL = "https://unexpected-comedy-mag-optimum.trycloudflare.com"
+from stage_manager_client import add_connection_args, connect_remote
 
 
 def extract_first_column_title(page: fitz.Page) -> str:
@@ -82,21 +79,6 @@ def split_pdf(src: Path, out_dir: Path) -> list[dict]:
     return manifest
 
 
-def authenticate(base_url: str, pin: str, opener: urllib.request.OpenerDirector) -> None:
-    req = urllib.request.Request(
-        f"{base_url.rstrip('/')}/api/auth",
-        data=json.dumps({"pin": pin}).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with opener.open(req) as resp:
-            resp.read()
-    except urllib.error.HTTPError as e:
-        body = e.read().decode(errors="replace")
-        raise RuntimeError(f"Authentication failed ({e.code}): {body}") from e
-
-
 def upload_song(
     base_url: str,
     playlist_id: int,
@@ -145,16 +127,7 @@ def parse_args() -> argparse.Namespace:
         description="Split a PDF into single-page files and upload each page as a Stage Manager song.",
     )
     parser.add_argument("pdf", type=Path, help="Path to the source PDF")
-    parser.add_argument(
-        "--url",
-        default=DEFAULT_URL,
-        help=f"Stage Manager remote base URL (default: {DEFAULT_URL})",
-    )
-    parser.add_argument(
-        "--pin",
-        default=None,
-        help=f"5-digit remote PIN (default: $STAGE_MANAGER_PIN or {DEFAULT_PIN})",
-    )
+    add_connection_args(parser)
     parser.add_argument(
         "--playlist",
         type=int,
@@ -193,7 +166,6 @@ def main() -> int:
         print(f"multi_upload: file not found: {pdf_path}", file=sys.stderr)
         return 1
 
-    pin = args.pin or __import__("os").environ.get("STAGE_MANAGER_PIN", DEFAULT_PIN)
     temp_dir: tempfile.TemporaryDirectory[str] | None = None
     if args.out_dir:
         out_dir = args.out_dir.expanduser().resolve()
@@ -218,15 +190,19 @@ def main() -> int:
             temp_dir.cleanup()
         return 0
 
-    cj = http.cookiejar.CookieJar()
-    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-    authenticate(args.url, pin, opener)
+    try:
+        remote_base, opener = connect_remote(args, script_name="multi_upload")
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(f"multi_upload: {e}", file=sys.stderr)
+        return 1
 
     ok = 0
     failures: list[tuple[dict, str]] = []
     for item in manifest:
         try:
-            result = upload_song(args.url, args.playlist, item, opener)
+            result = upload_song(remote_base, args.playlist, item, opener)
             song_count = len(result.get("songs", []))
             print(f"Uploaded {item['page']:2d}: {item['title']!r} (playlist now {song_count} songs)")
             ok += 1

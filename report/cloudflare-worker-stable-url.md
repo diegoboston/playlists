@@ -1,7 +1,7 @@
 # Cloudflare Worker stable URL — implementation plan
 
 **Stage Manager** · June 2026  
-**Status:** Proposed (not implemented)
+**Status:** Worker deployed; Android app integration implemented (July 2026)
 
 ## Summary
 
@@ -73,7 +73,7 @@ Each Cloudflare remote-play session
   → Worker stores it in KV
 
 Ongoing use
-  → bookmark https://stage-manager-tunnel.<you>.workers.dev/
+  → bookmark https://play.<you>.workers.dev/
   → browser redirects to current *.trycloudflare.com (PIN gate)
   → multi_upload.py uses same stable URL; resolves /url then calls API
 ```
@@ -133,19 +133,62 @@ Edge script with a KV binding `TUNNEL`, key `current` → tunnel base URL string
 
 ```bash
 cd workers/tunnel-redirect
-wrangler kv namespace create TUNNEL
-# add namespace id to wrangler.toml
-wrangler secret put WRITE_SECRET   # long random string → also paste in app Settings
-wrangler deploy
-# → https://stage-manager-tunnel.<account>.workers.dev
+cp wrangler.toml.example wrangler.toml
+npm install
+npx wrangler login
+npx wrangler kv namespace create TUNNEL
+# paste returned id into wrangler.toml (file is gitignored)
+openssl rand -base64 32   # optional: generate WRITE_SECRET
+npx wrangler secret put WRITE_SECRET   # same string → paste in app Settings later
+npm run deploy
+# → https://play.<account-subdomain>.workers.dev
 ```
+
+`wrangler.toml` is gitignored; only `wrangler.toml.example` is committed.
 
 User copies:
 
-1. **Stable redirect URL** — deploy output
+1. **Stable redirect URL** — deploy output (no trailing slash)
 2. **Write secret** — same value as `WRITE_SECRET`
 
 Free tier is sufficient for personal use (Workers + KV free allowances).
+
+### Simulate phone (before app integration)
+
+Until `TunnelRedirectClient` ships, register the live quick-tunnel URL by hand — same
+`POST /register` the phone will send after each Cloudflare remote-play start.
+
+1. Start **Cloudflare remote play** on the phone and note the session URL, e.g.
+   `https://abc-def.trycloudflare.com`.
+2. Register it with the Worker (replace values):
+
+```bash
+WORKER=https://play.<you>.workers.dev
+SECRET=your-write-secret
+TUNNEL=https://abc-def.trycloudflare.com
+
+curl -sS -X POST "$WORKER/register" \
+  -H "Authorization: Bearer $SECRET" \
+  -H "Content-Type: application/json" \
+  -d "{\"url\":\"$TUNNEL\"}"
+```
+
+3. Verify redirect and script resolution:
+
+```bash
+curl -sS -D - -o /dev/null "$WORKER/?playlist=3"
+# Expect: 302 Location: https://abc-def.trycloudflare.com/?playlist=3
+
+curl -sS "$WORKER/url"
+# Expect: https://abc-def.trycloudflare.com
+```
+
+4. Open the **stable bookmark** in a browser: `$WORKER/?playlist=…` (PIN gate is on
+   the tunnel, not the Worker).
+
+Repeat step 2 whenever the quick-tunnel host changes (each new remote-play session).
+After app integration, the phone does this automatically when Settings has stable URL +
+write secret configured.
 
 ### Android app
 
@@ -227,7 +270,7 @@ Call before `authenticate()`.
 Example:
 
 ```bash
-export STAGE_MANAGER_URL=https://stage-manager-tunnel.you.workers.dev
+export STAGE_MANAGER_URL=https://play.you.workers.dev
 python scripts/multi_upload.py --playlist 1 scores.pdf
 ```
 
@@ -252,7 +295,7 @@ Exposing `*.trycloudflare.com` is equivalent to sharing the session link today.
 
 | Path | Purpose |
 |------|---------|
-| `workers/tunnel-redirect/wrangler.toml` | Worker + KV binding |
+| `workers/tunnel-redirect/wrangler.toml.example` | Worker + KV binding template |
 | `workers/tunnel-redirect/src/index.ts` | Redirect + register logic |
 | `workers/tunnel-redirect/README.md` | Deploy instructions |
 | `app/.../remote/TunnelRedirectClient.kt` | HTTP client for `/register` |
