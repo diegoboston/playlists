@@ -2,6 +2,7 @@ package com.playlists.app.ui.navigation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -16,10 +17,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.app.Application
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavType
@@ -28,10 +32,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.playlists.app.PlaylistsApp
 import com.playlists.app.R
+import com.playlists.app.ui.AppUpdateInProgressBanner
 import com.playlists.app.ui.AppUpdateUiState
 import com.playlists.app.ui.PlaylistsViewModel
-import com.playlists.app.ui.components.AppUpdateBanner
 import com.playlists.app.ui.screens.ChartAssistantScreen
 import com.playlists.app.ui.screens.ImportSongScreen
 import com.playlists.app.ui.screens.MainTabsScreen
@@ -41,7 +46,7 @@ import com.playlists.app.ui.screens.QuickstartScreen
 import com.playlists.app.ui.screens.SettingsScreen
 import com.playlists.app.ui.screens.ChartRetransposeScreen
 import com.playlists.app.ui.screens.SongViewScreen
-import com.playlists.app.util.AppUpdate
+import com.playlists.app.util.SongFileIntegrity
 import java.io.File
 
 object Routes {
@@ -111,12 +116,10 @@ private fun NavController.popBackToMain() {
 fun AppNavigation(
     viewModel: PlaylistsViewModel,
     pendingInstallApk: (File) -> Unit,
-    retryInstallApk: (File) -> Unit,
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val onSettingsScreen = navBackStackEntry?.destination?.route == Routes.SETTINGS
-    val snackbarHostState = remember { SnackbarHostState() }
+    val updateSnackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val updateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
     val pendingImport by viewModel.pendingImport.collectAsStateWithLifecycle()
@@ -142,7 +145,7 @@ fun AppNavigation(
     LaunchedEffect(Unit) {
         val versionName = viewModel.fetchLaunchUpdateVersion(context)
         if (versionName != null) {
-            val result = snackbarHostState.showSnackbar(
+            val result = updateSnackbarHostState.showSnackbar(
                 message = context.getString(R.string.update_app_snackbar_prompt, versionName),
                 actionLabel = context.getString(R.string.update_app_snackbar_action),
                 duration = SnackbarDuration.Long,
@@ -151,27 +154,57 @@ fun AppNavigation(
                 viewModel.startAppUpdateDownload(context)
             }
         }
-    }
-
-    LaunchedEffect(updateState) {
-        when (val state = updateState) {
-            is AppUpdateUiState.ReadyToInstall -> pendingInstallApk(state.apk)
-            else -> Unit
+        val integrity = PlaylistsApp.from(context.applicationContext as Application)
+            .lastIntegrityScan
+        if (integrity != null && integrity.hasIssues) {
+            updateSnackbarHostState.showSnackbar(
+                message = SongFileIntegrity.snackbarMessage(context, integrity),
+                duration = SnackbarDuration.Long,
+            )
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
+    val terminalAppUpdate = when (val state = updateState) {
+        is AppUpdateUiState.UpToDate,
+        is AppUpdateUiState.ReadyToInstall,
+        is AppUpdateUiState.Failed -> state
+        else -> null
+    }
+    LaunchedEffect(terminalAppUpdate) {
+        when (val state = terminalAppUpdate ?: return@LaunchedEffect) {
+            is AppUpdateUiState.UpToDate -> updateSnackbarHostState.showSnackbar(
+                context.getString(R.string.update_app_up_to_date, state.versionName),
+            )
+            is AppUpdateUiState.ReadyToInstall -> {
+                updateSnackbarHostState.showSnackbar(
+                    context.getString(R.string.update_app_ready, state.versionName),
+                )
+                pendingInstallApk(state.apk)
+            }
+            is AppUpdateUiState.Failed -> updateSnackbarHostState.showSnackbar(
+                context.getString(R.string.update_app_failed, state.message),
+            )
+            else -> Unit
+        }
+        viewModel.clearAppUpdateState()
+    }
+
+    Scaffold { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            NavHost(
-                navController = navController,
-                startDestination = Routes.MAIN,
-            ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                AppUpdateInProgressBanner(
+                    state = updateState,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                NavHost(
+                    navController = navController,
+                    startDestination = Routes.MAIN,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
                 composable(Routes.MAIN) {
                     MainTabsScreen(
                         viewModel = viewModel,
@@ -204,7 +237,6 @@ fun AppNavigation(
                     SettingsScreen(
                         viewModel = viewModel,
                         onBack = onBack,
-                        onInstallUpdate = retryInstallApk,
                     )
                 }
                 composable(Routes.QUICKSTART) { entry ->
@@ -318,17 +350,12 @@ fun AppNavigation(
                         onBack = onBack,
                     )
                 }
-            }
-
-            if (!onSettingsScreen) {
-                updateState?.let { state ->
-                    AppUpdateBanner(
-                        state = state,
-                        onDismiss = { viewModel.clearAppUpdateState() },
-                        onInstall = { apk -> retryInstallApk(apk) },
-                    )
                 }
             }
+            SnackbarHost(
+                hostState = updateSnackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
     }
 }

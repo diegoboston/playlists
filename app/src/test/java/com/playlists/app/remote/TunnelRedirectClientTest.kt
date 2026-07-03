@@ -30,8 +30,8 @@ class TunnelRedirectClientTest {
     @Test
     fun buildWorkerBaseUrl_usesPlayWorkerName() {
         assertEquals(
-            "https://play.diegoppp.workers.dev",
-            TunnelRedirectClient.buildWorkerBaseUrl("diegoppp"),
+            "https://play.myaccount.workers.dev",
+            TunnelRedirectClient.buildWorkerBaseUrl("myaccount"),
         )
     }
 }

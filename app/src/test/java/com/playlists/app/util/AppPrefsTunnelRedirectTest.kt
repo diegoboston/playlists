@@ -9,7 +9,7 @@ class AppPrefsTunnelRedirectTest {
     @Test
     fun isValidWorkersSubdomain_allowsEmptyOrLabel() {
         assertTrue(AppPrefs.isValidWorkersSubdomain(""))
-        assertTrue(AppPrefs.isValidWorkersSubdomain("diegoppp"))
+        assertTrue(AppPrefs.isValidWorkersSubdomain("myaccount"))
         assertTrue(AppPrefs.isValidWorkersSubdomain("my-account-1"))
     }
 

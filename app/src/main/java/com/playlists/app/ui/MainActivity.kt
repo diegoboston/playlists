@@ -79,7 +79,6 @@ class MainActivity : ComponentActivity() {
                         AppNavigation(
                             viewModel = viewModel,
                             pendingInstallApk = { apk -> queueInstall(apk) },
-                            retryInstallApk = { apk -> queueInstall(apk) },
                         )
                     } else {
                         StorageAccessScreen(onOpenSettings = { requestStorageAccess() })

@@ -4,6 +4,34 @@
 
 ---
 
+## 1.0.60 · `db4e28f` — stable URL
+
+**Released:** 2026-07-03 (9:08 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/db4e28f5e4bffec56a972fb2ea47d6a48ca1b5e3)
+
+- Remote play adds **Stable play URL** mode: the phone registers the live Cloudflare tunnel with a **Workers KV redirect** (`workers/tunnel-redirect/`) so bookmarks stay at `https://play.<subdomain>.workers.dev`.
+- Settings: **Workers account subdomain** + **write secret** (validated against the deployed Worker). The remote start dialog lists stable, Cloudflare, and LAN URLs, each with a link and QR chevron.
+- `multi_upload.py`, `stage_manager_client.py`, and `show_playlist.py` accept the stable base URL; README and `report/cloudflare-worker-stable-url.md` document setup.
+
+---
+
+## 1.0.59 · `b3cbdcd` — simplify wifi icon
+
+**Released:** 2026-07-03 (2:37 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/b3cbdcd3ae3b5049c540979623f9921447bed4f8)
+
+- Remote play **Wi‑Fi** toolbar icon simplified on the Playlists tab and playlist detail.
+
+---
+
+## 1.0.58 · `dac4b79` — UI fix/cloudflare stability/wifi stop
+
+**Released:** 2026-07-02 (3:42 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/dac4b7936c808a1a2a3fd060d4e26014858713f5)
+
+- Remote play **STOP 🛑** ends the session from the start/status dialog; **OK** dismisses without stopping.
+- Cloudflare remote play: hardened stale-session detection after backgrounding; long-press Wi‑Fi status/debug behaves correctly when reopening the app.
+- Remote web (`index.html`, `play.html`, `edit.html`, `songs.html`) and light-theme UI polish.
+
+---
+
 ## `7c350d5` — song download/playlist quicklist
 
 **2026-07-01 (7:21 AM EDT)** · [commit](https://github.com/diegoboston/playlists/commit/7c350d57d5e6f5e392afc1336fec082c754282f5)

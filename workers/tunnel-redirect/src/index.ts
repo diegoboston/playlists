@@ -1,7 +1,7 @@
 /**
- * Stable redirect for Stage Manager Cloudflare quick tunnels.
+ * Stable reverse proxy for Stage Manager Cloudflare quick tunnels.
  *
- * GET  /         → 302 to current *.trycloudflare.com (query string preserved)
+ * GET  * (except /url, /register) → proxy to current *.trycloudflare.com
  * GET  /url      → text/plain tunnel base (empty if none registered)
  * POST /register → store tunnel URL in KV (Bearer WRITE_SECRET)
  */
@@ -17,6 +17,17 @@ const KV_KEY = "current";
 const TUNNEL_URL_RE = /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/;
 
 const QUICK_TUNNEL_API_HOST = "api.trycloudflare.com";
+
+const HOP_BY_HOP = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailers",
+  "transfer-encoding",
+  "upgrade",
+]);
 
 function normalizePath(pathname: string): string {
   const trimmed = pathname.replace(/\/+$/, "");
@@ -68,12 +79,76 @@ function authorizeRegister(request: Request, env: Env): boolean {
   return auth === `Bearer ${env.WRITE_SECRET}`;
 }
 
-function redirectToTunnel(tunnelBase: string, requestUrl: URL): Response {
-  const destination = new URL(`${tunnelBase}/`);
-  requestUrl.searchParams.forEach((value, key) => {
-    destination.searchParams.set(key, value);
+function filteredRequestHeaders(request: Request): Headers {
+  const out = new Headers();
+  request.headers.forEach((value, key) => {
+    const lower = key.toLowerCase();
+    if (lower === "host" || lower.startsWith("cf-") || HOP_BY_HOP.has(lower)) {
+      return;
+    }
+    out.set(key, value);
   });
-  return Response.redirect(destination.toString(), 302);
+  return out;
+}
+
+function rewriteLocation(
+  location: string,
+  tunnelOrigin: string,
+  workerOrigin: string,
+): string {
+  try {
+    const loc = new URL(location, `${tunnelOrigin}/`);
+    if (loc.origin === tunnelOrigin) {
+      return `${workerOrigin}${loc.pathname}${loc.search}${loc.hash}`;
+    }
+  } catch {
+    // Keep original on parse failure.
+  }
+  return location;
+}
+
+function filteredResponseHeaders(
+  headers: Headers,
+  tunnelOrigin: string,
+  workerOrigin: string,
+): Headers {
+  const out = new Headers();
+  headers.forEach((value, key) => {
+    const lower = key.toLowerCase();
+    if (HOP_BY_HOP.has(lower)) return;
+    if (lower === "location") {
+      out.set(key, rewriteLocation(value, tunnelOrigin, workerOrigin));
+      return;
+    }
+    out.set(key, value);
+  });
+  return out;
+}
+
+async function proxyToTunnel(tunnelBase: string, request: Request): Promise<Response> {
+  const incoming = new URL(request.url);
+  const tunnelOrigin = tunnelBase.replace(/\/+$/, "");
+  const upstream = new URL(`${incoming.pathname}${incoming.search}`, `${tunnelOrigin}/`);
+
+  const init: RequestInit = {
+    method: request.method,
+    headers: filteredRequestHeaders(request),
+    redirect: "manual",
+  };
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    init.body = request.body;
+  }
+
+  const upstreamResponse = await fetch(upstream.toString(), init);
+  return new Response(upstreamResponse.body, {
+    status: upstreamResponse.status,
+    statusText: upstreamResponse.statusText,
+    headers: filteredResponseHeaders(
+      upstreamResponse.headers,
+      tunnelOrigin,
+      incoming.origin,
+    ),
+  });
 }
 
 export default {
@@ -87,14 +162,6 @@ export default {
         status: 200,
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
-    }
-
-    if (request.method === "GET" && path === "/") {
-      const current = await env.TUNNEL.get(KV_KEY);
-      if (!current) {
-        return new Response("No tunnel active", { status: 503 });
-      }
-      return redirectToTunnel(current, url);
     }
 
     if (request.method === "POST" && path === "/register") {
@@ -116,6 +183,11 @@ export default {
       return Response.json({ ok: true, url: normalized });
     }
 
-    return new Response("Not found", { status: 404 });
+    const current = await env.TUNNEL.get(KV_KEY);
+    if (!current) {
+      return new Response("No tunnel active", { status: 503 });
+    }
+
+    return proxyToTunnel(current, request);
   },
 };

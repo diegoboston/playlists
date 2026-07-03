@@ -1,17 +1,49 @@
-# NFC playlist sharing — implementation plan
+# Playlist bundle sharing — implementation plan
 
 **Stage Manager** · June 2026  
 **Status:** Proposed (not implemented)
 
 ## Summary
 
-Add **nearby playlist transfer** between two phones running Stage Manager. The sender explicitly shares one playlist; the receiver listens whenever the app is in the foreground. A **tap** exchanges a small NFC handshake; **song files and metadata** transfer over **Wi‑Fi/LAN HTTP**. The receiver confirms, then imports songs and playlist order into `Music/StageManager/`.
+**v1:** Export a playlist as a **shareable `.smpl.zip`** (manifest + song files + metadata). The sender uses the system share sheet (Drive, email, Files, etc.); the receiver opens the zip with Stage Manager or shares it into the app. Import recreates the playlist, song order, per-song metadata, and sheet files (PDF/image) in `Music/StageManager/`.
 
-NFC is the **tap-to-connect** step only — not the file transport. Android Beam was removed in Android 10; minSdk 26 means we use **NDEF push + reader mode**, not legacy beam file push.
+**v2 (later):** Add **nearby NFC transfer** on top of the same bundle format. A **tap** exchanges a small NFC handshake; the zip streams over **Wi‑Fi/LAN HTTP**. NFC is the **tap-to-connect** step only — not the file transport. Android Beam was removed in Android 10; minSdk 26 means we use **NDEF push + reader mode**, not legacy beam file push.
 
 ---
 
-## Target behaviour (chosen UX)
+## Target behaviour
+
+### v1 — Shareable zip (chosen UX)
+
+```text
+Sender phone
+  → Open playlist → “Export playlist bundle” (pencil menu)
+  → App builds .smpl.zip in cache
+  → System share sheet (Save to Drive, email, Nearby Share, Files, …)
+
+Receiver phone
+  → Open .smpl.zip with Stage Manager, or share zip into the app
+  → Dialog: “Import <playlist name> (N songs, X MB)?”
+  → Accept → import songs + playlist in order (including placeholders)
+  → Open new playlist (or toast + navigate)
+```
+
+Same bundle format whether the zip travels by file share, cloud storage, or (in v2) NFC + LAN.
+
+```mermaid
+sequenceDiagram
+    participant Tx as Sender
+    participant Sheet as System share
+    participant Rx as Receiver
+
+    Tx->>Tx: Build .smpl.zip
+    Tx->>Sheet: ACTION_SEND (application/zip)
+    Sheet-->>Rx: User delivers file
+    Rx->>Rx: Confirm dialog
+    Rx->>Rx: Import songs + playlist
+```
+
+### v2 — NFC nearby transfer (same bundle)
 
 ```text
 Receiver phone
@@ -70,6 +102,18 @@ sequenceDiagram
 
 ## Constraints
 
+### v1 (shareable zip)
+
+| Constraint | Implication |
+|------------|-------------|
+| Playlist size often 5–50+ MB | Stream zip I/O; show size in confirm dialog |
+| Android share intents | Register `application/zip` (and/or custom MIME) for import via share / open-with |
+| Large attachments | Some email clients cap size — user may use Drive / Files instead |
+
+No same-Wi‑Fi requirement for v1; delivery is whatever channel the user picks in the share sheet.
+
+### v2 (NFC + LAN)
+
 | Constraint | Implication |
 |------------|-------------|
 | NFC payload size ~1–8 KB | Handshake only: host, port, token, playlist name, byte size |
@@ -77,9 +121,9 @@ sequenceDiagram
 | Android Beam removed (API 29+) | NDEF push on sender + `enableReaderMode` on receiver |
 | NFC reader mode | Foreground activity only — matches “app open” UX |
 | minSdk 26 | No Beam; reader mode + NDEF push are available |
-| No NFC hardware on some devices | Hide/disable feature; `uses-feature` not required |
+| No NFC hardware on some devices | Hide/disable NFC menu item; zip share still works |
 
-**Practical v1 requirement:** both phones on the **same Wi‑Fi** network. If not, tap may succeed but download fails — show a clear error.
+**Practical v2 requirement:** both phones on the **same Wi‑Fi** network. If not, tap may succeed but download fails — show a clear error.
 
 ---
 
@@ -92,6 +136,8 @@ manifest.json
 songs/
   {uuid}.pdf
   {uuid}.jpg
+  {uuid}.png          ← placeholder sheets (generated title PNGs)
+  {uuid}.chart.json   ← optional, AI chart sidecar next to PDF
 ```
 
 **`manifest.json`** (schema version 1):
@@ -110,6 +156,13 @@ songs/
       "keySignature": "G",
       "notes": "capo 2",
       "fileType": "PDF"
+    },
+    {
+      "file": "songs/b2c3d4.png",
+      "title": "Bridge 🚧",
+      "keySignature": "Am",
+      "notes": "placeholder",
+      "fileType": "IMAGE"
     }
   ]
 }
@@ -121,11 +174,13 @@ songs/
 | Song order (array order) | `lastViewedAt`, archive sort order |
 | Title, key, notes per song | |
 | Sheet files (PDF/image) | |
+| **Placeholder songs (🚧)** — same as real songs: generated PNG + title/key/notes | |
+| Optional `.chart.json` sidecar (`ChartDraftStore`) | |
 | `fileType` (IMAGE/PDF) | |
 
-**Placeholder songs (🚧):** omit from bundle; manifest may list `skippedPlaceholders` count; receiver toast matches PDF export skip messaging.
+**Maintain placeholders:** Placeholders are full archive rows (generated PNG on disk, DB metadata, playlist position). Export and import them like any other song — same rule as **Export PDF**, which already embeds placeholders. A Quickstart “Create with placeholders” set list must round-trip intact. Do not omit placeholders or block share for placeholder-only playlists.
 
-**Missing files on sender:** skip entry; include `skippedMissing` in handshake or manifest; receiver reports count.
+**Missing files on sender:** skip entry only when the file is absent on disk; include `skippedMissing` in manifest (and NFC handshake in v2); receiver reports count.
 
 ---
 
@@ -133,25 +188,42 @@ songs/
 
 ### Components (new)
 
-| Component | Role |
-|-----------|------|
-| `PlaylistBundleExporter` | Playlist + songs → `.smpl.zip` in cache |
-| `PlaylistBundleImporter` | Zip → new `Song` rows + `Playlist` + ordered `PlaylistSong` |
-| `NfcTransferServer` | One-shot NanoHTTPD: `GET /transfer/{token}` streams zip; bind LAN only |
-| `NfcTransferCoordinator` | Reader mode (receiver), NDEF push (sender), lifecycle tied to `MainActivity` |
-| `NfcHandshake` | JSON in NDEF: `{ v, host, port, token, playlist, bytes, songs, skippedMissing }` |
+| Component | Phase | Role |
+|-----------|-------|------|
+| `PlaylistBundleExporter` | v1 | Playlist + songs (incl. placeholders) → `.smpl.zip` in cache |
+| `PlaylistBundleImporter` | v1 | Zip → new `Song` rows + `Playlist` + ordered `PlaylistSong` |
+| `PlaylistBundleShare` | v1 | Export via `Intent.ACTION_SEND` + `FileProvider` (mirror `PlaylistExportShare`) |
+| `ShareImporter` extension | v1 | Parse zip share / open-with → pending bundle import + confirm dialog |
+| `NfcTransferServer` | v2 | One-shot NanoHTTPD: `GET /transfer/{token}` streams zip; bind LAN only |
+| `NfcTransferCoordinator` | v2 | Reader mode (receiver), NDEF push (sender), lifecycle tied to `MainActivity` |
+| `NfcHandshake` | v2 | JSON in NDEF: `{ v, host, port, token, playlist, bytes, songs, skippedMissing }` |
 
-MIME type for NDEF filter: `application/vnd.stagemanager.transfer+json`.
+v1 import MIME: `application/zip` and/or `application/vnd.stagemanager.playlist+zip`.  
+v2 NDEF filter MIME: `application/vnd.stagemanager.transfer+json`.
 
-### Receiver: always listening while app is open
+### v1 — Export and file import
+
+**Export (sender):**
+
+- Entry point: playlist detail **pencil menu** and/or Playlists tab menu — **Export playlist bundle** (alongside Export PDF).
+- On tap:
+  1. Build zip on `Dispatchers.IO` (progress if large).
+  2. Open system share sheet with `.smpl.zip` via `FileProvider`.
+
+**Import (receiver):**
+
+- `ACTION_SEND` / `ACTION_VIEW` with zip MIME → parse bundle → confirm dialog → `PlaylistBundleImporter`.
+- Optional in-app **Import playlist bundle** file picker (same importer).
+
+### v2 — Receiver: always listening while app is open
 
 - `MainActivity.onResume` → `NfcAdapter.enableReaderMode()` with flags that skip NFC-A/B/F tag polling noise where possible; **only** handle records matching Stage Manager MIME.
 - `MainActivity.onPause` → `disableReaderMode()`.
 - Optional subtle UI: “Ready for nearby import” in app chrome (Settings toggle to hide indicator later).
 
-### Sender: “Share via NFC”
+### v2 — Sender: “Share via NFC”
 
-- Entry point: playlist detail **pencil menu** (alongside Export PDF) and/or Playlists tab long-press menu.
+- Entry point: same menus as v1 — **Share via NFC** (disabled if no NFC hardware).
 - On tap:
   1. Build zip on `Dispatchers.IO` (progress if large).
   2. Start `NfcTransferServer` with random token, 2-minute TTL.
@@ -159,24 +231,30 @@ MIME type for NDEF filter: `application/vnd.stagemanager.transfer+json`.
   4. Full-screen or bottom sheet: “Hold phones together” + cancel.
 - On download complete or timeout: stop server, delete temp zip, clear NDEF callback.
 
-### Import rules (receiver)
+### Import rules (all paths)
 
 1. Validate `manifest.version`.
 2. Create `Playlist`; suffix name if collision (`"Sunday set (2)"`).
-3. For each song in manifest order:
+3. For each song in manifest order (including placeholders):
    - Copy file into `StageManagerStorage.songsDir()` via `FileStorage` (new UUID filename).
+   - Copy optional `.chart.json` sidecar when manifest references it.
    - `SongRepository.insert` → `PlaylistRepository.addSong` at position.
 4. Transactional rollback on failure (delete partial files + DB rows).
 5. Reuse patterns from `ShareImporter` / `FileStorage`, not `PlaylistPdfExporter`.
 
 ### Security
 
-- Random single-use token; server accepts only `GET /transfer/{token}`.
-- Bind to LAN interface (not `0.0.0.0` unless required for connectivity testing).
-- Short server lifetime (~2 min).
-- **Confirmation dialog** before import — prevents accidental imports from bumps.
+- **v1:** Confirm dialog before import; validate manifest version and zip structure.
+- **v2:** Random single-use token; server accepts only `GET /transfer/{token}`.
+- **v2:** Bind to LAN interface (not `0.0.0.0` unless required for connectivity testing).
+- **v2:** Short server lifetime (~2 min).
+- **v2:** Confirmation dialog before import — prevents accidental imports from bumps.
 
 ### Manifest / permissions
+
+v1: extend `MainActivity` intent filters for zip import (no new permissions).
+
+v2:
 
 ```xml
 <uses-permission android:name="android.permission.NFC" />
@@ -186,6 +264,24 @@ MIME type for NDEF filter: `application/vnd.stagemanager.transfer+json`.
 ---
 
 ## UI
+
+### v1
+
+| Location | Control |
+|----------|---------|
+| Playlist detail (pencil menu) | **Export playlist bundle** (disabled if playlist empty) |
+| Playlists tab (optional) | Same on playlist row menu |
+| Import | Open/share `.smpl.zip` into app, or optional file picker |
+| Export flow | Build zip → system share sheet |
+| Import flow | Confirm dialog: playlist name, song count, size → Accept / Decline |
+
+**Errors (user-facing):**
+
+- Empty playlist cannot export
+- Import failed (corrupt bundle, unsupported manifest version)
+- Missing song files on sender: `skippedMissing` count in toast after import
+
+### v2
 
 | Location | Control |
 |----------|---------|
@@ -207,14 +303,16 @@ MIME type for NDEF filter: `application/vnd.stagemanager.transfer+json`.
 
 ## Reuse from existing code
 
-| Existing | Use for NFC |
-|----------|-------------|
-| `PlayRemoteServer` | Pattern for NanoHTTPD + token gate; **separate** server instance (different lifecycle) |
-| `NetworkAddresses.kt` | LAN IP in handshake |
-| `ShareImporter` / `FileStorage` | Store imported bytes |
+| Existing | Use for bundle sharing |
+|----------|------------------------|
+| `PlaylistExportShare` | v1 pattern for `FileProvider` + share sheet |
+| `ShareImporter` / `FileStorage` | v1 zip import + store song bytes |
+| `ChartDraftStore` | v1 optional sidecar copy on export/import |
 | `SongRepository` / `PlaylistRepository` | Persist import |
 | `StageManagerStorage` | Target `songs/` and DB |
-| `PlaylistExportShare` | Not used — in-app flow, not system chooser |
+| `PlaylistPdfExporter` | Skip logic for **missing files only** (not placeholders) |
+| `PlayRemoteServer` | v2 pattern for NanoHTTPD + token gate; **separate** server instance |
+| `NetworkAddresses.kt` | v2 LAN IP in handshake |
 
 ---
 
@@ -228,41 +326,54 @@ MIME type for NDEF filter: `application/vnd.stagemanager.transfer+json`.
 | Duplicate playlist name | Auto-suffix on import |
 | Same file, different metadata | Two archive rows (current app semantics) |
 | Identical file bytes in bundle | One stored file; two rows if manifest has two entries (rare) |
-| Non-Stage Manager NDEF | Ignored by MIME filter |
-| Only one phone has NFC | Feature unavailable on that device |
+| Placeholder-only playlist | Fully shareable in v1 (set-list skeleton) |
+| Placeholder round-trip | Title with 🚧, notes, and generated PNG preserved |
+| Non-Stage Manager NDEF | Ignored by MIME filter (v2) |
+| Only one phone has NFC | v2 NFC unavailable; v1 zip share still works |
 
 ---
 
-## Out of scope (v1)
+## Out of scope
+
+### v1
+
+- NFC / LAN transfer (v2)
+- Full archive export (playlist-scoped only)
+- iOS (Android-only app)
+- Merging into live `PlayRemoteServer` / remote play session
+
+### v2+
 
 - Wi‑Fi Direct / Nearby Connections when phones are not on same AP
 - Background receive when app is closed
 - Tap-free room-scale discovery (mDNS/BLE)
-- iOS (Android-only app)
-- Merging into live `PlayRemoteServer` / remote play session
 
 ---
 
 ## Implementation phases
 
-### Phase 1 — Bundle format (no NFC)
+### Phase 1 — v1: Shareable zip (ship first)
 
-- `PlaylistBundleExporter` / `PlaylistBundleImporter`
-- JVM unit tests: round-trip, order preserved, name collision, missing files, placeholders skipped
-- Manual: export zip → import on same device (debug entry)
+- `PlaylistBundleExporter` / `PlaylistBundleImporter` / `PlaylistBundleShare`
+- **Maintain placeholders** in export and import (round-trip with Quickstart set lists)
+- Optional `.chart.json` sidecars for AI charts
+- Extend `ShareImporter` + `MainActivity` intent filters for zip import
+- UI: **Export playlist bundle** in pencil menu; confirm dialog on import
+- JVM unit tests: round-trip, order preserved, name collision, missing files, **placeholders preserved**
+- Manual: export zip → share → import on same or second device
 
-### Phase 2 — NFC UX (chosen option)
+### Phase 2 — v2: NFC nearby transfer
 
 - `NfcTransferServer` + `NfcTransferCoordinator`
 - Reader mode on `MainActivity` resume/pause
-- “Share via NFC” in playlist UI
+- “Share via NFC” in playlist UI (same `.smpl.zip` bundle)
 - Confirm dialog + import on receiver
 - Error strings + NFC capability checks
 
 ### Phase 3 — Polish
 
-- Transfer progress (bytes)
-- Settings toggle: “Listen for nearby imports” (default on) for users who want to disable reader mode
+- Transfer progress (bytes) for large zips and NFC downloads
+- Settings toggle: “Listen for nearby imports” (default on) for users who want to disable reader mode (v2)
 - Sender success animation / navigate optional
 
 ### Phase 4 (optional) — Hard environments
@@ -282,11 +393,21 @@ MIME type for NDEF filter: `application/vnd.stagemanager.transfer+json`.
 
 ## Test plan
 
-- [ ] Round-trip bundle export/import on one device (debug)
+### v1 (shareable zip)
+
+- [ ] Round-trip bundle export/import on one device (export → share → import)
+- [ ] Second device or emulator: receive zip via Files / Drive / email
+- [ ] Placeholder songs (🚧) preserved: title, key, notes, PNG, playlist position
+- [ ] Placeholder-only playlist exports and imports successfully
+- [ ] Quickstart “Create with placeholders” set list round-trips intact
+- [ ] Missing song file on sender: entry skipped; `skippedMissing` reported
+- [ ] Duplicate playlist name on import: auto-suffix
+- [ ] Corrupt or wrong manifest version: clear error, no partial DB state
+- [ ] `rebuild-app.sh` + JVM tests green after implementation
+
+### v2 (NFC)
+
 - [ ] Two physical devices, same Wi‑Fi: full tap → confirm → import
 - [ ] Decline on receiver; sender handles gracefully
-- [ ] Empty / placeholder-only playlist cannot share
-- [ ] Missing song file on sender: skipped count shown on both sides
-- [ ] No NFC device: menu item hidden or disabled with explanation
+- [ ] No NFC device: NFC menu item hidden or disabled; zip export still available
 - [ ] App backgrounded on receiver: reader mode off; tap does nothing until app reopened
-- [ ] `rebuild-app.sh` + JVM tests green after implementation

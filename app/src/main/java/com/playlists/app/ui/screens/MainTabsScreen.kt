@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Piano
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,8 +42,8 @@ import com.playlists.app.remote.RemotePlayFlowDialog
 import com.playlists.app.remote.RemotePlayFlowState
 import com.playlists.app.remote.RemotePlayMode
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.components.PianoDialog
 import com.playlists.app.ui.components.RemotePlayIconButton
-import com.playlists.app.util.AppPrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,9 +64,9 @@ fun MainTabsScreen(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var remoteError by remember { mutableStateOf<String?>(null) }
     var remoteFlow by remember { mutableStateOf<RemotePlayFlowState?>(null) }
-    var pendingRemotePlaylistId by remember { mutableStateOf<Long?>(null) }
     var remoteStartGeneration by remember { mutableIntStateOf(0) }
     var showRemoteDebug by remember { mutableStateOf(false) }
+    var showPiano by remember { mutableStateOf(false) }
 
     val activePlaylistId = if (remoteRunning) PlayRemoteController.activePlaylistId else null
     val entries by viewModel.observePlaylistSongs(activePlaylistId ?: 0L)
@@ -81,7 +82,6 @@ fun MainTabsScreen(
     fun cancelRemoteFlow() {
         remoteStartGeneration++
         remoteFlow = null
-        pendingRemotePlaylistId = null
         scope.launch(Dispatchers.IO) { PlayRemoteController.stop() }
     }
 
@@ -139,11 +139,16 @@ fun MainTabsScreen(
                                     if (remoteRunning) {
                                         showRemoteDebug = true
                                     } else {
-                                        pendingRemotePlaylistId = AppPrefs.getLastPlaylistId(context)
                                         remoteFlow = RemotePlayFlowState.ChooseMode
                                     }
                                 },
                             )
+                            IconButton(onClick = { showPiano = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Piano,
+                                    contentDescription = stringResource(R.string.piano_keyboard_label),
+                                )
+                            }
                             IconButton(onClick = onSettings) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
@@ -190,9 +195,7 @@ fun MainTabsScreen(
             onCancel = { cancelRemoteFlow() },
             onCloseStarted = { closeRemoteStartedDialog() },
             onStopRemote = { stopRemoteFlow() },
-            onSelectMode = { mode ->
-                pendingRemotePlaylistId?.let { startRemote(it, mode) }
-            },
+            onSelectMode = { mode -> startRemote(null, mode) },
         )
     }
 
@@ -207,5 +210,9 @@ fun MainTabsScreen(
                 stopRemoteFlow()
             },
         )
+    }
+
+    if (showPiano) {
+        PianoDialog(onDismiss = { showPiano = false })
     }
 }

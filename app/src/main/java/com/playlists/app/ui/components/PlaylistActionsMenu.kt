@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -60,6 +61,9 @@ fun PlaylistActionsMenu(
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.playlist_color)) },
+                leadingIcon = {
+                    Icon(Icons.Default.Palette, contentDescription = null)
+                },
                 onClick = {
                     expanded = false
                     onColor()

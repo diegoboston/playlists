@@ -51,7 +51,8 @@ def resolve_remote_base(base_url: str, opener: urllib.request.OpenerDirector) ->
         raise RuntimeError(
             "Stable URL has no active tunnel — start Cloudflare remote play on the phone first",
         )
-    return body.rstrip("/")
+    # Worker reverse-proxies API and web traffic; scripts stay on the stable hostname.
+    return base_url
 
 
 def resolve_configured_base(args: argparse.Namespace, *, script_name: str) -> str:
@@ -62,7 +63,7 @@ def resolve_configured_base(args: argparse.Namespace, *, script_name: str) -> st
         return env_url.rstrip("/")
     domain = (args.domain or os.environ.get("STAGE_MANAGER_DOMAIN", "")).strip()
     if not domain:
-        domain = input("Workers domain (e.g. diegoppp): ").strip()
+        domain = input("Workers domain (e.g. myaccount): ").strip()
     if not domain:
         print(
             f"{script_name}: domain required (--domain, STAGE_MANAGER_DOMAIN, or prompt)",

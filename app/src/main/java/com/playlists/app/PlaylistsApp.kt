@@ -7,6 +7,7 @@ import com.playlists.app.data.PlaylistRepository
 import com.playlists.app.data.SongRepository
 import com.playlists.app.util.AppIconManager
 import com.playlists.app.util.AppUpdate
+import com.playlists.app.util.SongFileIntegrity
 import com.playlists.app.util.SongFileMigration
 import com.playlists.app.util.StageManagerState
 import com.playlists.app.util.StageManagerStorage
@@ -26,6 +27,10 @@ class PlaylistsApp : Application() {
         private set
 
     private var initialized = false
+
+    /** Latest startup scan; null until [initialize] completes. */
+    var lastIntegrityScan: SongFileIntegrity.ScanResult? = null
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -53,7 +58,13 @@ class PlaylistsApp : Application() {
             PDFBoxResourceLoader.init(applicationContext)
             val db = AppDatabase.get(this)
             val songDao = db.songDao()
-            runBlocking { SongFileMigration.sync(songDao) }
+            runBlocking {
+                SongFileMigration.sync(songDao)
+                val songs = songDao.getAll()
+                val integrity = SongFileIntegrity.scan(songs)
+                SongFileIntegrity.log(TAG, integrity, songs.size)
+                lastIntegrityScan = integrity
+            }
             songRepository = SongRepository(songDao)
             playlistRepository = PlaylistRepository(db.playlistDao(), db.playlistSongDao())
             initialized = true

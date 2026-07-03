@@ -44,8 +44,7 @@
     <string name="remote_started_message_stable">Bookmark the stable URL — it keeps working across sessions after you start remote play on this phone. Enter the PIN when prompted on Cloudflare links.</string>
     <string name="remote_urls_heading">Available URLs</string>
     <string name="remote_url_label_stable">Stable URL</string>
-    <string name="remote_url_label_cloudflare">Cloudflare (this session)</string>
-    <string name="remote_url_label_session">This session</string>
+    <string name="remote_url_label_cloudflare">Cloudflare</string>
     <string name="remote_url_label_lan">LAN</string>
     <string name="remote_url_label_lan_numbered">LAN %1$d</string>
     <string name="remote_url_label_lan_hotspot">LAN %1$d (hotspot)</string>
@@ -74,9 +73,15 @@
     <string name="settings_remote_pin_hint">This is also the port for LAN server. Use range 49152-65535</string>
     <string name="settings_stable_redirect">Stable play URL (Cloudflare Worker)</string>
     <string name="settings_stable_subdomain">Workers account subdomain</string>
-    <string name="settings_stable_subdomain_hint">e.g. diegoppp → https://play.diegoppp.workers.dev</string>
+    <string name="settings_stable_subdomain_hint">Your Cloudflare account subdomain</string>
+    <string name="settings_stable_subdomain_supporting">https://play.&lt;subdomain&gt;.workers.dev</string>
     <string name="settings_stable_secret">Worker write secret</string>
     <string name="settings_stable_secret_hint">Same value as WRITE_SECRET from wrangler secret put</string>
+    <string name="settings_stable_secret_valid">secret accepted</string>
+    <string name="settings_stable_secret_invalid">secret rejected</string>
+    <string name="settings_stable_secret_testing">Testing write secret…</string>
+    <string name="settings_show_secret">Show</string>
+    <string name="settings_hide_secret">Hide</string>
     <string name="settings_stable_subdomain_invalid">Subdomain: lowercase letters, numbers, and hyphens only.</string>
     <string name="settings_remote_code_invalid">Enter exactly 5 digits from 49152 to 65535.</string>
     <string name="settings_saved">Settings saved</string>
@@ -87,6 +92,7 @@
     <string name="settings_app_version">App version</string>
     <string name="settings_app_version_value">%1$s</string>
     <string name="settings_check_for_updates">Check for updates</string>
+    <string name="settings_updates">Updates</string>
     <string name="settings_storage">Storage</string>
     <string name="settings_storage_calculating">Calculating…</string>
     <string name="remote_stopped">Remote play stopped</string>
@@ -133,6 +139,7 @@
     <string name="update_app_needs_permission">Allow installs from this app, then try updating again.</string>
     <string name="update_app_snackbar_prompt">Version %1$s is available. Update now?</string>
     <string name="update_app_snackbar_action">Update now</string>
+    <string name="piano_keyboard_label">Piano</string>
     <string name="storage_access_title">Storage access required</string>
     <string name="storage_access_message">Stage Manager keeps your songs, playlists, and settings in Music/StageManager so they survive app reinstall. Grant “All files access” to continue.</string>
     <string name="storage_access_open_settings">Open settings</string>
@@ -142,7 +149,6 @@
     <string name="settings_openai_key_valid">key accepted</string>
     <string name="settings_openai_key_invalid">OpenAI key failed</string>
     <string name="settings_openai_key_testing">Testing OpenAI key…</string>
-    <string name="settings_openai_billing">OpenAI billing overview</string>
     <string name="chart_key_label">Chart key</string>
     <string name="chart_key_play_in">Play in</string>
     <string name="chart_key_guessed">Guessed from first chord — tap chart key if wrong</string>
@@ -176,4 +182,13 @@
     <string name="export_playlist_working">Building PDF…</string>
     <string name="export_playlist_failed">Could not export playlist PDF</string>
     <string name="export_playlist_skipped_missing">Exported %1$d pages; %2$d songs had no file.</string>
+    <string name="song_integrity_snackbar">Song storage issues: %1$s</string>
+    <plurals name="song_integrity_missing">
+        <item quantity="one">%d missing file</item>
+        <item quantity="other">%d missing files</item>
+    </plurals>
+    <plurals name="song_integrity_shared">
+        <item quantity="one">%d shared file path</item>
+        <item quantity="other">%d shared file paths</item>
+    </plurals>
 </resources>

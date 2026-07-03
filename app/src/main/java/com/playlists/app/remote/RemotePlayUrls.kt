@@ -14,6 +14,12 @@ object RemotePlayUrls {
     fun playlistSuffix(playlistId: Long?): String =
         if (playlistId != null) "/?playlist=$playlistId" else "/"
 
+    internal fun shouldShowStableUrl(
+        mode: RemotePlayMode,
+        stableConfigured: Boolean,
+        stableUrlActive: Boolean,
+    ): Boolean = stableConfigured && (mode != RemotePlayMode.STABLE || stableUrlActive)
+
     fun forSession(
         context: Context,
         session: PlayRemoteController.SessionSnapshot,
@@ -23,7 +29,7 @@ object RemotePlayUrls {
         val entries = mutableListOf<RemotePlayUrlEntry>()
 
         val stableBase = AppPrefs.buildStableRedirectBase(context)
-        if (stableBase != null) {
+        if (shouldShowStableUrl(session.mode, stableBase != null, session.stableUrlActive)) {
             entries.add(
                 RemotePlayUrlEntry(
                     label = context.getString(R.string.remote_url_label_stable),
@@ -54,12 +60,13 @@ object RemotePlayUrls {
         val suffix = playlistSuffix(playlistId)
         val port = AppPrefs.getRemotePort(context)
         val entries = mutableListOf<RemotePlayUrlEntry>()
+        val stableBase = AppPrefs.buildStableRedirectBase(context)
 
-        AppPrefs.buildStableRedirectBase(context)?.let { stableBase ->
+        stableBase?.let { base ->
             entries.add(
                 RemotePlayUrlEntry(
                     label = context.getString(R.string.remote_url_label_stable),
-                    url = "$stableBase$suffix",
+                    url = "$base$suffix",
                 ),
             )
         }
@@ -80,11 +87,11 @@ object RemotePlayUrls {
 
         addLanEntries(context, entries, port, suffix)
 
-        PlayRemoteController.displayUrl()?.let { publicUrl ->
-            if (entries.isEmpty()) {
+        if (entries.isEmpty()) {
+            PlayRemoteController.displayUrl()?.let { publicUrl ->
                 entries.add(
                     RemotePlayUrlEntry(
-                        label = context.getString(R.string.remote_url_label_session),
+                        label = context.getString(R.string.remote_url_label_cloudflare),
                         url = publicUrl,
                     ),
                 )

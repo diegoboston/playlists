@@ -34,6 +34,7 @@ object PlayRemoteController {
         val localPort: Int,
         val tunnelBaseUrl: String?,
         val publicUrl: String,
+        val stableUrlActive: Boolean = false,
     )
 
     private var songSortState = SongSortState()
@@ -45,6 +46,7 @@ object PlayRemoteController {
         val tunnelBaseUrl: String?,
         val publicUrl: String,
         val startWarnings: List<String>,
+        val stableUrlActive: Boolean = false,
     )
 
     private val _running = MutableStateFlow(false)
@@ -71,6 +73,7 @@ object PlayRemoteController {
                 localPort = it.localPort,
                 tunnelBaseUrl = it.tunnelBaseUrl,
                 publicUrl = it.publicUrl,
+                stableUrlActive = it.stableUrlActive,
             )
         }
     }
@@ -290,6 +293,7 @@ object PlayRemoteController {
                 }
             }
             val startWarnings = mutableListOf<String>()
+            var stableUrlActive = false
             if (mode.usesCloudflareTunnel() && !CloudflareTunnel.isRunning()) {
                 startWarnings.add("cloudflared is not running — the public URL will not work.")
             }
@@ -310,6 +314,15 @@ object PlayRemoteController {
                     startWarnings.add(
                         "Could not register stable URL (${publishResult.exceptionOrNull()?.message ?: "unknown error"}).",
                     )
+                } else {
+                    val verifyResult = TunnelRedirectClient.verifyRegisteredTunnel(workerBase, tunnelUrl)
+                    if (verifyResult.isSuccess) {
+                        stableUrlActive = true
+                    } else {
+                        startWarnings.add(
+                            "Stable URL is not active (${verifyResult.exceptionOrNull()?.message ?: "unknown error"}).",
+                        )
+                    }
                 }
             }
             val playlistSuffix = if (playlistId != null) {
@@ -320,7 +333,11 @@ object PlayRemoteController {
             val resolvedPublicUrl = when (mode) {
                 RemotePlayMode.STABLE -> {
                     val stableBase = AppPrefs.buildStableRedirectBase(context)!!
-                    "$stableBase$playlistSuffix"
+                    if (stableUrlActive) {
+                        "$stableBase$playlistSuffix"
+                    } else {
+                        "$tunnelUrl$playlistSuffix"
+                    }
                 }
                 RemotePlayMode.CLOUDFLARE -> "$tunnelUrl$playlistSuffix"
                 RemotePlayMode.LAN -> "$tunnelUrl$playlistSuffix"
@@ -334,6 +351,7 @@ object PlayRemoteController {
                 tunnelBaseUrl = if (mode.usesCloudflareTunnel()) tunnelUrl else null,
                 publicUrl = resolvedPublicUrl,
                 startWarnings = startWarnings,
+                stableUrlActive = stableUrlActive,
             )
             _running.value = true
             RemotePlayService.start(context.applicationContext, playlistName)
