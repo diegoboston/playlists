@@ -252,18 +252,10 @@ fun PlaylistDetailScreen(
                             active = remoteSessionHere,
                             onClick = {
                                 if (remoteSessionHere) {
-                                    scope.launch(Dispatchers.IO) {
-                                        PlayRemoteController.stop()
-                                    }
-                                    Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
+                                    showRemoteDebug = true
                                 } else {
                                     remoteFlow = RemotePlayFlowState.ChooseMode
                                 }
-                            },
-                            onLongClick = if (remoteSessionHere) {
-                                { showRemoteDebug = true }
-                            } else {
-                                null
                             },
                         )
                         PlaylistActionsMenu(

@@ -6,9 +6,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
@@ -21,9 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -37,36 +34,21 @@ import com.playlists.app.R
 
 private val RemoteActiveGreen = Color(0xFF4CAF50)
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RemotePlayIconButton(
     active: Boolean,
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    var suppressNextClick by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
             .size(48.dp)
             .semantics { role = Role.Button }
-            .combinedClickable(
+            .clickable(
                 interactionSource = interactionSource,
                 indication = ripple(bounded = false, radius = 24.dp),
-                onClick = {
-                    if (suppressNextClick) {
-                        suppressNextClick = false
-                        return@combinedClickable
-                    }
-                    onClick()
-                },
-                onLongClick = onLongClick?.let { handler ->
-                    {
-                        suppressNextClick = true
-                        handler()
-                    }
-                },
+                onClick = onClick,
             ),
         contentAlignment = Alignment.Center,
     ) {

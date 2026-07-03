@@ -137,23 +137,11 @@ fun MainTabsScreen(
                                 active = remoteRunning,
                                 onClick = {
                                     if (remoteRunning) {
-                                        scope.launch(Dispatchers.IO) {
-                                            PlayRemoteController.stop()
-                                        }
-                                        Toast.makeText(
-                                            context,
-                                            R.string.remote_stopped,
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                        return@RemotePlayIconButton
+                                        showRemoteDebug = true
+                                    } else {
+                                        pendingRemotePlaylistId = AppPrefs.getLastPlaylistId(context)
+                                        remoteFlow = RemotePlayFlowState.ChooseMode
                                     }
-                                    pendingRemotePlaylistId = AppPrefs.getLastPlaylistId(context)
-                                    remoteFlow = RemotePlayFlowState.ChooseMode
-                                },
-                                onLongClick = if (remoteRunning) {
-                                    { showRemoteDebug = true }
-                                } else {
-                                    null
                                 },
                             )
                             IconButton(onClick = onSettings) {
