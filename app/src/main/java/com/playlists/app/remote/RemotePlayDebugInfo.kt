@@ -26,6 +26,14 @@ data class RemotePlayDebugInfo(
         return false
     }
 
+    /** True when cloudflared or the quick tunnel is unhealthy (not stable-redirect KV issues). */
+    fun hasCloudflareIssues(): Boolean {
+        if (mode != RemotePlayMode.CLOUDFLARE && mode != RemotePlayMode.STABLE) return false
+        if (!tunnelProcessAlive) return true
+        if (tunnelProbe?.ok == false) return true
+        return warnings.any { it.looksCloudflareSpecific() }
+    }
+
     fun formatForCopy(): String = buildString {
         appendLine("Stage Manager — remote play debug")
         appendLine("Checked: ${java.text.SimpleDateFormat.getDateTimeInstance().format(java.util.Date(checkedAtMs))}")
@@ -53,4 +61,11 @@ data class RemotePlayDebugInfo(
 
     private fun probeLine(probe: RemotePlayHealth.ProbeResult): String =
         if (probe.ok) "OK — ${probe.detail}" else "FAIL — ${probe.detail}"
+}
+
+internal fun String.looksCloudflareSpecific(): Boolean {
+    val lower = lowercase()
+    return lower.contains("cloudflared") ||
+        lower.contains("tunnel not reachable") ||
+        lower.contains("tunnel url")
 }

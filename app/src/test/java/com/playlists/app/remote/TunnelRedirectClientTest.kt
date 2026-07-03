@@ -34,4 +34,19 @@ class TunnelRedirectClientTest {
             TunnelRedirectClient.buildWorkerBaseUrl("myaccount"),
         )
     }
+
+    @Test
+    fun interpretValidateWriteSecretResponse_acceptsBadRequestAsReachableWorker() {
+        assertTrue(TunnelRedirectClient.interpretValidateWriteSecretResponse(400).isSuccess)
+    }
+
+    @Test
+    fun interpretValidateWriteSecretResponse_rejectsUnauthorized() {
+        assertTrue(TunnelRedirectClient.interpretValidateWriteSecretResponse(401).isFailure)
+    }
+
+    @Test
+    fun interpretValidateWriteSecretResponse_rejectsMissingWorker() {
+        assertTrue(TunnelRedirectClient.interpretValidateWriteSecretResponse(404).isFailure)
+    }
 }

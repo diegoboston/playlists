@@ -52,24 +52,22 @@ object TunnelRedirectClient {
         }
         return try {
             conn.outputStream.use { it.write("{}".toByteArray(Charsets.UTF_8)) }
-            when (val code = conn.responseCode) {
-                401 -> Result.failure(IllegalStateException("Unauthorized"))
-                in 200..299 -> Result.success(Unit)
-                in 400..499 -> Result.success(Unit)
-                else -> {
-                    val detail = (conn.errorStream ?: conn.inputStream)
-                        .bufferedReader()
-                        .readText()
-                        .take(200)
-                        .ifBlank { "HTTP $code" }
-                    Result.failure(IllegalStateException(detail))
-                }
-            }
+            interpretValidateWriteSecretResponse(conn.responseCode)
         } catch (e: Exception) {
             Result.failure(e)
         } finally {
             conn.disconnect()
         }
+    }
+
+    /**
+     * POST /register with an empty JSON body: authorized workers return 400 (missing url);
+     * 401 means wrong secret; 404 means the subdomain/worker does not exist.
+     */
+    internal fun interpretValidateWriteSecretResponse(code: Int): Result<Unit> = when (code) {
+        401 -> Result.failure(IllegalStateException("Unauthorized"))
+        400, in 200..299 -> Result.success(Unit)
+        else -> Result.failure(IllegalStateException("Worker not reachable (HTTP $code)"))
     }
 
     /** GET /url — registered tunnel base, or null if none. */

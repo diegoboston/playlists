@@ -5,13 +5,14 @@ import org.junit.Test
 
 class RemotePlayDebugInfoTest {
     private fun sampleInfo(
+        mode: RemotePlayMode = RemotePlayMode.CLOUDFLARE,
         warnings: List<String> = emptyList(),
         serverAlive: Boolean = true,
         tunnelProcessAlive: Boolean = true,
         localOk: Boolean = true,
         tunnelOk: Boolean = true,
     ) = RemotePlayDebugInfo(
-        mode = RemotePlayMode.CLOUDFLARE,
+        mode = mode,
         localPort = 52341,
         localUrl = "http://127.0.0.1:52341/",
         tunnelBaseUrl = "https://abc.trycloudflare.com",
@@ -38,6 +39,28 @@ class RemotePlayDebugInfoTest {
         assertTrue(sampleInfo(localOk = false).hasIssues())
         assertTrue(sampleInfo(tunnelProcessAlive = false).hasIssues())
         assertTrue(sampleInfo(tunnelOk = false).hasIssues())
+    }
+
+    @Test
+    fun hasCloudflareIssues_falseWhenOnlyStableUrlWarnings() {
+        val info = sampleInfo(
+            mode = RemotePlayMode.STABLE,
+            warnings = listOf("Could not register stable URL (HTTP 404)."),
+        )
+        assertTrue(!info.hasCloudflareIssues())
+    }
+
+    @Test
+    fun hasCloudflareIssues_trueWhenTunnelProbeFails() {
+        assertTrue(sampleInfo(tunnelOk = false).hasCloudflareIssues())
+    }
+
+    @Test
+    fun hasCloudflareIssues_trueWhenCloudflaredWarning() {
+        assertTrue(
+            sampleInfo(warnings = listOf("cloudflared is not running — the public URL will not work."))
+                .hasCloudflareIssues(),
+        )
     }
 
     @Test

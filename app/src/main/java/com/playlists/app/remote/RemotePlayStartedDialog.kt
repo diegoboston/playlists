@@ -59,7 +59,7 @@ internal fun RemotePlayDebugPanel(
         stringResource(R.string.remote_debug_server, if (info.serverAlive) "up" else "down"),
         style = MaterialTheme.typography.bodySmall,
     )
-    if (cloudflare && info.hasIssues() && info.cloudflaredLog.isNotBlank()) {
+    if (cloudflare && info.hasCloudflareIssues() && info.cloudflaredLog.isNotBlank()) {
         Spacer(Modifier.height(8.dp))
         Text(
             stringResource(R.string.remote_debug_log),
@@ -93,9 +93,4 @@ private fun ProbeLine(label: String, probe: RemotePlayHealth.ProbeResult) {
     )
 }
 
-private fun warningLooksCloudflareSpecific(warning: String): Boolean {
-    val lower = warning.lowercase()
-    return lower.contains("cloudflared") ||
-        lower.contains("tunnel not reachable") ||
-        lower.contains("tunnel url")
-}
+private fun warningLooksCloudflareSpecific(warning: String): Boolean = warning.looksCloudflareSpecific()

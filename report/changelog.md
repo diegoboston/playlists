@@ -4,6 +4,17 @@
 
 ---
 
+## `c2352c1` — piano/check secret/UI fixes
+
+**2026-07-03 (2:55 PM EDT)** · [commit](https://github.com/diegoboston/playlists/commit/c2352c1ddc064bec68720d7c6088db86670b2c05)
+
+- Main tabs: **Piano** icon opens a scrollable on-screen keyboard with synthesized tone for reference while prepping sets.
+- On launch, scans the song archive for **missing files** and **shared file paths**; a snackbar reports issues when found.
+- Settings: **Worker write secret** validates live (green check / error), matching the OpenAI key UX; **Check for updates** shows download progress on the status card.
+- Shared update progress banner composable used app-wide during APK download.
+
+---
+
 ## 1.0.60 · `db4e28f` — stable URL
 
 **Released:** 2026-07-03 (9:08 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/db4e28f5e4bffec56a972fb2ea47d6a48ca1b5e3)
