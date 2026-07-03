@@ -20,17 +20,17 @@ def parse_args() -> argparse.Namespace:
         description="List playlists or fetch song titles from a Stage Manager playlist.",
     )
     add_connection_args(parser)
-    target = parser.add_mutually_exclusive_group(required=True)
+    target = parser.add_mutually_exclusive_group()
     target.add_argument(
         "--playlist",
         type=int,
         metavar="ID",
-        help="Playlist id to show songs for (use --all to list ids)",
+        help="Playlist id to show songs for (default: list all playlists)",
     )
     target.add_argument(
         "--all",
         action="store_true",
-        help="List all playlists with their ids",
+        help="List all playlists with their ids (default when --playlist omitted)",
     )
     parser.add_argument(
         "--json",
@@ -62,10 +62,10 @@ def main() -> int:
     args = parse_args()
     try:
         base_url, opener = connect_remote(args, script_name="show_playlist")
-        if args.all:
-            data = fetch_playlists(base_url, opener)
-        else:
+        if args.playlist is not None:
             data = fetch_playlist_entries(base_url, args.playlist, opener)
+        else:
+            data = fetch_playlists(base_url, opener)
     except SystemExit:
         raise
     except Exception as e:
@@ -76,10 +76,10 @@ def main() -> int:
         print(json.dumps(data, indent=2))
         return 0
 
-    if args.all:
-        print_playlists(data)
-    else:
+    if args.playlist is not None:
         print_entries(data, args.playlist)
+    else:
+        print_playlists(data)
     return 0
 
 

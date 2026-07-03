@@ -37,7 +37,17 @@ class TunnelRedirectClientTest {
 
     @Test
     fun interpretValidateWriteSecretResponse_acceptsSuccess() {
-        assertTrue(TunnelRedirectClient.interpretValidateWriteSecretResponse(200).isSuccess)
+        assertTrue(
+            TunnelRedirectClient.interpretValidateWriteSecretResponse(200, """{"ok":true}""").isSuccess,
+        )
+    }
+
+    @Test
+    fun interpretValidateWriteSecretResponse_rejects200WithoutOkBody() {
+        assertTrue(TunnelRedirectClient.interpretValidateWriteSecretResponse(200, "").isFailure)
+        assertTrue(
+            TunnelRedirectClient.interpretValidateWriteSecretResponse(200, "No tunnel active").isFailure,
+        )
     }
 
     @Test

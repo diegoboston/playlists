@@ -47,10 +47,17 @@ object TunnelRedirectClient {
             requestMethod = "POST"
             connectTimeout = 10_000
             readTimeout = 10_000
+            doOutput = true
             setRequestProperty("Authorization", "Bearer $token")
         }
         return try {
-            interpretValidateWriteSecretResponse(conn.responseCode)
+            conn.outputStream.use { }
+            val code = conn.responseCode
+            val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                ?.bufferedReader()
+                ?.readText()
+                .orEmpty()
+            interpretValidateWriteSecretResponse(code, body)
         } catch (e: Exception) {
             Result.failure(e)
         } finally {
@@ -58,11 +65,18 @@ object TunnelRedirectClient {
         }
     }
 
-    internal fun interpretValidateWriteSecretResponse(code: Int): Result<Unit> = when (code) {
+    internal fun interpretValidateWriteSecretResponse(code: Int, body: String = ""): Result<Unit> = when (code) {
         401 -> Result.failure(IllegalStateException("Unauthorized"))
-        in 200..299 -> Result.success(Unit)
+        in 200..299 -> if (isValidateOkBody(body)) {
+            Result.success(Unit)
+        } else {
+            Result.failure(IllegalStateException("Worker did not confirm secret"))
+        }
         else -> Result.failure(IllegalStateException("Worker not reachable (HTTP $code)"))
     }
+
+    private fun isValidateOkBody(body: String): Boolean =
+        body.replace("\\s".toRegex(), "") == """{"ok":true}"""
 
     /** GET /url — registered tunnel base, or null if none. */
     fun registeredTunnelUrl(workerBaseUrl: String): Result<String?> {

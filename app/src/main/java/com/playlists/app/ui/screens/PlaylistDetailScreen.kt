@@ -169,6 +169,7 @@ fun PlaylistDetailScreen(
 
     fun stopRemoteFlow() {
         cancelRemoteFlow()
+        showRemoteDebug = false
         Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
     }
 

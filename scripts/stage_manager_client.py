@@ -11,9 +11,16 @@ import sys
 import urllib.error
 import urllib.request
 
-DEFAULT_PIN = "44444"
 WORKER_NAME = "play"
+USER_AGENT = "StageManager-Scripts/1.0"
 DOMAIN_RE = re.compile(r"^[a-z0-9-]+$")
+
+
+def default_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
+    headers = {"User-Agent": USER_AGENT}
+    if extra:
+        headers.update(extra)
+    return headers
 
 
 def normalize_domain(raw: str) -> str:
@@ -38,7 +45,11 @@ def resolve_remote_base(base_url: str, opener: urllib.request.OpenerDirector) ->
     base_url = base_url.rstrip("/")
     if ".workers.dev" not in base_url:
         return base_url
-    req = urllib.request.Request(f"{base_url}/url", method="GET")
+    req = urllib.request.Request(
+        f"{base_url}/url",
+        headers=default_headers(),
+        method="GET",
+    )
     try:
         with opener.open(req, timeout=15) as resp:
             body = resp.read().decode(errors="replace").strip()
@@ -73,8 +84,17 @@ def resolve_configured_base(args: argparse.Namespace, *, script_name: str) -> st
     return build_stable_url(domain)
 
 
-def resolve_pin(args: argparse.Namespace) -> str:
-    return args.pin or os.environ.get("STAGE_MANAGER_PIN", DEFAULT_PIN)
+def resolve_pin(args: argparse.Namespace, *, script_name: str) -> str:
+    pin = (args.pin or os.environ.get("STAGE_MANAGER_PIN", "")).strip()
+    if not pin:
+        pin = input("Remote PIN (5 digits): ").strip()
+    if not pin:
+        print(
+            f"{script_name}: PIN required (--pin, STAGE_MANAGER_PIN, or prompt)",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return pin
 
 
 def add_connection_args(parser: argparse.ArgumentParser) -> None:
@@ -93,7 +113,7 @@ def add_connection_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--pin",
         default=None,
-        help=f"5-digit remote PIN (default: $STAGE_MANAGER_PIN or {DEFAULT_PIN})",
+        help="5-digit remote PIN (or set STAGE_MANAGER_PIN; prompts if missing)",
     )
 
 
@@ -101,7 +121,7 @@ def authenticate(base_url: str, pin: str, opener: urllib.request.OpenerDirector)
     req = urllib.request.Request(
         f"{base_url.rstrip('/')}/api/auth",
         data=json.dumps({"pin": pin}).encode(),
-        headers={"Content-Type": "application/json"},
+        headers=default_headers({"Content-Type": "application/json"}),
         method="POST",
     )
     try:
@@ -118,7 +138,7 @@ def api_get(
     opener: urllib.request.OpenerDirector,
 ) -> dict:
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
-    req = urllib.request.Request(url, method="GET")
+    req = urllib.request.Request(url, headers=default_headers(), method="GET")
     try:
         with opener.open(req) as resp:
             return json.loads(resp.read().decode())
@@ -138,7 +158,7 @@ def connect_remote(
     remote_base = resolve_remote_base(configured_base, opener)
     if not quiet and remote_base != configured_base:
         print(f"Resolved tunnel: {remote_base}")
-    authenticate(remote_base, resolve_pin(args), opener)
+    authenticate(remote_base, resolve_pin(args, script_name=script_name), opener)
     return remote_base, opener
 
 

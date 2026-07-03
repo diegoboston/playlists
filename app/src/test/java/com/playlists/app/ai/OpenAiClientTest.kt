@@ -47,6 +47,16 @@ class OpenAiClientTest {
         assertTrue(error.message!!.contains("401"))
     }
 
+    @Test
+    fun validateApiKey_failsOn200WithoutModelsList() {
+        server.enqueue(MockResponse().setBody("""{"ok":true}"""))
+        val client = clientForServer()
+        val error = assertThrows(OpenAiException::class.java) {
+            client.validateApiKey()
+        }
+        assertTrue(error.message!!.contains("did not confirm"))
+    }
+
     private fun clientForServer(): OpenAiClient {
         val http = OkHttpClient.Builder()
             .addInterceptor { chain ->

@@ -122,13 +122,16 @@ fun SettingsScreen(
         }
         openAiKeyStatus = FieldValidationStatus.Testing
         delay(600)
-        val client = OpenAiClient(key)
-        openAiKeyStatus = withContext(Dispatchers.IO) {
-            runCatching { client.validateApiKey() }
+        if (openAiKeyText.trim() != key) return@LaunchedEffect
+        val status = withContext(Dispatchers.IO) {
+            runCatching { OpenAiClient(key).validateApiKey() }
                 .fold(
                     onSuccess = { FieldValidationStatus.Valid },
                     onFailure = { FieldValidationStatus.Invalid(it.message ?: "Failed") },
                 )
+        }
+        if (openAiKeyText.trim() == key) {
+            openAiKeyStatus = status
         }
     }
 
@@ -141,13 +144,19 @@ fun SettingsScreen(
         }
         writeSecretStatus = FieldValidationStatus.Testing
         delay(600)
+        if (workersSubdomainText.trim() != subdomain || writeSecretText.trim() != secret) {
+            return@LaunchedEffect
+        }
         val workerBase = TunnelRedirectClient.buildWorkerBaseUrl(subdomain)
-        writeSecretStatus = withContext(Dispatchers.IO) {
-            runCatching { TunnelRedirectClient.validateWriteSecret(workerBase, secret) }
+        val status = withContext(Dispatchers.IO) {
+            TunnelRedirectClient.validateWriteSecret(workerBase, secret)
                 .fold(
                     onSuccess = { FieldValidationStatus.Valid },
                     onFailure = { FieldValidationStatus.Invalid(it.message ?: "Failed") },
                 )
+        }
+        if (workersSubdomainText.trim() == subdomain && writeSecretText.trim() == secret) {
+            writeSecretStatus = status
         }
     }
 

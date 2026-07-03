@@ -19,7 +19,7 @@ except ImportError:
     print("multi_upload: pymupdf is required (pip install pymupdf)", file=sys.stderr)
     sys.exit(1)
 
-from stage_manager_client import add_connection_args, connect_remote
+from stage_manager_client import add_connection_args, connect_remote, default_headers
 
 
 def extract_first_column_title(page: fitz.Page) -> str:
@@ -111,7 +111,9 @@ def upload_song(
     req = urllib.request.Request(
         f"{base_url.rstrip('/')}/api/playlists/{playlist_id}/upload",
         data=body,
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        headers=default_headers(
+            {"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        ),
         method="POST",
     )
     try:

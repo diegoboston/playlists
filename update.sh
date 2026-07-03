@@ -46,6 +46,8 @@ RSYNC_EXCLUDES=(
     --exclude='.externalNativeBuild/'
     --exclude='.cxx/'
     --exclude='.go-build-cache/'
+    --exclude='__pycache__/'
+    --exclude='*.pyc'
 )
 
 clean_artifacts() {
@@ -64,6 +66,8 @@ clean_artifacts() {
     rm -f local.properties
     find . -name '.DS_Store' -delete 2>/dev/null || true
     find . -name '*.iml' -delete 2>/dev/null || true
+    find . -name '*.pyc' -delete 2>/dev/null || true
+    find . -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
 }
 
 RSYNC_FROM_REMOTE=(

@@ -17,3 +17,8 @@ captures/
 *.jks
 *.keystore
 !app/keystore/playlists.keystore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

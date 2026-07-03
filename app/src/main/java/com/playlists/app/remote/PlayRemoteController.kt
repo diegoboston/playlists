@@ -1,6 +1,7 @@
 package com.playlists.app.remote
 
 import android.content.Context
+import android.os.Looper
 import com.playlists.app.PlaylistsApp
 import com.playlists.app.data.FileType
 import com.playlists.app.data.PlaylistSongWithDetails
@@ -25,6 +26,9 @@ object PlayRemoteController {
     private var publicUrl: String? = null
     private var appContext: Context? = null
     private val stopLock = Any()
+    private val serverStopLock = Any()
+    private var startGeneration = 0
+    private var startingRemote: PlayRemoteServer? = null
     private var session: RemotePlaySession? = null
     var activePlaylistId: Long? = null
         private set
@@ -171,6 +175,7 @@ object PlayRemoteController {
         mode: RemotePlayMode = RemotePlayMode.CLOUDFLARE,
     ): Result<String> {
         stop()
+        val myGeneration = synchronized(stopLock) { startGeneration }
         appContext = context.applicationContext
         val playHtml = context.assets.open("remote/play.html").bufferedReader().readText()
         val indexHtml = context.assets.open("remote/index.html").bufferedReader().readText()
@@ -258,11 +263,15 @@ object PlayRemoteController {
                 runBlocking { createQuickstart(name, text, withPlaceholders) }
             },
         )
+        synchronized(stopLock) { startingRemote = remote }
         return try {
+            if (isStartCancelled(myGeneration)) {
+                return startCancelled(remote)
+            }
             remote.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
             val listeningPort = remote.listeningPort
             if (listeningPort <= 0) {
-                remote.stop()
+                stopHttpServerBlocking(remote)
                 return Result.failure(
                     IllegalStateException("Could not bind port $port — try another in Settings"),
                 )
@@ -271,7 +280,7 @@ object PlayRemoteController {
                 RemotePlayMode.STABLE, RemotePlayMode.CLOUDFLARE -> {
                     val tunnelResult = CloudflareTunnel.start(context.applicationContext, listeningPort)
                     if (tunnelResult.isFailure) {
-                        remote.stop()
+                        stopHttpServerBlocking(remote)
                         return Result.failure(
                             tunnelResult.exceptionOrNull()
                                 ?: IllegalStateException("Cloudflare tunnel failed"),
@@ -282,7 +291,7 @@ object PlayRemoteController {
                 RemotePlayMode.LAN -> {
                     val ip = NetworkAddresses.localLanIp()
                     if (ip == null) {
-                        remote.stop()
+                        stopHttpServerBlocking(remote)
                         return Result.failure(
                             IllegalStateException(
                                 "No LAN IP found — connect to Wi‑Fi or choose Cloudflare tunnel",
@@ -292,6 +301,9 @@ object PlayRemoteController {
                     "http://$ip:$listeningPort"
                 }
             }
+            if (isStartCancelled(myGeneration)) {
+                return startCancelled(remote)
+            }
             val startWarnings = mutableListOf<String>()
             var stableUrlActive = false
             if (mode.usesCloudflareTunnel() && !CloudflareTunnel.isRunning()) {
@@ -299,8 +311,8 @@ object PlayRemoteController {
             }
             if (mode == RemotePlayMode.STABLE) {
                 if (!AppPrefs.isTunnelRedirectConfigured(context)) {
-                    remote.stop()
                     CloudflareTunnel.stop()
+                    stopHttpServerBlocking(remote)
                     return Result.failure(
                         IllegalStateException(
                             "Stable redirect is not configured — set Workers subdomain and write secret in Settings",
@@ -325,6 +337,9 @@ object PlayRemoteController {
                     }
                 }
             }
+            if (isStartCancelled(myGeneration)) {
+                return startCancelled(remote)
+            }
             val playlistSuffix = if (playlistId != null) {
                 "/?playlist=$playlistId"
             } else {
@@ -342,24 +357,36 @@ object PlayRemoteController {
                 RemotePlayMode.CLOUDFLARE -> "$tunnelUrl$playlistSuffix"
                 RemotePlayMode.LAN -> "$tunnelUrl$playlistSuffix"
             }
-            server = remote
-            activePlaylistId = playlistId
-            publicUrl = resolvedPublicUrl
-            session = RemotePlaySession(
-                mode = mode,
-                localPort = listeningPort,
-                tunnelBaseUrl = if (mode.usesCloudflareTunnel()) tunnelUrl else null,
-                publicUrl = resolvedPublicUrl,
-                startWarnings = startWarnings,
-                stableUrlActive = stableUrlActive,
-            )
-            _running.value = true
+            synchronized(stopLock) {
+                if (isStartCancelled(myGeneration)) {
+                    return startCancelled(remote)
+                }
+                startingRemote = null
+                server = remote
+                activePlaylistId = playlistId
+                publicUrl = resolvedPublicUrl
+                session = RemotePlaySession(
+                    mode = mode,
+                    localPort = listeningPort,
+                    tunnelBaseUrl = if (mode.usesCloudflareTunnel()) tunnelUrl else null,
+                    publicUrl = resolvedPublicUrl,
+                    startWarnings = startWarnings,
+                    stableUrlActive = stableUrlActive,
+                )
+                _running.value = true
+            }
             RemotePlayService.start(context.applicationContext, playlistName)
             Result.success(resolvedPublicUrl)
         } catch (e: Exception) {
             CloudflareTunnel.stop()
-            remote.stop()
+            stopHttpServerBlocking(remote)
             Result.failure(e)
+        } finally {
+            synchronized(stopLock) {
+                if (startingRemote === remote) {
+                    startingRemote = null
+                }
+            }
         }
     }
 
@@ -372,19 +399,24 @@ object PlayRemoteController {
 
     fun stop() {
         val serviceContext: Context?
+        val starting: PlayRemoteServer?
         synchronized(stopLock) {
-            if (!_running.value && server == null) return
+            startGeneration++
+            starting = startingRemote
+            startingRemote = null
+            if (!_running.value && server == null && starting == null) return
             serviceContext = appContext
         }
+        starting?.let { stopHttpServerBlocking(it) }
         teardownResources()
         serviceContext?.let { RemotePlayService.requestStop(it.applicationContext) }
     }
 
     internal fun teardownResources() {
-        val remote: PlayRemoteServer?
+        val remoteToStop: PlayRemoteServer?
         synchronized(stopLock) {
             if (!_running.value && server == null) return
-            remote = server
+            remoteToStop = server
             server = null
             publicUrl = null
             activePlaylistId = null
@@ -396,8 +428,41 @@ object PlayRemoteController {
         }
         try {
             CloudflareTunnel.stop()
-            remote?.stop()
         } catch (_: Exception) {
+        }
+        stopHttpServerSafely(remoteToStop)
+    }
+
+    private fun isStartCancelled(myGeneration: Int): Boolean =
+        synchronized(stopLock) { myGeneration != startGeneration }
+
+    private fun startCancelled(remote: PlayRemoteServer): Result<String> {
+        CloudflareTunnel.stop()
+        stopHttpServerBlocking(remote)
+        return Result.failure(IllegalStateException("Remote play stopped"))
+    }
+
+    private fun stopHttpServerBlocking(remote: PlayRemoteServer) {
+        synchronized(serverStopLock) {
+            try {
+                remote.stop()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** NanoHTTPD must not stop on the main thread (notification/service stop path). */
+    private fun stopHttpServerSafely(remote: PlayRemoteServer?) {
+        if (remote == null) return
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            Thread({
+                stopHttpServerBlocking(remote)
+            }, "play-remote-stop").apply {
+                isDaemon = true
+                start()
+            }
+        } else {
+            stopHttpServerBlocking(remote)
         }
     }
 

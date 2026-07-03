@@ -118,7 +118,10 @@ class OpenAiClient(
             .header("Authorization", "Bearer $apiKey")
             .get()
             .build()
-        getJson(request)
+        val json = getJson(request)
+        if (json.optJSONArray("data") == null) {
+            throw OpenAiException("OpenAI did not confirm API key")
+        }
     }
 
     private fun getJson(request: Request): JSONObject {

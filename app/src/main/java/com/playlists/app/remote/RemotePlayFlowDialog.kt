@@ -148,12 +148,18 @@ fun RemotePlayStartedDialog(
 
     LaunchedEffect(mode, refreshTick) {
         if (mode == RemotePlayMode.LAN) return@LaunchedEffect
+        if (!PlayRemoteController.running.value) {
+            debug = null
+            return@LaunchedEffect
+        }
         val info = withContext(Dispatchers.IO) { PlayRemoteController.collectDebugInfo() }
-        if (!isActive) return@LaunchedEffect
+        if (!isActive || !PlayRemoteController.running.value) return@LaunchedEffect
         debug = info
         if (info?.hasIssues() != false) {
             delay(15_000)
-            refreshTick++
+            if (isActive && PlayRemoteController.running.value) {
+                refreshTick++
+            }
         }
     }
 

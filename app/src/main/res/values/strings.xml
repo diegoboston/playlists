@@ -99,7 +99,7 @@
     <string name="remote_notification_channel">Remote play</string>
     <string name="remote_notification_channel_desc">Shows while remote play is active</string>
     <string name="remote_notification_title">Remote: %1$s</string>
-    <string name="remote_notification_body">Active — tap Stop here or the Wi‑Fi icon in the app to end</string>
+    <string name="remote_notification_body">Active — tap to open the app, or Stop to end remote play</string>
     <string name="remote_debug_title">Remote play status</string>
     <string name="remote_debug_heading">Connection checks</string>
     <string name="remote_debug_local">Local server</string>

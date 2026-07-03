@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.playlists.app.R
+import com.playlists.app.ui.MainActivity
 
 object RemotePlayNotification {
     const val CHANNEL_ID = "remote_play"
@@ -31,12 +32,21 @@ object RemotePlayNotification {
     fun build(context: Context, playlistName: String): Notification {
         ensureChannel(context)
         val body = context.getString(R.string.remote_notification_body)
+        val openIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openPending = PendingIntent.getActivity(
+            context,
+            0,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         val stopIntent = Intent(context, RemotePlayService::class.java).apply {
             action = RemotePlayService.ACTION_STOP
         }
         val stopPending = PendingIntent.getService(
             context,
-            0,
+            1,
             stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -45,6 +55,7 @@ object RemotePlayNotification {
             .setContentTitle(context.getString(R.string.remote_notification_title, playlistName))
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentIntent(openPending)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
