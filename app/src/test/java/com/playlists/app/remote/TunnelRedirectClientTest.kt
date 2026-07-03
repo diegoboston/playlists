@@ -36,8 +36,8 @@ class TunnelRedirectClientTest {
     }
 
     @Test
-    fun interpretValidateWriteSecretResponse_acceptsBadRequestAsReachableWorker() {
-        assertTrue(TunnelRedirectClient.interpretValidateWriteSecretResponse(400).isSuccess)
+    fun interpretValidateWriteSecretResponse_acceptsSuccess() {
+        assertTrue(TunnelRedirectClient.interpretValidateWriteSecretResponse(200).isSuccess)
     }
 
     @Test

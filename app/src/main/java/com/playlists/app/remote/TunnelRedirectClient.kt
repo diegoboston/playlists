@@ -32,6 +32,7 @@ object TunnelRedirectClient {
         return null
     }
 
+    /** POST /validate — checks write secret without touching KV. */
     fun validateWriteSecret(workerBaseUrl: String, secret: String): Result<Unit> {
         val base = workerBaseUrl.trim().trimEnd('/')
         if (base.isEmpty()) {
@@ -42,16 +43,13 @@ object TunnelRedirectClient {
             return Result.failure(IllegalArgumentException("Write secret is empty"))
         }
 
-        val conn = (URL("$base/register").openConnection() as HttpURLConnection).apply {
+        val conn = (URL("$base/validate").openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 10_000
             readTimeout = 10_000
-            doOutput = true
             setRequestProperty("Authorization", "Bearer $token")
-            setRequestProperty("Content-Type", "application/json")
         }
         return try {
-            conn.outputStream.use { it.write("{}".toByteArray(Charsets.UTF_8)) }
             interpretValidateWriteSecretResponse(conn.responseCode)
         } catch (e: Exception) {
             Result.failure(e)
@@ -60,13 +58,9 @@ object TunnelRedirectClient {
         }
     }
 
-    /**
-     * POST /register with an empty JSON body: authorized workers return 400 (missing url);
-     * 401 means wrong secret; 404 means the subdomain/worker does not exist.
-     */
     internal fun interpretValidateWriteSecretResponse(code: Int): Result<Unit> = when (code) {
         401 -> Result.failure(IllegalStateException("Unauthorized"))
-        400, in 200..299 -> Result.success(Unit)
+        in 200..299 -> Result.success(Unit)
         else -> Result.failure(IllegalStateException("Worker not reachable (HTTP $code)"))
     }
 
@@ -93,7 +87,7 @@ object TunnelRedirectClient {
                         .readText()
                         .take(200)
                         .ifBlank { "HTTP $code" }
-                    Result.failure(IllegalStateException(detail))
+                    Result.failure(IllegalStateException("Worker not reachable ($detail)"))
                 }
             }
         } catch (e: Exception) {
@@ -121,6 +115,41 @@ object TunnelRedirectClient {
         )
     }
 
+    fun clearRegisteredTunnel(workerBaseUrl: String, secret: String): Result<Unit> {
+        val base = workerBaseUrl.trim().trimEnd('/')
+        if (base.isEmpty()) {
+            return Result.failure(IllegalArgumentException("Worker base URL is empty"))
+        }
+        val token = secret.trim()
+        if (token.isEmpty()) {
+            return Result.failure(IllegalArgumentException("Write secret is empty"))
+        }
+
+        val conn = (URL("$base/unregister").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 10_000
+            readTimeout = 10_000
+            setRequestProperty("Authorization", "Bearer $token")
+        }
+        return try {
+            val code = conn.responseCode
+            if (code in 200..299) {
+                Result.success(Unit)
+            } else {
+                val detail = (conn.errorStream ?: conn.inputStream)
+                    .bufferedReader()
+                    .readText()
+                    .take(200)
+                    .ifBlank { "HTTP $code" }
+                Result.failure(IllegalStateException(detail))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     fun publish(workerBaseUrl: String, secret: String, tunnelUrl: String): Result<Unit> {
         val base = workerBaseUrl.trim().trimEnd('/')
         if (base.isEmpty()) {
@@ -144,16 +173,17 @@ object TunnelRedirectClient {
         }
         return try {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            val code = conn.responseCode
-            if (code in 200..299) {
-                Result.success(Unit)
-            } else {
-                val detail = (conn.errorStream ?: conn.inputStream)
-                    .bufferedReader()
-                    .readText()
-                    .take(200)
-                    .ifBlank { "HTTP $code" }
-                Result.failure(IllegalStateException(detail))
+            when (val code = conn.responseCode) {
+                401 -> Result.failure(IllegalStateException("Unauthorized"))
+                in 200..299 -> Result.success(Unit)
+                else -> {
+                    val detail = (conn.errorStream ?: conn.inputStream)
+                        .bufferedReader()
+                        .readText()
+                        .take(200)
+                        .ifBlank { "HTTP $code" }
+                    Result.failure(IllegalStateException(detail))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)

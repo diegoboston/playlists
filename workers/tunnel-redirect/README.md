@@ -57,6 +57,13 @@ Save for the phone app:
 
 ## Manual verification
 
+Validate write secret (Settings probe):
+
+```bash
+curl -sS -X POST "$WORKER/validate" -H "Authorization: Bearer $SECRET"
+# Expect: {"ok":true}
+```
+
 Register a tunnel (replace values):
 
 ```bash
@@ -100,7 +107,9 @@ curl -sS "$WORKER/url"
 |--------|------|------|----------|
 | `GET` | `/` | None | `302` to stored tunnel; query string preserved |
 | `GET` | `/url` | None | `text/plain` tunnel base (empty if none) |
+| `POST` | `/validate` | `Authorization: Bearer <WRITE_SECRET>` | JSON `{"ok":true}` — checks secret, no KV access |
 | `POST` | `/register` | `Authorization: Bearer <WRITE_SECRET>` | JSON `{"url":"https://….trycloudflare.com"}` |
+| `POST` | `/unregister` | `Authorization: Bearer <WRITE_SECRET>` | JSON `{"ok":true}` — deletes stored tunnel |
 
 Only `https://*.trycloudflare.com` URLs are accepted (`api.trycloudflare.com` is rejected).
 

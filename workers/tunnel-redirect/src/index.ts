@@ -1,9 +1,10 @@
 /**
  * Stable reverse proxy for Stage Manager Cloudflare quick tunnels.
  *
- * GET  * (except /url, /register) → proxy to current *.trycloudflare.com
- * GET  /url      → text/plain tunnel base (empty if none registered)
- * POST /register → store tunnel URL in KV (Bearer WRITE_SECRET)
+ * GET  /url        → text/plain tunnel base (empty if none registered)
+ * POST /validate   → check Bearer WRITE_SECRET (no KV access)
+ * POST /register   → store tunnel URL in KV (Bearer WRITE_SECRET)
+ * POST /unregister → delete stored tunnel URL from KV (Bearer WRITE_SECRET)
  */
 
 export interface Env {
@@ -74,7 +75,7 @@ async function readRegisterBody(request: Request): Promise<{ url?: string } | nu
   }
 }
 
-function authorizeRegister(request: Request, env: Env): boolean {
+function authorizeWrite(request: Request, env: Env): boolean {
   const auth = request.headers.get("Authorization");
   return auth === `Bearer ${env.WRITE_SECRET}`;
 }
@@ -164,8 +165,15 @@ export default {
       });
     }
 
+    if (request.method === "POST" && path === "/validate") {
+      if (!authorizeWrite(request, env)) {
+        return unauthorized();
+      }
+      return Response.json({ ok: true });
+    }
+
     if (request.method === "POST" && path === "/register") {
-      if (!authorizeRegister(request, env)) {
+      if (!authorizeWrite(request, env)) {
         return unauthorized();
       }
 
@@ -181,6 +189,15 @@ export default {
 
       await env.TUNNEL.put(KV_KEY, normalized);
       return Response.json({ ok: true, url: normalized });
+    }
+
+    if (request.method === "POST" && path === "/unregister") {
+      if (!authorizeWrite(request, env)) {
+        return unauthorized();
+      }
+
+      await env.TUNNEL.delete(KV_KEY);
+      return Response.json({ ok: true });
     }
 
     const current = await env.TUNNEL.get(KV_KEY);
