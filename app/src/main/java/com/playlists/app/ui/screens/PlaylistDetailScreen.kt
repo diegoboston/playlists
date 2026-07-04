@@ -71,6 +71,7 @@ import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
+import com.playlists.app.util.AiCredentialStore
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.PlaylistExportShare
 import kotlinx.coroutines.Dispatchers
@@ -89,6 +90,7 @@ fun PlaylistDetailScreen(
     onFindChart: (Long) -> Unit,
 ) {
     val context = LocalContext.current
+    val chartSearchReady = AiCredentialStore.isOpenAiKeyReady(context)
     val scope = rememberCoroutineScope()
     var playlist by remember { mutableStateOf<Playlist?>(null) }
     val entries by viewModel.observePlaylistSongs(playlistId).collectAsStateWithLifecycle()
@@ -243,8 +245,10 @@ fun PlaylistDetailScreen(
                         IconButton(onClick = { showAddSong = true }) {
                             Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_song))
                         }
-                        IconButton(onClick = { onFindChart(playlistId) }) {
-                            Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.find_chart))
+                        if (chartSearchReady) {
+                            IconButton(onClick = { onFindChart(playlistId) }) {
+                                Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.find_chart))
+                            }
                         }
                         IconButton(onClick = { onPlay(playlistId) }) {
                             Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.play))

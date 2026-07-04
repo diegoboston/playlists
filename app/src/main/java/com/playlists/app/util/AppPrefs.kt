@@ -41,6 +41,13 @@ object AppPrefs {
     fun isTunnelRedirectConfigured(context: Context): Boolean =
         buildStableRedirectBase(context) != null && !getTunnelRedirectSecret(context).isNullOrBlank()
 
+    fun isStableRedirectReady(context: Context): Boolean =
+        isTunnelRedirectConfigured(context) && StageManagerState.readTunnelRedirectValidated(context)
+
+    fun setStableRedirectValidated(context: Context, validated: Boolean) {
+        StageManagerState.writeTunnelRedirectValidated(context, validated)
+    }
+
     fun isValidWorkersSubdomain(text: String): Boolean {
         val trimmed = text.trim().lowercase()
         if (trimmed.isEmpty()) return true

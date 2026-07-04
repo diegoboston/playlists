@@ -7,6 +7,7 @@ import androidx.security.crypto.MasterKey
 object AiCredentialStore {
     private const val PREFS = "ai_credentials"
     private const val KEY_OPENAI = "openai_api_key"
+    private const val KEY_OPENAI_VALIDATED = "openai_api_key_validated"
 
     private fun prefs(context: Context) = EncryptedSharedPreferences.create(
         context.applicationContext,
@@ -26,4 +27,11 @@ object AiCredentialStore {
     }
 
     fun hasOpenAiApiKey(context: Context): Boolean = getOpenAiApiKey(context) != null
+
+    fun isOpenAiKeyReady(context: Context): Boolean =
+        hasOpenAiApiKey(context) && prefs(context).getBoolean(KEY_OPENAI_VALIDATED, false)
+
+    fun setOpenAiKeyValidated(context: Context, validated: Boolean) {
+        prefs(context).edit().putBoolean(KEY_OPENAI_VALIDATED, validated).apply()
+    }
 }

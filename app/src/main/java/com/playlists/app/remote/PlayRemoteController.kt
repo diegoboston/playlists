@@ -328,7 +328,7 @@ object PlayRemoteController {
                 startWarnings.add("cloudflared is not running — the public URL will not work.")
             }
             if (mode == RemotePlayMode.STABLE) {
-                if (!AppPrefs.isTunnelRedirectConfigured(context)) {
+                if (!AppPrefs.isStableRedirectReady(context)) {
                     CloudflareTunnel.stop()
                     stopHttpServerBlocking(remote)
                     return Result.failure(

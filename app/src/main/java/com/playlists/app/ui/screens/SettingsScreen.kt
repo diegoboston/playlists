@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -107,6 +110,10 @@ fun SettingsScreen(
     var openAiKeyStatus by remember { mutableStateOf<FieldValidationStatus>(FieldValidationStatus.Unknown) }
     var librarySizeLabel by remember { mutableStateOf<String?>(null) }
     var selectedAppIcon by remember { mutableStateOf(AppIconManager.getSelected(context)) }
+    var advancedExpanded by remember { mutableStateOf(false) }
+    val savedOpenAiKey = remember { AiCredentialStore.getOpenAiApiKey(context).orEmpty() }
+    val savedSubdomain = remember { AppPrefs.getTunnelRedirectSubdomain(context).orEmpty() }
+    val savedWriteSecret = remember { AppPrefs.getTunnelRedirectSecret(context).orEmpty() }
 
     LaunchedEffect(Unit) {
         librarySizeLabel = withContext(Dispatchers.IO) {
@@ -160,6 +167,32 @@ fun SettingsScreen(
         }
     }
 
+    LaunchedEffect(openAiKeyStatus, openAiKeyText) {
+        val matchesSaved = openAiKeyText.trim() == savedOpenAiKey
+        when {
+            openAiKeyStatus is FieldValidationStatus.Valid && matchesSaved ->
+                AiCredentialStore.setOpenAiKeyValidated(context, true)
+            openAiKeyStatus is FieldValidationStatus.Invalid && matchesSaved ->
+                AiCredentialStore.setOpenAiKeyValidated(context, false)
+            openAiKeyText.trim().isEmpty() && savedOpenAiKey.isEmpty() ->
+                AiCredentialStore.setOpenAiKeyValidated(context, false)
+        }
+    }
+
+    LaunchedEffect(writeSecretStatus, workersSubdomainText, writeSecretText) {
+        val matchesSaved = workersSubdomainText.trim() == savedSubdomain.trim() &&
+            writeSecretText.trim() == savedWriteSecret.trim()
+        when {
+            writeSecretStatus is FieldValidationStatus.Valid && matchesSaved ->
+                AppPrefs.setStableRedirectValidated(context, true)
+            writeSecretStatus is FieldValidationStatus.Invalid && matchesSaved ->
+                AppPrefs.setStableRedirectValidated(context, false)
+            workersSubdomainText.trim().isEmpty() && writeSecretText.trim().isEmpty() &&
+                savedSubdomain.isEmpty() && savedWriteSecret.isEmpty() ->
+                AppPrefs.setStableRedirectValidated(context, false)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -197,110 +230,24 @@ fun SettingsScreen(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
-            Text(
-                text = stringResource(R.string.settings_stable_redirect),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 24.dp, bottom = 4.dp),
-            )
-            OutlinedTextField(
-                value = workersSubdomainText,
-                onValueChange = { workersSubdomainText = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' } },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(stringResource(R.string.settings_stable_subdomain)) },
-                placeholder = { Text(stringResource(R.string.settings_stable_subdomain_hint)) },
-                supportingText = { Text(stringResource(R.string.settings_stable_subdomain_supporting)) },
-            )
-            OutlinedTextField(
-                value = writeSecretText,
-                onValueChange = { writeSecretText = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                singleLine = true,
-                visualTransformation = if (writeSecretVisible) {
-                    VisualTransformation.None
-                } else {
-                    PasswordVisualTransformation()
+            SettingsAdvancedPanel(
+                expanded = advancedExpanded,
+                onToggleExpanded = { advancedExpanded = !advancedExpanded },
+                workersSubdomainText = workersSubdomainText,
+                onWorkersSubdomainChange = {
+                    workersSubdomainText = it.lowercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }
                 },
-                label = { Text(stringResource(R.string.settings_stable_secret)) },
-                placeholder = { Text(stringResource(R.string.settings_stable_secret_hint)) },
-                trailingIcon = {
-                    SensitiveFieldTrailing(
-                        visible = writeSecretVisible,
-                        onToggleVisibility = { writeSecretVisible = !writeSecretVisible },
-                        status = writeSecretStatus,
-                        validContentDescription = stringResource(R.string.settings_stable_secret_valid),
-                        invalidContentDescription = stringResource(R.string.settings_stable_secret_invalid),
-                    )
-                },
+                writeSecretText = writeSecretText,
+                onWriteSecretChange = { writeSecretText = it },
+                writeSecretVisible = writeSecretVisible,
+                onToggleWriteSecretVisible = { writeSecretVisible = !writeSecretVisible },
+                writeSecretStatus = writeSecretStatus,
+                openAiKeyText = openAiKeyText,
+                onOpenAiKeyChange = { openAiKeyText = it },
+                openAiKeyVisible = openAiKeyVisible,
+                onToggleOpenAiKeyVisible = { openAiKeyVisible = !openAiKeyVisible },
+                openAiKeyStatus = openAiKeyStatus,
             )
-            when (val status = writeSecretStatus) {
-                is FieldValidationStatus.Invalid -> {
-                    Text(
-                        text = status.message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                FieldValidationStatus.Valid -> Unit
-                FieldValidationStatus.Testing -> {
-                    Text(
-                        text = stringResource(R.string.settings_stable_secret_testing),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                FieldValidationStatus.Unknown -> Unit
-            }
-            Text(
-                text = stringResource(R.string.settings_openai_api_key),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
-            )
-            OutlinedTextField(
-                value = openAiKeyText,
-                onValueChange = { openAiKeyText = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = if (openAiKeyVisible) {
-                    VisualTransformation.None
-                } else {
-                    PasswordVisualTransformation()
-                },
-                placeholder = { Text(stringResource(R.string.settings_openai_api_key_hint)) },
-                trailingIcon = {
-                    SensitiveFieldTrailing(
-                        visible = openAiKeyVisible,
-                        onToggleVisibility = { openAiKeyVisible = !openAiKeyVisible },
-                        status = openAiKeyStatus,
-                        validContentDescription = stringResource(R.string.settings_openai_key_valid),
-                        invalidContentDescription = stringResource(R.string.settings_openai_key_invalid),
-                    )
-                },
-            )
-            when (val status = openAiKeyStatus) {
-                is FieldValidationStatus.Invalid -> {
-                    Text(
-                        text = status.message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                FieldValidationStatus.Valid -> Unit
-                FieldValidationStatus.Testing -> {
-                    Text(
-                        text = stringResource(R.string.settings_openai_key_testing),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                FieldValidationStatus.Unknown -> Unit
-            }
             Text(
                 text = stringResource(R.string.settings_app_icon),
                 style = MaterialTheme.typography.titleMedium,
@@ -332,6 +279,16 @@ fun SettingsScreen(
                         secret = writeSecretText,
                     )
                     AiCredentialStore.setOpenAiApiKey(context, openAiKeyText)
+                    AiCredentialStore.setOpenAiKeyValidated(
+                        context,
+                        openAiKeyText.trim().isNotEmpty() && openAiKeyStatus is FieldValidationStatus.Valid,
+                    )
+                    AppPrefs.setStableRedirectValidated(
+                        context,
+                        workersSubdomainText.trim().isNotEmpty() &&
+                            writeSecretText.trim().isNotEmpty() &&
+                            writeSecretStatus is FieldValidationStatus.Valid,
+                    )
                     Toast.makeText(context, R.string.settings_saved, Toast.LENGTH_SHORT).show()
                     onBack()
                 },
@@ -350,6 +307,144 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 32.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun SettingsAdvancedPanel(
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    workersSubdomainText: String,
+    onWorkersSubdomainChange: (String) -> Unit,
+    writeSecretText: String,
+    onWriteSecretChange: (String) -> Unit,
+    writeSecretVisible: Boolean,
+    onToggleWriteSecretVisible: () -> Unit,
+    writeSecretStatus: FieldValidationStatus,
+    openAiKeyText: String,
+    onOpenAiKeyChange: (String) -> Unit,
+    openAiKeyVisible: Boolean,
+    onToggleOpenAiKeyVisible: () -> Unit,
+    openAiKeyStatus: FieldValidationStatus,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggleExpanded)
+            .padding(top = 24.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.settings_advanced),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+            contentDescription = stringResource(
+                if (expanded) R.string.settings_advanced_collapse else R.string.settings_advanced_expand,
+            ),
+        )
+    }
+    AnimatedVisibility(visible = expanded) {
+        Column {
+            Text(
+                text = stringResource(R.string.settings_stable_redirect),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            OutlinedTextField(
+                value = workersSubdomainText,
+                onValueChange = onWorkersSubdomainChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.settings_stable_subdomain)) },
+                placeholder = { Text(stringResource(R.string.settings_stable_subdomain_hint)) },
+                supportingText = { Text(stringResource(R.string.settings_stable_subdomain_supporting)) },
+            )
+            OutlinedTextField(
+                value = writeSecretText,
+                onValueChange = onWriteSecretChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                singleLine = true,
+                visualTransformation = if (writeSecretVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                label = { Text(stringResource(R.string.settings_stable_secret)) },
+                placeholder = { Text(stringResource(R.string.settings_stable_secret_hint)) },
+                trailingIcon = {
+                    SensitiveFieldTrailing(
+                        visible = writeSecretVisible,
+                        onToggleVisibility = onToggleWriteSecretVisible,
+                        status = writeSecretStatus,
+                        validContentDescription = stringResource(R.string.settings_stable_secret_valid),
+                        invalidContentDescription = stringResource(R.string.settings_stable_secret_invalid),
+                    )
+                },
+            )
+            SecretFieldStatusMessage(writeSecretStatus)
+            Text(
+                text = stringResource(R.string.settings_openai_api_key),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
+            )
+            OutlinedTextField(
+                value = openAiKeyText,
+                onValueChange = onOpenAiKeyChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                visualTransformation = if (openAiKeyVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                placeholder = { Text(stringResource(R.string.settings_openai_api_key_hint)) },
+                trailingIcon = {
+                    SensitiveFieldTrailing(
+                        visible = openAiKeyVisible,
+                        onToggleVisibility = onToggleOpenAiKeyVisible,
+                        status = openAiKeyStatus,
+                        validContentDescription = stringResource(R.string.settings_openai_key_valid),
+                        invalidContentDescription = stringResource(R.string.settings_openai_key_invalid),
+                    )
+                },
+            )
+            SecretFieldStatusMessage(
+                status = openAiKeyStatus,
+                testingMessage = stringResource(R.string.settings_openai_key_testing),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SecretFieldStatusMessage(
+    status: FieldValidationStatus,
+    testingMessage: String = stringResource(R.string.settings_stable_secret_testing),
+) {
+    when (status) {
+        is FieldValidationStatus.Invalid -> {
+            Text(
+                text = status.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        FieldValidationStatus.Valid -> Unit
+        FieldValidationStatus.Testing -> {
+            Text(
+                text = testingMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        FieldValidationStatus.Unknown -> Unit
     }
 }
 

@@ -29,7 +29,8 @@ object RemotePlayUrls {
         val entries = mutableListOf<RemotePlayUrlEntry>()
 
         val stableBase = AppPrefs.buildStableRedirectBase(context)
-        if (shouldShowStableUrl(session.mode, stableBase != null, session.stableUrlActive)) {
+        val stableReady = AppPrefs.isStableRedirectReady(context)
+        if (shouldShowStableUrl(session.mode, stableReady, session.stableUrlActive)) {
             entries.add(
                 RemotePlayUrlEntry(
                     label = context.getString(R.string.remote_url_label_stable),
@@ -61,14 +62,17 @@ object RemotePlayUrls {
         val port = AppPrefs.getRemotePort(context)
         val entries = mutableListOf<RemotePlayUrlEntry>()
         val stableBase = AppPrefs.buildStableRedirectBase(context)
+        val stableReady = AppPrefs.isStableRedirectReady(context)
 
-        stableBase?.let { base ->
-            entries.add(
-                RemotePlayUrlEntry(
-                    label = context.getString(R.string.remote_url_label_stable),
-                    url = "$base$suffix",
-                ),
-            )
+        if (stableReady) {
+            stableBase?.let { base ->
+                entries.add(
+                    RemotePlayUrlEntry(
+                        label = context.getString(R.string.remote_url_label_stable),
+                        url = "$base$suffix",
+                    ),
+                )
+            }
         }
 
         PlayRemoteController.displayUrl()?.let { publicUrl ->

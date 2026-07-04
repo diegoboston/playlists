@@ -82,6 +82,9 @@
     <string name="settings_stable_secret_testing">Testing write secret…</string>
     <string name="settings_show_secret">Show</string>
     <string name="settings_hide_secret">Hide</string>
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_advanced_expand">Show advanced settings</string>
+    <string name="settings_advanced_collapse">Hide advanced settings</string>
     <string name="settings_stable_subdomain_invalid">Subdomain: lowercase letters, numbers, and hyphens only.</string>
     <string name="settings_remote_code_invalid">Enter exactly 5 digits from 49152 to 65535.</string>
     <string name="settings_saved">Settings saved</string>

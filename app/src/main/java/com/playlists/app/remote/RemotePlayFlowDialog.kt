@@ -43,7 +43,7 @@ fun RemotePlayFlowDialog(
     when (state) {
         RemotePlayFlowState.ChooseMode -> {
             val context = LocalContext.current
-            val stableConfigured = remember { AppPrefs.isTunnelRedirectConfigured(context) }
+            val stableReady = remember { AppPrefs.isStableRedirectReady(context) }
             AlertDialog(
                 onDismissRequest = onCancel,
                 title = { Text(stringResource(R.string.remote_mode_title)) },
@@ -53,22 +53,15 @@ fun RemotePlayFlowDialog(
                             stringResource(R.string.remote_mode_message),
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        TextButton(
-                            onClick = { onSelectMode(RemotePlayMode.STABLE) },
-                            enabled = stableConfigured,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp),
-                        ) {
-                            Text(stringResource(R.string.remote_mode_stable))
-                        }
-                        if (!stableConfigured) {
-                            Text(
-                                stringResource(R.string.remote_mode_stable_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 12.dp, bottom = 4.dp),
-                            )
+                        if (stableReady) {
+                            TextButton(
+                                onClick = { onSelectMode(RemotePlayMode.STABLE) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                            ) {
+                                Text(stringResource(R.string.remote_mode_stable))
+                            }
                         }
                         TextButton(
                             onClick = { onSelectMode(RemotePlayMode.CLOUDFLARE) },

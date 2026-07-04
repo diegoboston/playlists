@@ -147,7 +147,7 @@ fun ChartAssistantScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                if (!AiCredentialStore.hasOpenAiApiKey(context)) {
+                if (!AiCredentialStore.isOpenAiKeyReady(context)) {
                     Text(
                         text = stringResource(R.string.chart_assistant_no_api_key),
                         color = MaterialTheme.colorScheme.error,

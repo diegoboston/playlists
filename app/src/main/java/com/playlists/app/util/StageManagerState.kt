@@ -11,6 +11,7 @@ object StageManagerState {
     private const val KEY_LAST_PLAYLIST_ID = "last_playlist_id"
     private const val KEY_TUNNEL_REDIRECT_SUBDOMAIN = "tunnel_redirect_subdomain"
     private const val KEY_TUNNEL_REDIRECT_SECRET = "tunnel_redirect_secret"
+    private const val KEY_TUNNEL_REDIRECT_VALIDATED = "tunnel_redirect_validated"
 
     fun readRemoteCode(context: Context): Int {
         readFromFile()?.let { json ->
@@ -105,6 +106,26 @@ object StageManagerState {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_TUNNEL_REDIRECT_SECRET, null)
             ?.takeIf { it.isNotBlank() }
+    }
+
+    fun readTunnelRedirectValidated(context: Context): Boolean {
+        readFromFile()?.let { json ->
+            if (json.has(KEY_TUNNEL_REDIRECT_VALIDATED)) {
+                return json.getBoolean(KEY_TUNNEL_REDIRECT_VALIDATED)
+            }
+        }
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_TUNNEL_REDIRECT_VALIDATED, false)
+    }
+
+    fun writeTunnelRedirectValidated(context: Context, validated: Boolean) {
+        val json = readFromFile() ?: JSONObject()
+        json.put(KEY_TUNNEL_REDIRECT_VALIDATED, validated)
+        writeToFile(json)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_TUNNEL_REDIRECT_VALIDATED, validated)
+            .apply()
     }
 
     fun writeTunnelRedirectSecret(context: Context, secret: String?) {
