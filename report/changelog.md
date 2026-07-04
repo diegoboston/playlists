@@ -4,9 +4,40 @@
 
 ---
 
-## `c2352c1` — piano/check secret/UI fixes
+## `b64de56` — harden checks
 
-**2026-07-03 (2:55 PM EDT)** · [commit](https://github.com/diegoboston/playlists/commit/c2352c1ddc064bec68720d7c6088db86670b2c05)
+**2026-07-03 (4:07 PM EDT)** · [commit](https://github.com/diegoboston/playlists/commit/b64de56f71e4ea4d3bbb931e4c59da727da9630c)
+
+- Remote play start/stop: cancels in-flight starts cleanly; **Stop** from the notification no longer blocks on the main thread (NanoHTTPD teardown on a background thread).
+- Settings: OpenAI key and Worker write-secret probes ignore stale results when you edit the field mid-check; OpenAI validation requires a models list; Worker validation requires `{"ok":true}` so misconfigured proxies cannot false-pass.
+- Remote notification **tap** opens the app; status/debug polling stops when remote play is not running.
+- `show_playlist.py` lists all playlists by default and prompts for domain/PIN; Python scripts send a **User-Agent** so Cloudflare stable URLs no longer return 403.
+- `update.sh` skips and cleans `__pycache__/` and `*.pyc`; `.gitignore` ignores Python bytecode.
+
+---
+
+## 1.0.63 · `037de0b` — better check with validate
+
+**Released:** 2026-07-03 (3:42 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/037de0b52bbcad835485e3b04a566e8ade0e0f47)
+
+- Stable redirect Worker: **`POST /validate`** checks the write secret without touching KV; **`POST /unregister`** clears the stored tunnel.
+- App Settings secret probe calls `/validate` instead of posting an empty `/register`.
+- Worker README documents the new endpoints.
+
+---
+
+## 1.0.62 · `6e698a4` — better key check for workers
+
+**Released:** 2026-07-03 (3:20 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/6e698a4ddb63b271ddce8ee67200e2bebdbd6fee)
+
+- Worker write-secret check distinguishes **wrong secret** (401), **missing worker** (404), and a reachable worker (was probing via empty `/register`).
+- Remote debug panel shows the cloudflared log only for tunnel/cloudflared issues—not stable-redirect KV registration warnings.
+
+---
+
+## 1.0.61 · `c2352c1` — piano/check secret/UI fixes
+
+**Released:** 2026-07-03 (2:55 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/c2352c1ddc064bec68720d7c6088db86670b2c05)
 
 - Main tabs: **Piano** icon opens a scrollable on-screen keyboard with synthesized tone for reference while prepping sets.
 - On launch, scans the song archive for **missing files** and **shared file paths**; a snackbar reports issues when found.

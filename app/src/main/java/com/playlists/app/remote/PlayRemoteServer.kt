@@ -50,6 +50,8 @@ class PlayRemoteServer(
     private val onDeletePlaylist: ((id: Long) -> Result<Unit>)? = null,
     private val onMatchQuickstart: ((text: String) -> List<QuickstartMatchJson>)? = null,
     private val onCreateQuickstart: ((name: String, text: String, withPlaceholders: Boolean) -> Result<Long>)? = null,
+    private val onGetRemoteUrls: (() -> String)? = null,
+    private val onGetAppIcon: (() -> ByteArray?)? = null,
 ) : NanoHTTPD(hostname, port) {
 
     private val sessionToken: String = UUID.randomUUID().toString()
@@ -122,6 +124,7 @@ class PlayRemoteServer(
                 uri == "/song-display.js" -> jsResponse(songDisplayJs)
                 uri == "/upload.js" -> jsResponse(uploadJs)
                 uri == "/upload-panel.css" -> cssResponse(uploadPanelCss)
+                uri == "/app-icon.png" -> serveAppIcon()
                 isHtmlPageRoute(uri) -> htmlResponse(pinHtml)
                 uri.startsWith("/api/") -> jsonUnauthorized()
                 else -> notFound()
@@ -155,6 +158,8 @@ class PlayRemoteServer(
             uri == "/compat.js" -> jsResponse(compatJs)
             uri == "/upload.js" -> jsResponse(uploadJs)
             uri == "/upload-panel.css" -> cssResponse(uploadPanelCss)
+            uri == "/app-icon.png" -> serveAppIcon()
+            uri == "/api/remote/urls" && session.method == Method.GET -> handleRemoteUrls()
             uri == "/api/songs" && session.method == Method.GET -> handleListSongs()
             uri == "/api/songs/sort" && session.method == Method.POST -> handleSortSongs(session)
             uri == "/api/songs/upload" && session.method == Method.POST -> handleCatalogUpload(session)
@@ -585,6 +590,26 @@ class PlayRemoteServer(
             "webp" -> "image/webp"
             else -> "image/jpeg"
         }
+    }
+
+    private fun handleRemoteUrls(): Response {
+        val json = onGetRemoteUrls?.invoke() ?: """{"urls":[]}"""
+        return jsonResponse(json)
+    }
+
+    private fun serveAppIcon(): Response {
+        val bytes = onGetAppIcon?.invoke()
+        if (bytes == null || bytes.isEmpty()) {
+            return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Icon missing")
+        }
+        val response = newFixedLengthResponse(
+            Response.Status.OK,
+            "image/png",
+            ByteArrayInputStream(bytes),
+            bytes.size.toLong(),
+        )
+        response.addHeader("Cache-Control", "private, max-age=3600")
+        return response
     }
 
     private fun jsonError(message: String): Response =

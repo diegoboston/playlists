@@ -16,9 +16,13 @@ import com.playlists.app.ui.SongSortCriterion
 import com.playlists.app.ui.SongSortState
 import fi.iki.elonen.NanoHTTPD
 import java.io.File
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.runBlocking
 
 object PlayRemoteController {
@@ -41,6 +45,8 @@ object PlayRemoteController {
         val stableUrlActive: Boolean = false,
     )
 
+    data class TunnelRestartEvent(val publicUrl: String)
+
     private var songSortState = SongSortState()
     private var archiveListInitialized = false
 
@@ -55,6 +61,12 @@ object PlayRemoteController {
 
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
+
+    private val _tunnelRestartEvents = MutableSharedFlow<TunnelRestartEvent>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val tunnelRestartEvents: SharedFlow<TunnelRestartEvent> = _tunnelRestartEvents.asSharedFlow()
 
     fun isRunning(): Boolean = server?.isAlive == true
 
@@ -262,6 +274,12 @@ object PlayRemoteController {
             onCreateQuickstart = { name, text, withPlaceholders ->
                 runBlocking { createQuickstart(name, text, withPlaceholders) }
             },
+            onGetRemoteUrls = {
+                buildRemoteUrlsJson(context.applicationContext)
+            },
+            onGetAppIcon = {
+                RemoteAppIcon.pngBytes(context.applicationContext)
+            },
         )
         synchronized(stopLock) { startingRemote = remote }
         return try {
@@ -319,23 +337,9 @@ object PlayRemoteController {
                         ),
                     )
                 }
-                val workerBase = AppPrefs.buildStableRedirectBase(context)!!
-                val secret = AppPrefs.getTunnelRedirectSecret(context)!!
-                val publishResult = TunnelRedirectClient.publish(workerBase, secret, tunnelUrl)
-                if (publishResult.isFailure) {
-                    startWarnings.add(
-                        "Could not register stable URL (${publishResult.exceptionOrNull()?.message ?: "unknown error"}).",
-                    )
-                } else {
-                    val verifyResult = TunnelRedirectClient.verifyRegisteredTunnel(workerBase, tunnelUrl)
-                    if (verifyResult.isSuccess) {
-                        stableUrlActive = true
-                    } else {
-                        startWarnings.add(
-                            "Stable URL is not active (${verifyResult.exceptionOrNull()?.message ?: "unknown error"}).",
-                        )
-                    }
-                }
+                val registration = registerStableTunnel(context, tunnelUrl)
+                stableUrlActive = registration.first
+                startWarnings.addAll(registration.second)
             }
             if (isStartCancelled(myGeneration)) {
                 return startCancelled(remote)
@@ -375,6 +379,9 @@ object PlayRemoteController {
                 )
                 _running.value = true
             }
+            if (mode.usesCloudflareTunnel()) {
+                RemotePlayTunnelRecovery.startWatchdog()
+            }
             RemotePlayService.start(context.applicationContext, playlistName)
             Result.success(resolvedPublicUrl)
         } catch (e: Exception) {
@@ -412,7 +419,56 @@ object PlayRemoteController {
         serviceContext?.let { RemotePlayService.requestStop(it.applicationContext) }
     }
 
+    internal fun tryRecoverCloudflareTunnel(): Boolean {
+        val ctx: Context
+        val active: RemotePlaySession
+        synchronized(stopLock) {
+            val current = session ?: return false
+            if (!current.mode.usesCloudflareTunnel()) return false
+            ctx = appContext ?: return false
+            active = current
+        }
+        val localUrl = "http://127.0.0.1:${active.localPort}/"
+        val localProbe = RemotePlayHealth.probeGet(localUrl, timeoutMs = 4_000)
+        val cloudflaredRunning = CloudflareTunnel.isRunning()
+        val serverAlive = server?.isAlive == true
+        if (!shouldAttemptTunnelRecovery(active.mode, cloudflaredRunning, localProbe.ok, serverAlive)) {
+            return false
+        }
+        if (!RemotePlayTunnelRecovery.recordRestartAttempt(System.currentTimeMillis())) {
+            return false
+        }
+        val tunnelResult = CloudflareTunnel.start(ctx, active.localPort)
+        if (tunnelResult.isFailure) {
+            synchronized(stopLock) {
+                session?.let { current ->
+                    val warnings = current.startWarnings.toMutableList()
+                    val message = tunnelResult.exceptionOrNull()?.message ?: "unknown error"
+                    val warning = "Could not restart cloudflared ($message)."
+                    if (warning !in warnings) warnings.add(warning)
+                    session = current.copy(startWarnings = warnings)
+                }
+            }
+            return false
+        }
+        val newTunnelUrl = tunnelResult.getOrThrow()
+        var stableUrlActive = active.stableUrlActive
+        val recoveryWarnings = mutableListOf<String>()
+        if (active.mode == RemotePlayMode.STABLE) {
+            val registration = registerStableTunnel(ctx, newTunnelUrl)
+            stableUrlActive = registration.first
+            recoveryWarnings.addAll(registration.second)
+        }
+        applyTunnelUpdate(newTunnelUrl, stableUrlActive, recoveryWarnings)
+        val newPublicUrl = synchronized(stopLock) { publicUrl }
+        if (newPublicUrl != null) {
+            _tunnelRestartEvents.tryEmit(TunnelRestartEvent(newPublicUrl))
+        }
+        return true
+    }
+
     internal fun teardownResources() {
+        RemotePlayTunnelRecovery.stopWatchdog()
         val remoteToStop: PlayRemoteServer?
         synchronized(stopLock) {
             if (!_running.value && server == null) return
@@ -431,6 +487,91 @@ object PlayRemoteController {
         } catch (_: Exception) {
         }
         stopHttpServerSafely(remoteToStop)
+    }
+
+    private fun registerStableTunnel(context: Context, tunnelUrl: String): Pair<Boolean, List<String>> {
+        val warnings = mutableListOf<String>()
+        val workerBase = AppPrefs.buildStableRedirectBase(context)!!
+        val secret = AppPrefs.getTunnelRedirectSecret(context)!!
+        val publishResult = TunnelRedirectClient.publish(workerBase, secret, tunnelUrl)
+        if (publishResult.isFailure) {
+            warnings.add(
+                "Could not register stable URL (${publishResult.exceptionOrNull()?.message ?: "unknown error"}).",
+            )
+            return false to warnings
+        }
+        val verifyResult = TunnelRedirectClient.verifyRegisteredTunnel(workerBase, tunnelUrl)
+        if (verifyResult.isSuccess) {
+            return true to warnings
+        }
+        warnings.add(
+            "Stable URL is not active (${verifyResult.exceptionOrNull()?.message ?: "unknown error"}).",
+        )
+        return false to warnings
+    }
+
+    private fun applyTunnelUpdate(
+        newTunnelUrl: String,
+        stableUrlActive: Boolean,
+        extraWarnings: List<String>,
+    ) {
+        synchronized(stopLock) {
+            val active = session ?: return
+            val ctx = appContext ?: return
+            val suffix = RemotePlayUrls.playlistSuffix(activePlaylistId)
+            val newPublicUrl = when (active.mode) {
+                RemotePlayMode.STABLE -> {
+                    val stableBase = AppPrefs.buildStableRedirectBase(ctx)
+                    if (stableUrlActive && stableBase != null) {
+                        "$stableBase$suffix"
+                    } else {
+                        "$newTunnelUrl$suffix"
+                    }
+                }
+                RemotePlayMode.CLOUDFLARE -> "$newTunnelUrl$suffix"
+                RemotePlayMode.LAN -> active.publicUrl
+            }
+            val warnings = active.startWarnings.toMutableList()
+            extraWarnings.forEach { warning ->
+                if (warning !in warnings) warnings.add(warning)
+            }
+            session = active.copy(
+                tunnelBaseUrl = newTunnelUrl,
+                publicUrl = newPublicUrl,
+                stableUrlActive = stableUrlActive,
+                startWarnings = warnings,
+            )
+            publicUrl = newPublicUrl
+        }
+    }
+
+    private fun buildRemoteUrlsJson(context: Context): String {
+        val entries = RemotePlayUrls.collect(context, activePlaylistId)
+        val sb = StringBuilder("""{"urls":[""")
+        entries.forEachIndexed { index, entry ->
+            if (index > 0) sb.append(',')
+            sb.append(
+                """{"label":${jsonEscape(entry.label)},"url":${jsonEscape(entry.url)}}""",
+            )
+        }
+        sb.append(']')
+        session?.let { active ->
+            if (active.mode != RemotePlayMode.LAN) {
+                sb.append(""","pin":${jsonEscape(AppPrefs.getRemotePin(context))}""")
+            }
+        }
+        sb.append('}')
+        return sb.toString()
+    }
+
+    private fun jsonEscape(value: String): String {
+        val escaped = value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+        return "\"$escaped\""
     }
 
     private fun isStartCancelled(myGeneration: Int): Boolean =
@@ -832,5 +973,3 @@ object PlayRemoteController {
     }
 }
 
-private fun RemotePlayMode.usesCloudflareTunnel(): Boolean =
-    this == RemotePlayMode.CLOUDFLARE || this == RemotePlayMode.STABLE

@@ -4,12 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stage Manager Remote</title>
+  <link rel="icon" href="/app-icon.png" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; background: #000; color: #fff; font-family: sans-serif; }
     main { min-height: 100%; display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center; padding: 24px; }
     form { width: 100%; max-width: 320px; text-align: center; }
     h1 { font-size: 22px; margin-bottom: 8px; }
+    #brand { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center; margin-bottom: 8px; }
+    .app-icon { width: 40px; height: 40px; border-radius: 10px; margin-right: 10px; }
     p { opacity: .75; font-size: 14px; margin-bottom: 20px; line-height: 1.4; }
     input { width: 100%; padding: 14px; font-size: 28px; letter-spacing: .35em; text-align: center; border-radius: 10px; border: 1px solid #444; background: #111; color: #fff; }
     button { margin-top: 16px; width: 100%; padding: 12px; border: none; border-radius: 10px; background: #7ecbff; color: #000; font-size: 16px; font-weight: 600; cursor: pointer; }
@@ -20,7 +23,10 @@
 <body>
   <main>
     <form id="pinForm">
-      <h1>Remote play</h1>
+      <div id="brand">
+        <img class="app-icon" src="/app-icon.png" alt="" />
+        <h1>Remote play</h1>
+      </div>
       <p>Enter the 5-digit code from Stage Manager Settings on the phone.</p>
       <input id="pin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" autofocus />
       <button type="submit">Connect</button>

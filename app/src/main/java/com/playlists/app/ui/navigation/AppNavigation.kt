@@ -34,6 +34,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.playlists.app.PlaylistsApp
 import com.playlists.app.R
+import com.playlists.app.remote.PlayRemoteController
 import com.playlists.app.ui.AppUpdateInProgressBanner
 import com.playlists.app.ui.AppUpdateUiState
 import com.playlists.app.ui.PlaylistsViewModel
@@ -139,6 +140,15 @@ fun AppNavigation(
         val pending = pendingChartImport ?: return@LaunchedEffect
         navController.navigate(Routes.chartAssistant(pending.playlistId)) {
             launchSingleTop = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        PlayRemoteController.tunnelRestartEvents.collect { event ->
+            updateSnackbarHostState.showSnackbar(
+                message = context.getString(R.string.remote_tunnel_restarted, event.publicUrl),
+                duration = SnackbarDuration.Long,
+            )
         }
     }
 

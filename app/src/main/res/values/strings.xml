@@ -95,6 +95,7 @@
     <string name="settings_updates">Updates</string>
     <string name="settings_storage">Storage</string>
     <string name="settings_storage_calculating">Calculating…</string>
+    <string name="remote_tunnel_restarted">Cloudflare tunnel restarted — new URL: %1$s</string>
     <string name="remote_stopped">Remote play stopped</string>
     <string name="remote_notification_channel">Remote play</string>
     <string name="remote_notification_channel_desc">Shows while remote play is active</string>

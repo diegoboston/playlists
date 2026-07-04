@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Song archive — Stage Manager</title>
+  <link rel="icon" href="/app-icon.png" />
   <link rel="stylesheet" href="/upload-panel.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -17,7 +18,8 @@
       -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
     }
     #headerLeft { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; min-width: 0; }
-    #backLink { color: #7ecbff; text-decoration: none; font-size: 15px; margin-right: 12px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    #backLink { color: #7ecbff; text-decoration: none; font-size: 15px; margin-right: 12px; -webkit-flex-shrink: 0; flex-shrink: 0; display: -webkit-inline-box; display: -webkit-inline-flex; display: inline-flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
+    .app-icon { width: 28px; height: 28px; border-radius: 6px; display: block; }
     #title { font-size: 18px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #uploadBtn {
       background: #7ecbff; color: #000; border: none; border-radius: 8px;
@@ -61,7 +63,7 @@
 <body>
   <div id="header">
     <div id="headerLeft">
-      <a id="backLink" href="/">Stage Manager</a>
+      <a id="backLink" href="/"><img class="app-icon" src="/app-icon.png" alt="Stage Manager" /></a>
       <div id="title">Song archive</div>
     </div>
     <button id="uploadBtn" type="button">Upload</button>
