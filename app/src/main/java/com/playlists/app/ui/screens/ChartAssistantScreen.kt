@@ -68,9 +68,9 @@ import com.playlists.app.ui.ChartAssistantUiState
 import com.playlists.app.ui.ChartAssistantViewModel
 import com.playlists.app.ui.ChartAssistantViewModelFactory
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.rememberOpenAiKeyReady
 import com.playlists.app.render.AccidentalSpelling
 import com.playlists.app.ui.components.ChartKeyPreviewContent
-import com.playlists.app.util.AiCredentialStore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,6 +87,7 @@ fun ChartAssistantScreen(
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pendingChartImport by playlistsViewModel.pendingChartImport.collectAsStateWithLifecycle()
+    val openAiKeyReady = rememberOpenAiKeyReady()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -134,6 +135,7 @@ fun ChartAssistantScreen(
                 modifier = Modifier.padding(padding),
                 state = current,
                 onNudgeKey = viewModel::nudgePreviewKey,
+                onNudgeFontSize = viewModel::nudgeFontSize,
                 onSelectChartKey = viewModel::setChartKey,
                 onPreferFlats = { viewModel.setSpellingPreference(AccidentalSpelling.Flats) },
                 onPreferSharps = { viewModel.setSpellingPreference(AccidentalSpelling.Sharps) },
@@ -147,7 +149,7 @@ fun ChartAssistantScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                if (!AiCredentialStore.isOpenAiKeyReady(context)) {
+                if (!openAiKeyReady) {
                     Text(
                         text = stringResource(R.string.chart_assistant_no_api_key),
                         color = MaterialTheme.colorScheme.error,
@@ -352,6 +354,7 @@ private fun PreviewContent(
     modifier: Modifier = Modifier,
     state: ChartAssistantUiState.Preview,
     onNudgeKey: (Int) -> Unit,
+    onNudgeFontSize: (Int) -> Unit,
     onSelectChartKey: (String) -> Unit,
     onPreferFlats: () -> Unit,
     onPreferSharps: () -> Unit,
@@ -378,6 +381,7 @@ private fun PreviewContent(
         transposeNote = state.transposeNote,
         previewRevision = state.previewRevision,
         pdfFile = state.pdfFile,
+        bodyTextSize = state.bodyTextSize,
         confirmLabel = stringResource(
             if (state.playlist != null) {
                 R.string.chart_assistant_confirm
@@ -386,6 +390,7 @@ private fun PreviewContent(
             },
         ),
         onNudgeKey = onNudgeKey,
+        onNudgeFontSize = onNudgeFontSize,
         onSelectChartKey = onSelectChartKey,
         spellingPreference = state.spellingPreference,
         onPreferFlats = onPreferFlats,

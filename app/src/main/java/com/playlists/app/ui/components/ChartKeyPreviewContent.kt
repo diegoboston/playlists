@@ -12,18 +12,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,6 +39,9 @@ import androidx.compose.ui.unit.dp
 import com.playlists.app.R
 import com.playlists.app.data.FileType
 import com.playlists.app.render.AccidentalSpelling
+import com.playlists.app.ui.PdfHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
@@ -45,8 +53,10 @@ fun ChartKeyPreviewContent(
     transposeNote: String?,
     previewRevision: Int,
     pdfFile: File,
+    bodyTextSize: Float?,
     confirmLabel: String,
     onNudgeKey: (Int) -> Unit,
+    onNudgeFontSize: (Int) -> Unit,
     onSelectChartKey: (String) -> Unit,
     spellingPreference: AccidentalSpelling = AccidentalSpelling.Auto,
     onPreferFlats: () -> Unit = {},
@@ -56,6 +66,20 @@ fun ChartKeyPreviewContent(
     modifier: Modifier = Modifier,
 ) {
     var showKeyPicker by remember { mutableStateOf(false) }
+    var pageCount by remember { mutableIntStateOf(1) }
+    var pageIndex by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(pdfFile, previewRevision) {
+        pageIndex = 0
+        pageCount = withContext(Dispatchers.IO) {
+            PdfHelper.invalidate(pdfFile)
+            PdfHelper.pageCount(pdfFile).coerceAtLeast(1)
+        }
+    }
+
+    LaunchedEffect(pageCount) {
+        pageIndex = pageIndex.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -143,6 +167,32 @@ fun ChartKeyPreviewContent(
                     onClick = onPreferSharps,
                 )
             }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.chart_font_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                FontPillButton(
+                    label = "−",
+                    onClick = { onNudgeFontSize(-1) },
+                )
+                Text(
+                    text = bodyTextSize?.toInt()?.toString() ?: "—",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                FontPillButton(
+                    label = "+",
+                    onClick = { onNudgeFontSize(1) },
+                )
+            }
             transposeNote?.let {
                 Text(
                     it,
@@ -152,11 +202,56 @@ fun ChartKeyPreviewContent(
             }
         }
         Box(modifier = Modifier.weight(1f)) {
-            key(previewRevision) {
-                SongMediaViewer(
+            key(previewRevision to pageIndex) {
+                PlaybackSongMedia(
                     file = pdfFile,
                     fileType = FileType.PDF,
+                    pageIndex = pageIndex,
                     modifier = Modifier.fillMaxSize(),
+                )
+            }
+            if (pageCount > 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.Center),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = { if (pageIndex > 0) pageIndex-- },
+                        enabled = pageIndex > 0,
+                        modifier = Modifier.padding(start = 4.dp),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            contentDescription = stringResource(R.string.chart_preview_prev_page),
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = { if (pageIndex < pageCount - 1) pageIndex++ },
+                        enabled = pageIndex < pageCount - 1,
+                        modifier = Modifier.padding(end = 4.dp),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = stringResource(R.string.chart_preview_next_page),
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
+                }
+                Text(
+                    text = stringResource(
+                        R.string.playback_page_indicator,
+                        pageIndex + 1,
+                        pageCount,
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 8.dp),
                 )
             }
         }
@@ -180,6 +275,23 @@ fun ChartKeyPreviewContent(
             selectedKey = chartKeyLabel,
             onDismiss = { showKeyPicker = false },
             onSelectKey = onSelectChartKey,
+        )
+    }
+}
+
+@Composable
+private fun FontPillButton(
+    label: String,
+    onClick: () -> Unit,
+) {
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = Modifier.size(width = 56.dp, height = 40.dp),
+        contentPadding = PaddingValues(0.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
         )
     }
 }

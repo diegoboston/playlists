@@ -1,5 +1,7 @@
 package com.playlists.app.ai
 
+import com.playlists.app.ai.normalizeOptionalField
+import com.playlists.app.render.ChartPdfLayout
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -22,6 +24,7 @@ data class ChartDraft(
     val sections: List<ChartSection>,
     val notes: String?,
     val sourceUrl: String?,
+    val bodyTextSize: Float? = null,
 ) {
     fun withTargetKey(targetKey: String): ChartDraft = copy(key = targetKey)
 
@@ -62,6 +65,7 @@ data class ChartDraft(
         capo?.let { json.put("capo", it) }
         notes?.let { json.put("notes", it) }
         sourceUrl?.let { json.put("sourceUrl", it) }
+        bodyTextSize?.let { json.put("bodyTextSize", it.toDouble()) }
         val sectionsArr = JSONArray()
         sections.forEach { section ->
             sectionsArr.put(
@@ -97,6 +101,10 @@ data class ChartDraft(
             if (sections.isEmpty()) return null
             val sourceKey = json.optString("sourceKey").normalizeOptionalField()
             val key = json.optString("key").normalizeOptionalField() ?: sourceKey
+            val bodyTextSize = json.optDouble("bodyTextSize", Double.NaN)
+                .takeIf { !it.isNaN() }
+                ?.toFloat()
+                ?.coerceIn(ChartPdfLayout.MIN_TEXT_SIZE, ChartPdfLayout.MAX_FONT_SIZE)
             return ChartDraft(
                 title = title,
                 artist = json.optString("artist").normalizeOptionalField(),
@@ -107,6 +115,7 @@ data class ChartDraft(
                 sections = sections,
                 notes = json.optString("notes").normalizeOptionalField(),
                 sourceUrl = json.optString("sourceUrl").normalizeOptionalField(),
+                bodyTextSize = bodyTextSize,
             )
         }
     }

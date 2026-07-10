@@ -22,11 +22,13 @@ import com.playlists.app.find.SearchResult
 import com.playlists.app.util.AiCredentialStore
 import com.playlists.app.util.AudioRecorder
 import com.playlists.app.render.ChartPdfRenderer
+import com.playlists.app.render.ChartPdfLayout
 import com.playlists.app.render.AccidentalSpelling
 import com.playlists.app.render.ChordTransposer
 import com.playlists.app.util.ChartDraftStore
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.SongStoragePaths
+import com.playlists.app.ui.PdfHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,6 +64,7 @@ sealed class ChartAssistantUiState {
         val previewRevision: Int = 0,
         val spellingPreference: AccidentalSpelling = AccidentalSpelling.Auto,
         val chartKeyGuessed: Boolean = false,
+        val bodyTextSize: Float? = null,
     ) : ChartAssistantUiState()
     data class Error(val message: String) : ChartAssistantUiState()
 }
@@ -257,6 +260,31 @@ class ChartAssistantViewModel(
         }
     }
 
+    fun nudgeFontSize(delta: Int) {
+        if (delta == 0) return
+        val state = _uiState.value as? ChartAssistantUiState.Preview ?: return
+        val current = state.bodyTextSize
+            ?: ChartPdfRenderer.resolvedBodyTextSize(state.draft)
+        val next = (current + delta).coerceIn(ChartPdfLayout.MIN_TEXT_SIZE, ChartPdfLayout.MAX_FONT_SIZE)
+        if (next == current) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    renderPreviewState(
+                        state = state,
+                        semitoneOffset = state.semitoneOffset,
+                        spellingPreference = state.spellingPreference,
+                        bodyTextSize = next,
+                    )
+                }
+            }.onSuccess { updated ->
+                _uiState.value = updated
+            }.onFailure {
+                _uiState.value = ChartAssistantUiState.Error(it.message ?: "Could not change font")
+            }
+        }
+    }
+
     private fun draftAtOffset(
         source: ChartDraft,
         offset: Int,
@@ -267,14 +295,18 @@ class ChartAssistantViewModel(
         state: ChartAssistantUiState.Preview,
         semitoneOffset: Int,
         spellingPreference: AccidentalSpelling,
+        bodyTextSize: Float? = state.bodyTextSize,
     ): ChartAssistantUiState.Preview {
         val newDraft = draftAtOffset(state.sourceDraft, semitoneOffset, spellingPreference)
-        val pdfBytes = ChartPdfRenderer.render(newDraft)
+        val resolvedSize = ChartPdfRenderer.resolvedBodyTextSize(newDraft, bodyTextSize)
+        val pdfBytes = ChartPdfRenderer.render(newDraft, resolvedSize)
+        PdfHelper.invalidate(state.pdfFile)
         state.pdfFile.writeBytes(pdfBytes)
         return state.copy(
-            draft = newDraft,
+            draft = newDraft.copy(bodyTextSize = resolvedSize),
             semitoneOffset = semitoneOffset,
             spellingPreference = spellingPreference,
+            bodyTextSize = resolvedSize,
             transposeNote = null,
             previewRevision = state.previewRevision + 1,
         )
@@ -353,8 +385,9 @@ class ChartAssistantViewModel(
                 val service = ChartAssistantService(OpenAiClient(apiKey))
                 val (draft, pdfBytes) = service.fetchAndBuildChart(result, intent)
                 val previewFile = File(context.cacheDir, "chart-preview-${System.currentTimeMillis()}.pdf")
-                previewFile.writeBytes(pdfBytes)
-                draft to PreviewBundle(previewFile)
+                val resolvedSize = ChartPdfRenderer.resolvedBodyTextSize(draft)
+                previewFile.writeBytes(ChartPdfRenderer.render(draft, resolvedSize))
+                draft.copy(bodyTextSize = resolvedSize) to PreviewBundle(previewFile, resolvedSize)
             }
         }.onSuccess { (draft, bundle) ->
             _uiState.value = ChartAssistantUiState.Preview(
@@ -366,6 +399,7 @@ class ChartAssistantViewModel(
                 pdfFile = bundle.file,
                 transposeNote = null,
                 chartKeyGuessed = draft.isChartKeyGuessed(),
+                bodyTextSize = bundle.bodyTextSize,
             )
         }.onFailure {
             _uiState.value = ChartAssistantUiState.Error(it.userMessage())
@@ -378,7 +412,10 @@ class ChartAssistantViewModel(
         val notes = buildNotes(draft)
         val storedFile = FileStorage.storeBytes(state.pdfFile.readBytes(), "pdf")
         val storedPath = SongStoragePaths.toStoredPath(storedFile)
-        ChartDraftStore.save(state.sourceDraft, storedPath)
+        ChartDraftStore.save(
+            state.sourceDraft.copy(bodyTextSize = state.bodyTextSize),
+            storedPath,
+        )
         state.pdfFile.delete()
         val songId = songRepo.insert(
             Song(
@@ -407,5 +444,5 @@ class ChartAssistantViewModel(
         else -> message ?: "Something went wrong"
     }
 
-    private data class PreviewBundle(val file: File)
+    private data class PreviewBundle(val file: File, val bodyTextSize: Float)
 }

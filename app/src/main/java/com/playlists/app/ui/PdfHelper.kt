@@ -21,6 +21,10 @@ object PdfHelper {
             openRenderer(file)?.use { it.pageCount } ?: 0
         }
 
+    fun invalidate(file: File) {
+        pageCountCache.remove(file.absolutePath)
+    }
+
     fun renderPage(file: File, pageIndex: Int, width: Int): Bitmap? {
         val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
         val renderer = PdfRenderer(pfd)

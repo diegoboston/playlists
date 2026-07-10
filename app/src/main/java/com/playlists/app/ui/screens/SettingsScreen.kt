@@ -279,9 +279,13 @@ fun SettingsScreen(
                         secret = writeSecretText,
                     )
                     AiCredentialStore.setOpenAiApiKey(context, openAiKeyText)
+                    val openAiTrimmed = openAiKeyText.trim()
                     AiCredentialStore.setOpenAiKeyValidated(
                         context,
-                        openAiKeyText.trim().isNotEmpty() && openAiKeyStatus is FieldValidationStatus.Valid,
+                        openAiTrimmed.isNotEmpty() &&
+                            (openAiKeyStatus is FieldValidationStatus.Valid ||
+                                (openAiKeyStatus is FieldValidationStatus.Testing &&
+                                    openAiTrimmed == savedOpenAiKey)),
                     )
                     AppPrefs.setStableRedirectValidated(
                         context,

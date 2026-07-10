@@ -62,6 +62,7 @@ import com.playlists.app.remote.RemotePlayFlowDialog
 import com.playlists.app.remote.RemotePlayFlowState
 import com.playlists.app.remote.RemotePlayMode
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.rememberOpenAiKeyReady
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.components.PlaylistActionsMenu
@@ -71,7 +72,6 @@ import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
-import com.playlists.app.util.AiCredentialStore
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.PlaylistExportShare
 import kotlinx.coroutines.Dispatchers
@@ -90,7 +90,7 @@ fun PlaylistDetailScreen(
     onFindChart: (Long) -> Unit,
 ) {
     val context = LocalContext.current
-    val chartSearchReady = AiCredentialStore.isOpenAiKeyReady(context)
+    val chartSearchReady = rememberOpenAiKeyReady()
     val scope = rememberCoroutineScope()
     var playlist by remember { mutableStateOf<Playlist?>(null) }
     val entries by viewModel.observePlaylistSongs(playlistId).collectAsStateWithLifecycle()

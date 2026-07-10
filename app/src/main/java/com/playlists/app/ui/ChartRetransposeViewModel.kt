@@ -10,8 +10,10 @@ import com.playlists.app.data.Song
 import com.playlists.app.render.ChartPdfRenderer
 import com.playlists.app.render.AccidentalSpelling
 import com.playlists.app.render.ChordTransposer
+import com.playlists.app.render.ChartPdfLayout
 import com.playlists.app.util.ChartDraftStore
 import com.playlists.app.util.SongStoragePaths
+import com.playlists.app.ui.PdfHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +37,7 @@ sealed class ChartRetransposeUiState {
         val previewRevision: Int = 0,
         val spellingPreference: AccidentalSpelling = AccidentalSpelling.Auto,
         val chartKeyGuessed: Boolean = false,
+        val bodyTextSize: Float? = null,
     ) : ChartRetransposeUiState()
     data class Error(val message: String) : ChartRetransposeUiState()
 }
@@ -120,14 +123,43 @@ class ChartRetransposeViewModel(
         }
     }
 
+    fun nudgeFontSize(delta: Int) {
+        if (delta == 0) return
+        val state = _uiState.value as? ChartRetransposeUiState.Preview ?: return
+        val current = state.bodyTextSize
+            ?: ChartPdfRenderer.resolvedBodyTextSize(state.draft)
+        val next = (current + delta).coerceIn(ChartPdfLayout.MIN_TEXT_SIZE, ChartPdfLayout.MAX_FONT_SIZE)
+        if (next == current) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    renderPreviewState(
+                        state = state,
+                        semitoneOffset = state.semitoneOffset,
+                        spellingPreference = state.spellingPreference,
+                        bodyTextSize = next,
+                    )
+                }
+            }.onSuccess { updated ->
+                _uiState.value = updated
+            }.onFailure {
+                _uiState.value = ChartRetransposeUiState.Error(it.message ?: "Could not change font")
+            }
+        }
+    }
+
     fun confirmSave() {
         val state = _uiState.value as? ChartRetransposeUiState.Preview ?: return
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
                     val pdfFile = SongStoragePaths.resolve(state.song.filePath)
+                    PdfHelper.invalidate(pdfFile)
                     pdfFile.writeBytes(state.pdfFile.readBytes())
-                    ChartDraftStore.save(state.sourceDraft, state.song.filePath)
+                    ChartDraftStore.save(
+                        state.sourceDraft.copy(bodyTextSize = state.bodyTextSize),
+                        state.song.filePath,
+                    )
                     songRepo.update(
                         state.song.copy(keySignature = state.draft.key.orEmpty()),
                     )
@@ -161,15 +193,20 @@ class ChartRetransposeViewModel(
                 val displayDraft = draftAtOffset(sourceDraft, offset)
                 val context = getApplication<Application>()
                 val previewFile = File(context.cacheDir, "chart-retranspose-${System.currentTimeMillis()}.pdf")
-                previewFile.writeBytes(ChartPdfRenderer.render(displayDraft))
+                val resolvedSize = ChartPdfRenderer.resolvedBodyTextSize(
+                    displayDraft,
+                    sourceDraft.bodyTextSize,
+                )
+                previewFile.writeBytes(ChartPdfRenderer.render(displayDraft, resolvedSize))
                 ChartRetransposeUiState.Preview(
                     song = song,
                     sourceDraft = sourceDraft,
-                    draft = displayDraft,
+                    draft = displayDraft.copy(bodyTextSize = resolvedSize),
                     semitoneOffset = offset,
                     pdfFile = previewFile,
                     transposeNote = null,
                     chartKeyGuessed = sourceDraft.isChartKeyGuessed(),
+                    bodyTextSize = resolvedSize,
                 )
             }
         }.onSuccess { preview ->
@@ -189,14 +226,18 @@ class ChartRetransposeViewModel(
         state: ChartRetransposeUiState.Preview,
         semitoneOffset: Int,
         spellingPreference: AccidentalSpelling,
+        bodyTextSize: Float? = state.bodyTextSize,
     ): ChartRetransposeUiState.Preview {
         val newDraft = draftAtOffset(state.sourceDraft, semitoneOffset, spellingPreference)
-        val pdfBytes = ChartPdfRenderer.render(newDraft)
+        val resolvedSize = ChartPdfRenderer.resolvedBodyTextSize(newDraft, bodyTextSize)
+        val pdfBytes = ChartPdfRenderer.render(newDraft, resolvedSize)
+        PdfHelper.invalidate(state.pdfFile)
         state.pdfFile.writeBytes(pdfBytes)
         return state.copy(
-            draft = newDraft,
+            draft = newDraft.copy(bodyTextSize = resolvedSize),
             semitoneOffset = semitoneOffset,
             spellingPreference = spellingPreference,
+            bodyTextSize = resolvedSize,
             transposeNote = null,
             previewRevision = state.previewRevision + 1,
         )

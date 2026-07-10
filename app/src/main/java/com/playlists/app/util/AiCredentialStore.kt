@@ -28,8 +28,13 @@ object AiCredentialStore {
 
     fun hasOpenAiApiKey(context: Context): Boolean = getOpenAiApiKey(context) != null
 
-    fun isOpenAiKeyReady(context: Context): Boolean =
-        hasOpenAiApiKey(context) && prefs(context).getBoolean(KEY_OPENAI_VALIDATED, false)
+    fun isOpenAiKeyReady(context: Context): Boolean {
+        if (!hasOpenAiApiKey(context)) return false
+        val p = prefs(context)
+        // Keys saved before validated tracking never wrote this flag; treat as ready.
+        if (!p.contains(KEY_OPENAI_VALIDATED)) return true
+        return p.getBoolean(KEY_OPENAI_VALIDATED, false)
+    }
 
     fun setOpenAiKeyValidated(context: Context, validated: Boolean) {
         prefs(context).edit().putBoolean(KEY_OPENAI_VALIDATED, validated).apply()
