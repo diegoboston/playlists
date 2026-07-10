@@ -111,7 +111,20 @@ fun MainTabsScreen(
             val list = if (playlistId != null) viewModel.getPlaylistSongs(playlistId) else emptyList()
             val name = playlist?.name ?: context.getString(R.string.app_name)
             val result = withContext(Dispatchers.IO) {
-                PlayRemoteController.start(context, playlistId, name, list, mode)
+                PlayRemoteController.start(
+                    context = context,
+                    playlistId = playlistId,
+                    playlistName = name,
+                    entries = list,
+                    mode = mode,
+                    onPhase = { phase ->
+                        scope.launch(Dispatchers.Main.immediate) {
+                            if (generation == remoteStartGeneration) {
+                                remoteFlow = RemotePlayFlowState.Starting(mode, phase)
+                            }
+                        }
+                    },
+                )
             }
             if (generation != remoteStartGeneration) return@launch
             result

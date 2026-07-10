@@ -63,6 +63,7 @@
     <string name="remote_mode_stable_hint">Configure Workers subdomain and write secret in Settings</string>
     <string name="remote_mode_lan">LAN only (same Wi‑Fi)</string>
     <string name="remote_starting_stable">Starting stable redirect and Cloudflare tunnel… This can take up to a minute.</string>
+    <string name="remote_uploading_playlist_pdf">Uploading playlist PDF for offline access…</string>
     <string name="remote_starting_cloudflare">Starting Cloudflare tunnel… This can take up to a minute.</string>
     <string name="remote_starting_lan">Starting local server…</string>
     <string name="remote_open_playlist">Open a playlist to start remote play.</string>

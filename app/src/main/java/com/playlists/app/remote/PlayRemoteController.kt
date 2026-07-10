@@ -7,6 +7,7 @@ import com.playlists.app.data.FileType
 import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.data.Song
 import com.playlists.app.ui.PdfHelper
+import com.playlists.app.render.PlaylistPdfExporter
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.QuickstartMatcher
@@ -185,6 +186,7 @@ object PlayRemoteController {
         playlistName: String,
         entries: List<PlaylistSongWithDetails>,
         mode: RemotePlayMode = RemotePlayMode.CLOUDFLARE,
+        onPhase: (RemotePlayStartPhase) -> Unit = {},
     ): Result<String> {
         stop()
         val myGeneration = synchronized(stopLock) { startGeneration }
@@ -340,6 +342,16 @@ object PlayRemoteController {
                 val registration = registerStableTunnel(context, tunnelUrl)
                 stableUrlActive = registration.first
                 startWarnings.addAll(registration.second)
+                if (playlistId != null && entries.isNotEmpty()) {
+                    onPhase(RemotePlayStartPhase.UPLOADING_PDF)
+                    val pdfWarnings = pushStablePlaylistPdf(
+                        context = context,
+                        playlistId = playlistId,
+                        playlistName = playlistName,
+                        entries = entries,
+                    )
+                    startWarnings.addAll(pdfWarnings)
+                }
             }
             if (isStartCancelled(myGeneration)) {
                 return startCancelled(remote)
@@ -508,6 +520,47 @@ object PlayRemoteController {
             "Stable URL is not active (${verifyResult.exceptionOrNull()?.message ?: "unknown error"}).",
         )
         return false to warnings
+    }
+
+    private fun pushStablePlaylistPdf(
+        context: Context,
+        playlistId: Long,
+        playlistName: String,
+        entries: List<PlaylistSongWithDetails>,
+    ): List<String> {
+        val warnings = mutableListOf<String>()
+        val workerBase = AppPrefs.buildStableRedirectBase(context) ?: return warnings
+        val secret = AppPrefs.getTunnelRedirectSecret(context) ?: return warnings
+        val export = try {
+            PlaylistPdfExporter.export(
+                cacheDir = context.cacheDir,
+                playlistName = playlistName,
+                entries = entries,
+            )
+        } catch (e: Exception) {
+            warnings.add(
+                "Could not build playlist PDF (${e.message ?: "unknown error"}).",
+            )
+            return warnings
+        }
+        try {
+            val pushResult = TunnelRedirectClient.pushPlaylistPdf(
+                workerBaseUrl = workerBase,
+                secret = secret,
+                pin = AppPrefs.getRemotePin(context),
+                playlistId = playlistId,
+                playlistName = playlistName,
+                pdfFile = export.file,
+            )
+            if (pushResult.isFailure) {
+                warnings.add(
+                    "Could not upload playlist PDF (${pushResult.exceptionOrNull()?.message ?: "unknown error"}).",
+                )
+            }
+        } finally {
+            export.file.delete()
+        }
+        return warnings
     }
 
     private fun applyTunnelUpdate(

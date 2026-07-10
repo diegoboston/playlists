@@ -13,6 +13,12 @@ binding = "TUNNEL"
 id = "REPLACE_WITH_KV_NAMESPACE_ID"
 # preview_id = "REPLACE_WITH_PREVIEW_KV_NAMESPACE_ID"
 
+# Offline playlist PDF cache (stable URL only):
+#   npx wrangler r2 bucket create stage-manager-playlist-pdf
+[[r2_buckets]]
+binding = "PLAYLIST_PDF"
+bucket_name = "stage-manager-playlist-pdf"
+
 [vars]
 # WRITE_SECRET is set via: wrangler secret put WRITE_SECRET
 # Do not commit secrets to this file.

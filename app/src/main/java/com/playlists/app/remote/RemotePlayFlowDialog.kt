@@ -96,10 +96,15 @@ fun RemotePlayFlowDialog(
                         CircularProgressIndicator()
                         Text(
                             stringResource(
-                                when (state.mode) {
-                                    RemotePlayMode.STABLE -> R.string.remote_starting_stable
-                                    RemotePlayMode.CLOUDFLARE -> R.string.remote_starting_cloudflare
-                                    RemotePlayMode.LAN -> R.string.remote_starting_lan
+                                when {
+                                    state.mode == RemotePlayMode.STABLE &&
+                                        state.phase == RemotePlayStartPhase.UPLOADING_PDF ->
+                                        R.string.remote_uploading_playlist_pdf
+                                    state.mode == RemotePlayMode.STABLE ->
+                                        R.string.remote_starting_stable
+                                    state.mode == RemotePlayMode.CLOUDFLARE ->
+                                        R.string.remote_starting_cloudflare
+                                    else -> R.string.remote_starting_lan
                                 },
                             ),
                             modifier = Modifier.padding(top = 16.dp),

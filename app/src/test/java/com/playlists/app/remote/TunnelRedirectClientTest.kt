@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class TunnelRedirectClientTest {
 
@@ -58,5 +59,23 @@ class TunnelRedirectClientTest {
     @Test
     fun interpretValidateWriteSecretResponse_rejectsMissingWorker() {
         assertTrue(TunnelRedirectClient.interpretValidateWriteSecretResponse(404).isFailure)
+    }
+
+    @Test
+    fun pushPlaylistPdf_rejectsInvalidPin() {
+        val file = File.createTempFile("playlist-export", ".pdf").apply {
+            writeBytes(byteArrayOf(0x25, 0x50, 0x44, 0x46))
+            deleteOnExit()
+        }
+        assertTrue(
+            TunnelRedirectClient.pushPlaylistPdf(
+                workerBaseUrl = "https://play.test.workers.dev",
+                secret = "secret",
+                pin = "abc",
+                playlistId = 1L,
+                playlistName = "Gig",
+                pdfFile = file,
+            ).isFailure,
+        )
     }
 }

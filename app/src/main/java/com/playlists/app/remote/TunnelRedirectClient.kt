@@ -1,5 +1,6 @@
 package com.playlists.app.remote
 
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.regex.Pattern
@@ -13,6 +14,8 @@ object TunnelRedirectClient {
 
     private val TUNNEL_URL_PATTERN = Pattern.compile("""https://[a-z0-9-]+\.trycloudflare\.com""")
     private const val QUICK_TUNNEL_API_HOST = "api.trycloudflare.com"
+    private val PIN_PATTERN = Pattern.compile("""^\d{5}$""")
+    private const val PDF_UPLOAD_TIMEOUT_MS = 120_000
 
     fun buildWorkerBaseUrl(workersSubdomain: String): String {
         val sub = workersSubdomain.trim().lowercase()
@@ -190,6 +193,75 @@ object TunnelRedirectClient {
             when (val code = conn.responseCode) {
                 401 -> Result.failure(IllegalStateException("Unauthorized"))
                 in 200..299 -> Result.success(Unit)
+                else -> {
+                    val detail = (conn.errorStream ?: conn.inputStream)
+                        .bufferedReader()
+                        .readText()
+                        .take(200)
+                        .ifBlank { "HTTP $code" }
+                    Result.failure(IllegalStateException(detail))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** POST /push-pdf — uploads the combined playlist PDF for offline access on the Worker. */
+    fun pushPlaylistPdf(
+        workerBaseUrl: String,
+        secret: String,
+        pin: String,
+        playlistId: Long,
+        playlistName: String,
+        pdfFile: File,
+    ): Result<Unit> {
+        val base = workerBaseUrl.trim().trimEnd('/')
+        if (base.isEmpty()) {
+            return Result.failure(IllegalArgumentException("Worker base URL is empty"))
+        }
+        val token = secret.trim()
+        if (token.isEmpty()) {
+            return Result.failure(IllegalArgumentException("Write secret is empty"))
+        }
+        val normalizedPin = pin.trim()
+        if (!PIN_PATTERN.matcher(normalizedPin).matches()) {
+            return Result.failure(IllegalArgumentException("PIN must be 5 digits"))
+        }
+        if (!pdfFile.isFile) {
+            return Result.failure(IllegalArgumentException("PDF file not found"))
+        }
+
+        val conn = (URL("$base/push-pdf").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = PDF_UPLOAD_TIMEOUT_MS
+            readTimeout = PDF_UPLOAD_TIMEOUT_MS
+            doOutput = true
+            setRequestProperty("Authorization", "Bearer $token")
+            setRequestProperty("Content-Type", "application/pdf")
+            setRequestProperty("X-Pin", normalizedPin)
+            setRequestProperty("X-Playlist-Id", playlistId.toString())
+            setRequestProperty("X-Playlist-Name", playlistName.trim().ifBlank { "Playlist" })
+            setFixedLengthStreamingMode(pdfFile.length().toInt())
+        }
+        return try {
+            conn.outputStream.use { output ->
+                pdfFile.inputStream().use { input ->
+                    input.copyTo(output)
+                }
+            }
+            when (val code = conn.responseCode) {
+                401 -> Result.failure(IllegalStateException("Unauthorized"))
+                in 200..299 -> {
+                    val body = conn.inputStream.bufferedReader().readText()
+                    if (body.replace("\\s".toRegex(), "").contains(""""ok":true""")) {
+                        Result.success(Unit)
+                    } else {
+                        Result.failure(IllegalStateException("Worker did not confirm PDF upload"))
+                    }
+                }
                 else -> {
                     val detail = (conn.errorStream ?: conn.inputStream)
                         .bufferedReader()

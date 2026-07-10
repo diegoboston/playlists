@@ -31,6 +31,12 @@ Create a KV namespace and copy its id into `wrangler.toml`:
 npx wrangler kv namespace create TUNNEL
 ```
 
+Create an R2 bucket for offline playlist PDFs (stable URL only):
+
+```bash
+npx wrangler r2 bucket create stage-manager-playlist-pdf
+```
+
 Edit `wrangler.toml` — replace `REPLACE_WITH_KV_NAMESPACE_ID` with the `id` from
 that command.
 
@@ -110,6 +116,11 @@ curl -sS "$WORKER/url"
 | `POST` | `/validate` | `Authorization: Bearer <WRITE_SECRET>` | JSON `{"ok":true}` — checks secret, no KV access |
 | `POST` | `/register` | `Authorization: Bearer <WRITE_SECRET>` | JSON `{"url":"https://….trycloudflare.com"}` |
 | `POST` | `/unregister` | `Authorization: Bearer <WRITE_SECRET>` | JSON `{"ok":true}` — deletes stored tunnel |
+| `POST` | `/push-pdf` | `Authorization: Bearer <WRITE_SECRET>` | Raw PDF body; headers `X-Pin` (5 digits), `X-Playlist-Id`, `X-Playlist-Name` |
+
+When the phone tunnel is offline, `GET /` shows a PIN gate and `GET /pdf` serves the
+last pushed playlist PDF (same PIN as remote play on the phone). `GET /pdf?download=1`
+forces download.
 
 Only `https://*.trycloudflare.com` URLs are accepted (`api.trycloudflare.com` is rejected).
 
