@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.content.FileProvider
 import java.io.File
 import java.net.HttpURLConnection
@@ -19,6 +20,7 @@ object AppUpdate {
     const val REPO = "diegoboston/playlists"
     const val APK_ASSET_NAME = "app.apk"
     const val UPDATE_APK_FILENAME = "playlists-update.apk"
+    private val UPDATE_APK_PREFIX = UPDATE_APK_FILENAME.removeSuffix(".apk")
     private const val LATEST_RELEASE_API =
         "https://api.github.com/repos/$REPO/releases/latest"
     const val LATEST_APK_URL =
@@ -41,8 +43,12 @@ object AppUpdate {
             context.packageName,
             PackageManager.GET_META_DATA,
         )
-        @Suppress("DEPRECATION")
-        return pi.versionCode.toLong()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            pi.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            pi.versionCode.toLong()
+        }
     }
 
     fun installedVersionName(context: Context): String {
@@ -141,14 +147,57 @@ object AppUpdate {
         }
     }
 
+    /**
+     * Returns a previously downloaded update APK when it matches [versionCode]
+     * and is still newer than the installed build.
+     */
+    fun cachedApkForUpdate(context: Context, versionCode: Long): File? {
+        val apk = File(context.cacheDir, UPDATE_APK_FILENAME)
+        if (!apk.isFile || apk.length() <= 0L) return null
+        val archivedVersion = readApkVersionCode(context, apk) ?: return null
+        if (archivedVersion != versionCode) return null
+        if (archivedVersion <= installedVersionCode(context)) return null
+        return apk
+    }
+
+    /** Uses a valid cached APK when present; otherwise downloads from [release]. */
+    fun resolveApkForUpdate(
+        context: Context,
+        release: ReleaseInfo,
+        onProgress: (Float?) -> Unit,
+    ): File {
+        cachedApkForUpdate(context, release.versionCode)?.let { return it }
+        return downloadApk(context, release.downloadUrl, onProgress)
+    }
+
     fun clearUpdateCache(context: Context) {
         context.cacheDir.listFiles()?.forEach { file ->
-            val name = file.name
-            if (name == UPDATE_APK_FILENAME ||
-                name.startsWith("$UPDATE_APK_FILENAME.") ||
-                (name.startsWith("playlists-update") && name.endsWith(".tmp"))
-            ) {
+            if (isUpdateCacheFile(file.name) && file.isFile) {
                 file.delete()
+            }
+        }
+    }
+
+    /**
+     * Deletes interrupted downloads and update APKs that are no longer needed.
+     * Keeps a complete cached APK when it is still newer than the installed build.
+     */
+    fun clearStaleUpdateCache(context: Context) {
+        val installed = installedVersionCode(context)
+        context.cacheDir.listFiles()?.forEach { file ->
+            if (!file.isFile) return@forEach
+            val name = file.name
+            when {
+                name.startsWith("$UPDATE_APK_FILENAME.") ||
+                    (name.startsWith(UPDATE_APK_PREFIX) && name.endsWith(".tmp")) -> {
+                    file.delete()
+                }
+                name == UPDATE_APK_FILENAME -> {
+                    val version = readApkVersionCode(context, file)
+                    if (version == null || version <= installed) {
+                        file.delete()
+                    }
+                }
             }
         }
     }
@@ -181,6 +230,29 @@ object AppUpdate {
             }
         } catch (e: Exception) {
             InstallResult.Failed(e.message ?: e.toString())
+        }
+    }
+
+    private fun isUpdateCacheFile(name: String): Boolean =
+        name == UPDATE_APK_FILENAME ||
+            name.startsWith("$UPDATE_APK_FILENAME.") ||
+            (name.startsWith(UPDATE_APK_PREFIX) && name.endsWith(".tmp"))
+
+    private fun readApkVersionCode(context: Context, apk: File): Long? {
+        val info = context.packageManager.getPackageArchiveInfo(
+            apk.absolutePath,
+            PackageManager.GET_META_DATA,
+        ) ?: return null
+        info.applicationInfo?.let { appInfo ->
+            appInfo.sourceDir = apk.absolutePath
+            appInfo.publicSourceDir = apk.absolutePath
+        }
+        if (info.packageName != context.packageName) return null
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            info.versionCode.toLong()
         }
     }
 

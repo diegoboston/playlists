@@ -290,7 +290,7 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
                 _appUpdateState.value = AppUpdateUiState.Downloading(null)
-                val apk = AppUpdate.downloadApk(context, release.downloadUrl) { frac ->
+                val apk = AppUpdate.resolveApkForUpdate(context, release) { frac ->
                     _appUpdateState.value = AppUpdateUiState.Downloading(frac)
                 }
                 _appUpdateState.value = AppUpdateUiState.ReadyToInstall(apk, release.versionName)
