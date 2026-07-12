@@ -7,6 +7,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -36,13 +38,16 @@ fun PlaylistActionsMenu(
     iconTint: Color = Color.Unspecified,
     iconSize: Dp = 24.dp,
     exportEnabled: Boolean = true,
+    showPushToServer: Boolean = false,
+    pushToServerEnabled: Boolean = true,
+    onPushToServer: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
         IconButton(onClick = { expanded = true }) {
             Icon(
-                Icons.Default.Edit,
+                Icons.Default.Menu,
                 contentDescription = stringResource(R.string.playlist_actions),
                 tint = iconTint,
                 modifier = Modifier.size(iconSize),
@@ -54,6 +59,9 @@ fun PlaylistActionsMenu(
         ) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.rename_playlist)) },
+                leadingIcon = {
+                    Icon(Icons.Default.Edit, contentDescription = null)
+                },
                 onClick = {
                     expanded = false
                     onRename()
@@ -100,6 +108,19 @@ fun PlaylistActionsMenu(
                     onExport()
                 },
             )
+            if (showPushToServer) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.push_playlist_to_server)) },
+                    leadingIcon = {
+                        Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
+                    },
+                    enabled = pushToServerEnabled,
+                    onClick = {
+                        expanded = false
+                        onPushToServer()
+                    },
+                )
+            }
         }
     }
 }

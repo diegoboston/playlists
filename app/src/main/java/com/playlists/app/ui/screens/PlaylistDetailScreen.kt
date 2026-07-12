@@ -61,6 +61,8 @@ import com.playlists.app.remote.RemotePlayErrors
 import com.playlists.app.remote.RemotePlayFlowDialog
 import com.playlists.app.remote.RemotePlayFlowState
 import com.playlists.app.remote.RemotePlayMode
+import com.playlists.app.remote.RemotePlayStartPhase
+import com.playlists.app.remote.RemotePlayStartingDialog
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.rememberOpenAiKeyReady
 import com.playlists.app.ui.SongDisplay
@@ -75,6 +77,7 @@ import com.playlists.app.ui.reorder.syncDisplayedKeys
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.PlaylistExportShare
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -107,6 +110,8 @@ fun PlaylistDetailScreen(
     var remoteStartGeneration by remember { mutableIntStateOf(0) }
     var showRemoteDebug by remember { mutableStateOf(false) }
     var exporting by remember { mutableStateOf(false) }
+    var pushingToServer by remember { mutableStateOf(false) }
+    var pushToServerJob by remember { mutableStateOf<Job?>(null) }
 
     fun exportPlaylistPdf() {
         if (exporting || entries.isEmpty()) return
@@ -139,6 +144,41 @@ fun PlaylistDetailScreen(
                 }
             }
         }
+    }
+
+    fun pushPlaylistToServer() {
+        if (pushingToServer || exporting || entries.isEmpty() || !PlayRemoteController.running.value) return
+        pushingToServer = true
+        pushToServerJob = scope.launch {
+            val list = viewModel.getPlaylistSongs(playlistId)
+            val name = playlist?.name.orEmpty()
+            val result = withContext(Dispatchers.IO) {
+                PlayRemoteController.pushPlaylistPdfToServer(
+                    context = context,
+                    playlistId = playlistId,
+                    playlistName = name,
+                    entries = list,
+                )
+            }
+            pushingToServer = false
+            pushToServerJob = null
+            result.onFailure { error ->
+                Toast.makeText(
+                    context,
+                    context.getString(
+                        R.string.push_playlist_to_server_failed,
+                        error.message ?: context.getString(R.string.export_playlist_failed),
+                    ),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
+
+    fun cancelPushToServer() {
+        pushToServerJob?.cancel()
+        pushToServerJob = null
+        pushingToServer = false
     }
 
     LaunchedEffect(playlistId) {
@@ -282,7 +322,10 @@ fun PlaylistDetailScreen(
                             onDelete = { showDelete = true },
                             onDuplicate = { showDuplicate = true },
                             onExport = { exportPlaylistPdf() },
-                            exportEnabled = entries.isNotEmpty() && !exporting,
+                            exportEnabled = entries.isNotEmpty() && !exporting && !pushingToServer,
+                            showPushToServer = remoteRunning,
+                            pushToServerEnabled = entries.isNotEmpty() && !exporting && !pushingToServer,
+                            onPushToServer = { pushPlaylistToServer() },
                         )
                     }
                 }
@@ -350,6 +393,14 @@ fun PlaylistDetailScreen(
                 }
             }
         }
+    }
+
+    if (pushingToServer) {
+        RemotePlayStartingDialog(
+            mode = RemotePlayMode.STABLE,
+            phase = RemotePlayStartPhase.UPLOADING_PDF,
+            onCancel = { cancelPushToServer() },
+        )
     }
 
     if (showRename) {

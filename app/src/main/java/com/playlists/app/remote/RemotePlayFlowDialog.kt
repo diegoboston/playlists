@@ -85,39 +85,10 @@ fun RemotePlayFlowDialog(
             )
         }
         is RemotePlayFlowState.Starting -> {
-            AlertDialog(
-                onDismissRequest = onCancel,
-                title = { Text(stringResource(R.string.remote_play)) },
-                text = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        CircularProgressIndicator()
-                        Text(
-                            stringResource(
-                                when {
-                                    state.mode == RemotePlayMode.STABLE &&
-                                        state.phase == RemotePlayStartPhase.UPLOADING_PDF ->
-                                        R.string.remote_uploading_playlist_pdf
-                                    state.mode == RemotePlayMode.STABLE ->
-                                        R.string.remote_starting_stable
-                                    state.mode == RemotePlayMode.CLOUDFLARE ->
-                                        R.string.remote_starting_cloudflare
-                                    else -> R.string.remote_starting_lan
-                                },
-                            ),
-                            modifier = Modifier.padding(top = 16.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                },
-                confirmButton = {},
-                dismissButton = {
-                    TextButton(onClick = onCancel) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
-                },
+            RemotePlayStartingDialog(
+                mode = state.mode,
+                phase = state.phase,
+                onCancel = onCancel,
             )
         }
         is RemotePlayFlowState.Started -> {
@@ -128,6 +99,48 @@ fun RemotePlayFlowDialog(
             )
         }
     }
+}
+
+@Composable
+fun RemotePlayStartingDialog(
+    mode: RemotePlayMode,
+    phase: RemotePlayStartPhase = RemotePlayStartPhase.STARTING_TUNNEL,
+    onCancel: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(stringResource(R.string.remote_play)) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                CircularProgressIndicator()
+                Text(
+                    stringResource(
+                        when {
+                            mode == RemotePlayMode.STABLE &&
+                                phase == RemotePlayStartPhase.UPLOADING_PDF ->
+                                R.string.remote_uploading_playlist_pdf
+                            mode == RemotePlayMode.STABLE ->
+                                R.string.remote_starting_stable
+                            mode == RemotePlayMode.CLOUDFLARE ->
+                                R.string.remote_starting_cloudflare
+                            else -> R.string.remote_starting_lan
+                        },
+                    ),
+                    modifier = Modifier.padding(top = 16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
 }
 
 @Composable

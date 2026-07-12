@@ -522,6 +522,34 @@ object PlayRemoteController {
         return false to warnings
     }
 
+    /** Build the combined playlist PDF and upload it as [last.pdf] on the stable Worker. */
+    fun pushPlaylistPdfToServer(
+        context: Context,
+        playlistId: Long,
+        playlistName: String,
+        entries: List<PlaylistSongWithDetails>,
+    ): Result<Unit> {
+        if (!_running.value) {
+            return Result.failure(IllegalStateException("Remote play is not active"))
+        }
+        if (!AppPrefs.isStableRedirectReady(context)) {
+            return Result.failure(
+                IllegalStateException(
+                    "Stable redirect is not configured — set Workers subdomain and write secret in Settings",
+                ),
+            )
+        }
+        if (entries.isEmpty()) {
+            return Result.failure(IllegalStateException("Add songs before pushing the playlist PDF"))
+        }
+        val warnings = pushStablePlaylistPdf(context, playlistId, playlistName, entries)
+        return if (warnings.isEmpty()) {
+            Result.success(Unit)
+        } else {
+            Result.failure(IllegalStateException(warnings.first()))
+        }
+    }
+
     private fun pushStablePlaylistPdf(
         context: Context,
         playlistId: Long,

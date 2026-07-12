@@ -44,6 +44,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
 import com.playlists.app.data.Playlist
 import com.playlists.app.remote.PlayRemoteController
+import com.playlists.app.remote.RemotePlayStartPhase
+import com.playlists.app.remote.RemotePlayMode
+import com.playlists.app.remote.RemotePlayStartingDialog
 import com.playlists.app.ui.PlaylistAccentColors
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.components.PlaylistActionsMenu
@@ -54,7 +57,9 @@ import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
 import com.playlists.app.util.PlaylistExportShare
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +80,9 @@ fun PlaylistsScreen(
     var deleteTarget by remember { mutableStateOf<Playlist?>(null) }
     var duplicateTarget by remember { mutableStateOf<Playlist?>(null) }
     var exportingPlaylistId by remember { mutableStateOf<Long?>(null) }
+    var pushingPlaylistId by remember { mutableStateOf<Long?>(null) }
+    var pushToServerJob by remember { mutableStateOf<Job?>(null) }
+    val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
 
     fun exportPlaylistPdf(playlistId: Long, songCount: Int) {
         if (exportingPlaylistId != null || songCount == 0) return
@@ -107,6 +115,47 @@ fun PlaylistsScreen(
                 }
             }
         }
+    }
+
+    fun pushPlaylistToServer(playlistId: Long, playlistName: String, songCount: Int) {
+        if (
+            pushingPlaylistId != null ||
+            exportingPlaylistId != null ||
+            songCount == 0 ||
+            !remoteRunning
+        ) {
+            return
+        }
+        pushingPlaylistId = playlistId
+        pushToServerJob = scope.launch {
+            val entries = viewModel.getPlaylistSongs(playlistId)
+            val result = withContext(Dispatchers.IO) {
+                PlayRemoteController.pushPlaylistPdfToServer(
+                    context = context,
+                    playlistId = playlistId,
+                    playlistName = playlistName,
+                    entries = entries,
+                )
+            }
+            pushingPlaylistId = null
+            pushToServerJob = null
+            result.onFailure { error ->
+                Toast.makeText(
+                    context,
+                    context.getString(
+                        R.string.push_playlist_to_server_failed,
+                        error.message ?: context.getString(R.string.export_playlist_failed),
+                    ),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
+
+    fun cancelPushToServer() {
+        pushToServerJob?.cancel()
+        pushToServerJob = null
+        pushingPlaylistId = null
     }
 
     LaunchedEffect(playlists, dragState.draggingKey) {
@@ -168,12 +217,17 @@ fun PlaylistsScreen(
                             playlist = playlist,
                             songCount = playlistSongs.size,
                             fallbackColor = PlaylistAccentColors.palette[paletteIndex % PlaylistAccentColors.palette.size],
-                            exporting = exportingPlaylistId == playlist.id,
+                            showPushToServer = remoteRunning,
+                            pushingToServer = pushingPlaylistId == playlist.id,
+                            busy = exportingPlaylistId != null || pushingPlaylistId != null,
                             onRename = { renameTarget = playlist },
                             onColor = { colorTarget = playlist },
                             onDelete = { deleteTarget = playlist },
                             onDuplicate = { duplicateTarget = playlist },
                             onExport = { exportPlaylistPdf(playlist.id, playlistSongs.size) },
+                            onPushToServer = {
+                                pushPlaylistToServer(playlist.id, playlist.name, playlistSongs.size)
+                            },
                         )
                     }
                 }
@@ -271,6 +325,14 @@ fun PlaylistsScreen(
             }
         }
     }
+
+    if (pushingPlaylistId != null) {
+        RemotePlayStartingDialog(
+            mode = RemotePlayMode.STABLE,
+            phase = RemotePlayStartPhase.UPLOADING_PDF,
+            onCancel = { cancelPushToServer() },
+        )
+    }
 }
 
 @Composable
@@ -278,12 +340,15 @@ private fun PlaylistBlock(
     playlist: Playlist,
     songCount: Int,
     fallbackColor: Int,
-    exporting: Boolean,
+    showPushToServer: Boolean,
+    pushingToServer: Boolean,
+    busy: Boolean,
     onRename: () -> Unit,
     onColor: () -> Unit,
     onDelete: () -> Unit,
     onDuplicate: () -> Unit,
     onExport: () -> Unit,
+    onPushToServer: () -> Unit,
 ) {
     val bg = Color(playlist.colorArgb ?: fallbackColor)
     val onBg = if (bg.luminance() > 0.5f) Color.Black else Color.White
@@ -316,12 +381,15 @@ private fun PlaylistBlock(
             PlaylistActionsMenu(
                 iconTint = onBg,
                 iconSize = 20.dp,
-                exportEnabled = songCount > 0 && !exporting,
+                exportEnabled = songCount > 0 && !busy,
+                showPushToServer = showPushToServer,
+                pushToServerEnabled = songCount > 0 && !busy && !pushingToServer,
                 onRename = onRename,
                 onColor = onColor,
                 onDelete = onDelete,
                 onDuplicate = onDuplicate,
                 onExport = onExport,
+                onPushToServer = onPushToServer,
             )
         }
     }
