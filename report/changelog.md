@@ -4,6 +4,73 @@
 
 ---
 
+## `1b82431` — push playlist/readme
+
+**2026-07-26 (9:43 AM EDT)** · [commit](https://github.com/diegoboston/playlists/commit/1b82431c328f45da650b8f936dc272cbda5c1de0)
+
+- **Push playlist to server** is available as soon as stable redirect keys are validated in Settings — remote play no longer needs to be running.
+- README documents the ungated push flow and shows side-by-side Original / Guido launcher icon previews.
+
+---
+
+## 1.0.70 · `d265741` — upload to server/menu icons
+
+**Released:** 2026-07-12 (7:14 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/d26574177c617900eecbcaefb99fc40bd87992dc)
+
+- Playlist menus (Playlists tab and detail) switch from pencil to **☰**, with per-action icons (rename, color, delete, duplicate, export).
+- While remote play is active, **Push playlist to server** uploads the combined playlist PDF as **last.pdf** on the stable Worker (same path as stable-start auto-upload), with an uploading progress dialog.
+
+---
+
+## 1.0.69 · `bae62a8` — update PDF offline
+
+**Released:** 2026-07-10 (10:23 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/bae62a85f1557f216136e8c0a6559df672002b0c)
+
+- Stable remote start uploads the combined playlist PDF to the Worker (**POST /push-pdf** → R2 `last.pdf`) and shows **Uploading playlist PDF…** during that phase.
+- When the phone tunnel is offline, the stable bookmark serves a PIN gate and the last uploaded playlist PDF (`/pdf`, optional download).
+- Worker needs an R2 bucket binding (`PLAYLIST_PDF`); app/client and Worker README cover the offline fallback flow.
+
+---
+
+## 1.0.68 · `1c36b08` — 2up pdf fix
+
+**Released:** 2026-07-10 (10:07 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/1c36b084cb7b60b4daef5f660a157d8385b04d4a)
+
+- AI chart PDF rendering packs content across multiple letter pages (continuation headers) instead of forcing a single page.
+- Chart key preview adds font size control plus previous/next page navigation for multi-page drafts.
+- OpenAI key readiness is remembered via a validated flag so mic/find-chart gating stays consistent after Settings.
+
+---
+
+## 1.0.67 · `338ad98` — reuse cached APK for update
+
+**Released:** 2026-07-10 (4:06 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/338ad98d21c1eec99b38114b3e7c216b188b236b)
+
+- In-app update reuses a previously downloaded APK when it still matches the newer GitHub release version code (skips re-download).
+- Stale or incomplete update cache files are cleaned; a still-newer complete APK is kept. Uses `longVersionCode` on API 28+.
+
+---
+
+## 1.0.66 · `de17f57` — UI reorganization
+
+**Released:** 2026-07-04 (4:22 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/de17f577a157be055b4cc27a8cdf5cbefef2844b)
+
+- Settings folds less-common options under an expandable **Advanced** section; OpenAI and Worker secret validation state is persisted once a live check succeeds.
+- Stable play URL only appears in remote URL lists when redirect keys are validated (`isStableRedirectReady`).
+- Playlist color picker uses a cleaner dialog layout (tap swatch to select; no separate OK).
+
+---
+
+## 1.0.65 · `33b6103` — cloudfare watch/UI fix
+
+**Released:** 2026-07-04 (3:03 AM EDT) · [commit](https://github.com/diegoboston/playlists/commit/33b6103fa6eead8f9713c058bf367c5de3786439)
+
+- Cloudflare/stable remote play: tunnel watchdog restarts cloudflared when it dies mid-session (capped retries) and re-publishes the stable URL; toast shows the new public URL.
+- Remote web pages show the app icon (favicon + brand) and list alternate connect URLs on the home page when available.
+- Serves `/app-icon.png` from the remote HTTP server for browser UI branding.
+
+---
+
 ## `b64de56` — harden checks
 
 **2026-07-03 (4:07 PM EDT)** · [commit](https://github.com/diegoboston/playlists/commit/b64de56f71e4ea4d3bbb931e4c59da727da9630c)

@@ -41,7 +41,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs). **↓** shares the current song file; **↻** in the top bar jumps to the first song and page.
 - **Settings** — **Gear** icon on the main tabs opens **Settings**: under **Remote play**, set one **5-digit code** used as the Cloudflare PIN and the LAN port, plus optional **stable play URL** fields (Workers account subdomain + write secret — builds `https://play.<subdomain>.workers.dev`; see `workers/tunnel-redirect/`). Under **AI chart assistant**, paste your **OpenAI API key** (never stored in git); a **green check** confirms the key works. Tap **OpenAI billing overview** to open your account balance on platform.openai.com. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Under **App icon**, pick **Original** (orchestra conductor) or **Guido** to change the launcher icon (your home screen may take a moment to refresh), then tap **Save**. A **status card** at the bottom shows **installed app version**, **Check for updates** (same GitHub Release flow as the launch snackbar), and **total library storage** under `Music/StageManager` (song files, chart sidecars, database, and state).
 
-  | Original (orchestra conductor) | Guido |
+  | Original | Guido |
   |:---:|:---:|
   | <img src="app/src/main/res/drawable-nodpi/ic_launcher_foreground.png" width="96" alt="Original launcher icon — orchestra conductor"> | <img src="app/src/main/res/drawable-nodpi/ic_launcher_alt_foreground.png" width="96" alt="Guido launcher icon"> |
 
@@ -269,7 +269,7 @@ On push to `main` or `master`, GitHub Actions (`.github/workflows/android.yml`):
 
 Stable download URL: `https://github.com/diegoboston/playlists/releases/latest/download/app.apk`
 
-Each CI run sets `versionCode = GITHUB_RUN_NUMBER` and `versionName = 1.0.<run>`. No GitHub Secrets are needed for signing — the keystore is in the repo.
+Each CI run sets `versionCode = GITHUB_RUN_NUMBER` and `versionName = 1.0.<run>`. No GitHub Secrets are needed for signing — the keystore is in the repo. CI publishes APKs straight to GitHub Releases in the same job (no Actions artifacts), so storage quota is not used.
 
 ## In-app updates
 

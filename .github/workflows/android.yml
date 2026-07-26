@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   build:
-    name: Build APK
+    name: Build and release
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    outputs:
-      version: ${{ steps.version.outputs.version }}
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -62,38 +62,24 @@ jobs:
           mkdir -p artifacts
           src="$(ls app/build/outputs/apk/release/*.apk | head -n1)"
           cp "$src" "artifacts/app-${VERSION}.apk"
-          cp "$src" artifacts/app.apk
           ls -la artifacts/
 
-      - name: Upload release artifacts
-        uses: actions/upload-artifact@v5
-        with:
-          name: app-${{ steps.version.outputs.version }}
-          path: artifacts/*.apk
-          if-no-files-found: error
-
-  release:
-    name: Publish GitHub Release
-    needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download APK artifacts
-        uses: actions/download-artifact@v5
-        with:
-          name: app-${{ needs.build.outputs.version }}
-          path: artifacts
+      # Stable alias for in-app updates — same bytes, second name only on
+      # the GitHub Release. No actions/upload-artifact (storage quota).
+      - name: Stage stable release filename
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: cp "artifacts/app-${VERSION}.apk" artifacts/app.apk
 
       - name: Create GitHub Release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build.outputs.version }}
-          name: Stage Manager ${{ needs.build.outputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Stage Manager ${{ steps.version.outputs.version }}
           generate_release_notes: true
           make_latest: true
           files: |
-            artifacts/app-${{ needs.build.outputs.version }}.apk
+            artifacts/app-${{ steps.version.outputs.version }}.apk
             artifacts/app.apk
