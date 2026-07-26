@@ -147,7 +147,14 @@ fun PlaylistDetailScreen(
     }
 
     fun pushPlaylistToServer() {
-        if (pushingToServer || exporting || entries.isEmpty() || !PlayRemoteController.running.value) return
+        if (
+            pushingToServer ||
+            exporting ||
+            entries.isEmpty() ||
+            !AppPrefs.isStableRedirectReady(context)
+        ) {
+            return
+        }
         pushingToServer = true
         pushToServerJob = scope.launch {
             val list = viewModel.getPlaylistSongs(playlistId)
@@ -323,7 +330,7 @@ fun PlaylistDetailScreen(
                             onDuplicate = { showDuplicate = true },
                             onExport = { exportPlaylistPdf() },
                             exportEnabled = entries.isNotEmpty() && !exporting && !pushingToServer,
-                            showPushToServer = remoteRunning,
+                            showPushToServer = AppPrefs.isStableRedirectReady(context),
                             pushToServerEnabled = entries.isNotEmpty() && !exporting && !pushingToServer,
                             onPushToServer = { pushPlaylistToServer() },
                         )

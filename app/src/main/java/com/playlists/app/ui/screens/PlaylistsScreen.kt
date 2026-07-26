@@ -55,6 +55,7 @@ import com.playlists.app.ui.components.TextInputDialog
 import com.playlists.app.ui.reorder.DraggableItem
 import com.playlists.app.ui.reorder.ReorderDragState
 import com.playlists.app.ui.reorder.syncDisplayedKeys
+import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.PlaylistExportShare
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -82,7 +83,7 @@ fun PlaylistsScreen(
     var exportingPlaylistId by remember { mutableStateOf<Long?>(null) }
     var pushingPlaylistId by remember { mutableStateOf<Long?>(null) }
     var pushToServerJob by remember { mutableStateOf<Job?>(null) }
-    val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
+    val stableRedirectReady = AppPrefs.isStableRedirectReady(context)
 
     fun exportPlaylistPdf(playlistId: Long, songCount: Int) {
         if (exportingPlaylistId != null || songCount == 0) return
@@ -122,7 +123,7 @@ fun PlaylistsScreen(
             pushingPlaylistId != null ||
             exportingPlaylistId != null ||
             songCount == 0 ||
-            !remoteRunning
+            !stableRedirectReady
         ) {
             return
         }
@@ -217,7 +218,7 @@ fun PlaylistsScreen(
                             playlist = playlist,
                             songCount = playlistSongs.size,
                             fallbackColor = PlaylistAccentColors.palette[paletteIndex % PlaylistAccentColors.palette.size],
-                            showPushToServer = remoteRunning,
+                            showPushToServer = stableRedirectReady,
                             pushingToServer = pushingPlaylistId == playlist.id,
                             busy = exportingPlaylistId != null || pushingPlaylistId != null,
                             onRename = { renameTarget = playlist },

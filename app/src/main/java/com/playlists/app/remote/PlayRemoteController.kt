@@ -522,16 +522,16 @@ object PlayRemoteController {
         return false to warnings
     }
 
-    /** Build the combined playlist PDF and upload it as [last.pdf] on the stable Worker. */
+    /**
+     * Build the combined playlist PDF and upload it as [last.pdf] on the stable Worker.
+     * Does not require remote play to be running — only validated stable-redirect keys.
+     */
     fun pushPlaylistPdfToServer(
         context: Context,
         playlistId: Long,
         playlistName: String,
         entries: List<PlaylistSongWithDetails>,
     ): Result<Unit> {
-        if (!_running.value) {
-            return Result.failure(IllegalStateException("Remote play is not active"))
-        }
         if (!AppPrefs.isStableRedirectReady(context)) {
             return Result.failure(
                 IllegalStateException(
