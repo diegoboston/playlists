@@ -41,6 +41,7 @@ class OpenAiClient(
     fun parseIntent(
         transcript: String,
         playlistsContextJson: String,
+        searchMode: ChartSearchMode = ChartSearchMode.ChordsAndLyrics,
     ): ChartIntent? {
         val system = """
             You parse voice commands for a chord-chart assistant app.
@@ -50,10 +51,13 @@ class OpenAiClient(
             artist (optional),
             playlistName (optional).
             Do not ask for or require a musical key — transposition happens in the preview UI.
+            Ignore whether the user asked for chords, lyrics, or both — the app adds that to the search query itself.
             Context: $playlistsContextJson
         """.trimIndent()
         val content = chatJson(system, transcript) ?: return null
-        return AiJsonHelper.parseObject(content)?.let { ChartIntent.fromJson(it, transcript) }
+        return AiJsonHelper.parseObject(content)?.let {
+            ChartIntent.fromJson(it, transcript, searchMode)
+        }
     }
 
     fun extractChart(

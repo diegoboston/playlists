@@ -10,6 +10,7 @@ import com.playlists.app.ai.ChartAssistantException
 import com.playlists.app.ai.ChartAssistantService
 import com.playlists.app.ai.ChartDraft
 import com.playlists.app.ai.ChartIntent
+import com.playlists.app.ai.ChartSearchMode
 import com.playlists.app.ai.OpenAiClient
 import com.playlists.app.ai.OpenAiException
 import com.playlists.app.ai.PlaylistNameResolver
@@ -46,11 +47,11 @@ sealed class ChartAssistantUiState {
     data object Processing : ChartAssistantUiState()
     data class IntentReady(
         val intent: ChartIntent,
-        val playlist: Playlist,
+        val playlist: Playlist?,
     ) : ChartAssistantUiState()
     data class SearchResults(
         val intent: ChartIntent,
-        val playlist: Playlist,
+        val playlist: Playlist?,
         val results: List<SearchResult>,
     ) : ChartAssistantUiState()
     data class Preview(
@@ -85,9 +86,11 @@ class ChartAssistantViewModel(
     val savedSongId: SharedFlow<Long> = _savedSongId.asSharedFlow()
 
     private var lastSearchResults: List<SearchResult> = emptyList()
+    private var pendingSearchMode: ChartSearchMode = ChartSearchMode.ChordsAndLyrics
 
-    fun startRecording() {
+    fun startRecording(searchMode: ChartSearchMode) {
         if (_uiState.value is ChartAssistantUiState.Recording) return
+        pendingSearchMode = searchMode
         runCatching { audioRecorder.start() }
             .onSuccess { _uiState.value = ChartAssistantUiState.Recording }
             .onFailure { _uiState.value = ChartAssistantUiState.Error(it.message ?: "Mic failed") }
@@ -102,13 +105,49 @@ class ChartAssistantViewModel(
         }
         _uiState.value = ChartAssistantUiState.Processing
         viewModelScope.launch {
-            processAudio(audioFile)
+            processAudio(audioFile, pendingSearchMode)
         }
     }
 
     fun cancelRecording() {
         audioRecorder.stop()
         _uiState.value = ChartAssistantUiState.Idle
+    }
+
+    fun searchFromText(text: String, searchMode: ChartSearchMode) {
+        if (_uiState.value is ChartAssistantUiState.Processing ||
+            _uiState.value is ChartAssistantUiState.Recording ||
+            _uiState.value is ChartAssistantUiState.Preview
+        ) {
+            return
+        }
+        val keepPlaylist = when (val state = _uiState.value) {
+            is ChartAssistantUiState.SearchResults -> state.playlist to true
+            is ChartAssistantUiState.IntentReady -> state.playlist to true
+            else -> null to false
+        }
+        _uiState.value = ChartAssistantUiState.Processing
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val playlist = if (keepPlaylist.second) {
+                        keepPlaylist.first
+                    } else {
+                        playlistId?.let { playlistRepo.getById(it) }
+                    }
+                    val intent = ChartIntent.fromTypedQuery(
+                        text = text,
+                        searchMode = searchMode,
+                        playlistName = playlist?.name,
+                    ) ?: throw ChartAssistantException("Enter a song title")
+                    intent to playlist
+                }
+            }.onSuccess { (intent, playlist) ->
+                searchForIntent(intent, playlist)
+            }.onFailure {
+                _uiState.value = ChartAssistantUiState.Error(it.userMessage())
+            }
+        }
     }
 
     fun retrySearch() {
@@ -312,7 +351,7 @@ class ChartAssistantViewModel(
         )
     }
 
-    private suspend fun processAudio(audioFile: File) {
+    private suspend fun processAudio(audioFile: File, searchMode: ChartSearchMode) {
         val context = getApplication<Application>()
         val apiKey = AiCredentialStore.getOpenAiApiKey(context)
         if (apiKey == null) {
@@ -331,13 +370,17 @@ class ChartAssistantViewModel(
                 val intent = client.parseIntent(
                     transcript = transcript,
                     playlistsContextJson = AiJsonHelper.playlistsContext(playlists, playlistId),
+                    searchMode = searchMode,
                 ) ?: throw ChartAssistantException("Could not parse command")
                 val playlist = PlaylistNameResolver.resolve(
                     name = intent.playlistName,
                     playlists = playlists,
                     defaultPlaylistId = playlistId,
-                ) ?: throw ChartAssistantException("Playlist not found")
-                intent.copy(transcript = transcript) to playlist
+                )
+                if (playlistId != null && playlist == null) {
+                    throw ChartAssistantException("Playlist not found")
+                }
+                intent.copy(transcript = transcript, searchMode = searchMode) to playlist
             }
         }.onSuccess { (intent, playlist) ->
             audioFile.delete()
@@ -349,7 +392,7 @@ class ChartAssistantViewModel(
         }
     }
 
-    private fun searchForIntent(intent: ChartIntent, playlist: Playlist) {
+    private fun searchForIntent(intent: ChartIntent, playlist: Playlist?) {
         _uiState.value = ChartAssistantUiState.Processing
         viewModelScope.launch {
             runCatching {

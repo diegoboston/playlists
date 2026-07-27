@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.playlists.app.ui.screens
 
 import android.Manifest
@@ -21,6 +23,7 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,22 +32,31 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -54,6 +66,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
@@ -62,7 +75,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.playlists.app.R
-import com.playlists.app.data.FileType
+import com.playlists.app.ai.ChartSearchMode
 import com.playlists.app.find.SearchResult
 import com.playlists.app.ui.ChartAssistantUiState
 import com.playlists.app.ui.ChartAssistantViewModel
@@ -72,7 +85,6 @@ import com.playlists.app.ui.rememberOpenAiKeyReady
 import com.playlists.app.render.AccidentalSpelling
 import com.playlists.app.ui.components.ChartKeyPreviewContent
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChartAssistantScreen(
     playlistId: Long?,
@@ -88,6 +100,10 @@ fun ChartAssistantScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pendingChartImport by playlistsViewModel.pendingChartImport.collectAsStateWithLifecycle()
     val openAiKeyReady = rememberOpenAiKeyReady()
+    var searchMode by rememberSaveable { mutableStateOf(ChartSearchMode.ChordsAndLyrics.name) }
+    val selectedMode = remember(searchMode) {
+        runCatching { ChartSearchMode.valueOf(searchMode) }.getOrDefault(ChartSearchMode.ChordsAndLyrics)
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -158,19 +174,26 @@ fun ChartAssistantScreen(
                 when (current) {
                     is ChartAssistantUiState.Idle,
                     is ChartAssistantUiState.Recording,
-                    -> HoldToRecordMic(
+                    -> IdleSearchContent(
                         isRecording = current is ChartAssistantUiState.Recording,
+                        searchMode = selectedMode,
+                        onSearchModeChange = { searchMode = it.name },
                         onPressMic = {
                             when {
                                 ContextCompat.checkSelfPermission(
                                     context,
                                     Manifest.permission.RECORD_AUDIO,
-                                ) == PackageManager.PERMISSION_GRANTED -> viewModel.startRecording()
+                                ) == PackageManager.PERMISSION_GRANTED -> {
+                                    viewModel.startRecording(selectedMode)
+                                }
                                 else -> permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                             }
                         },
                         onReleaseMic = viewModel::stopRecordingAndProcess,
                         onCancelMic = viewModel::cancelRecording,
+                        onTypedSearch = { text ->
+                            viewModel.searchFromText(text, selectedMode)
+                        },
                     )
                     is ChartAssistantUiState.Processing -> ProcessingBlock()
                     is ChartAssistantUiState.IntentReady -> {
@@ -178,10 +201,14 @@ fun ChartAssistantScreen(
                         ProcessingBlock()
                     }
                     is ChartAssistantUiState.SearchResults -> SearchResultsBlock(
-                        transcript = current.intent.transcript,
-                        playlistName = current.playlist.name,
+                        queryText = current.intent.editableQuery(),
+                        searchMode = current.intent.searchMode,
+                        playlistName = current.playlist?.name,
                         results = current.results,
                         onSelect = viewModel::selectSearchResult,
+                        onSearchAgain = { text, mode ->
+                            viewModel.searchFromText(text, mode)
+                        },
                     )
                     is ChartAssistantUiState.Error -> {
                         Text(current.message, color = MaterialTheme.colorScheme.error)
@@ -193,6 +220,85 @@ fun ChartAssistantScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun IdleSearchContent(
+    isRecording: Boolean,
+    searchMode: ChartSearchMode,
+    onSearchModeChange: (ChartSearchMode) -> Unit,
+    onPressMic: () -> Unit,
+    onReleaseMic: () -> Unit,
+    onCancelMic: () -> Unit,
+    onTypedSearch: (String) -> Unit,
+) {
+    var typedQuery by rememberSaveable { mutableStateOf("") }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        HoldToRecordMic(
+            isRecording = isRecording,
+            onPressMic = onPressMic,
+            onReleaseMic = onReleaseMic,
+            onCancelMic = onCancelMic,
+        )
+        if (!isRecording) {
+            OutlinedTextField(
+                value = typedQuery,
+                onValueChange = { typedQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.chart_assistant_typed_hint)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        if (typedQuery.isNotBlank()) onTypedSearch(typedQuery)
+                    },
+                ),
+            )
+            ChartSearchModeSelector(
+                selected = searchMode,
+                onSelected = onSearchModeChange,
+            )
+            OutlinedButton(
+                onClick = { onTypedSearch(typedQuery) },
+                enabled = typedQuery.isNotBlank(),
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(18.dp),
+                )
+                Text(stringResource(R.string.chart_assistant_search))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChartSearchModeSelector(
+    selected: ChartSearchMode,
+    onSelected: (ChartSearchMode) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(
+            selected = selected == ChartSearchMode.ChordsAndLyrics,
+            onClick = { onSelected(ChartSearchMode.ChordsAndLyrics) },
+            label = { Text(stringResource(R.string.chart_assistant_mode_chords_lyrics)) },
+        )
+        FilterChip(
+            selected = selected == ChartSearchMode.LyricsOnly,
+            onClick = { onSelected(ChartSearchMode.LyricsOnly) },
+            label = { Text(stringResource(R.string.chart_assistant_mode_lyrics_only)) },
+        )
     }
 }
 
@@ -312,13 +418,53 @@ private fun ProcessingBlock() {
 
 @Composable
 private fun SearchResultsBlock(
-    transcript: String,
-    playlistName: String,
+    queryText: String,
+    searchMode: ChartSearchMode,
+    playlistName: String?,
     results: List<SearchResult>,
     onSelect: (SearchResult) -> Unit,
+    onSearchAgain: (String, ChartSearchMode) -> Unit,
 ) {
-    Text(stringResource(R.string.chart_assistant_heard, transcript))
-    Text(stringResource(R.string.chart_assistant_playlist_target, playlistName))
+    var heardText by remember(queryText) { mutableStateOf(queryText) }
+    var mode by remember(searchMode) { mutableStateOf(searchMode) }
+    Text(stringResource(R.string.chart_assistant_heard_label))
+    OutlinedTextField(
+        value = heardText,
+        onValueChange = { heardText = it },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(stringResource(R.string.chart_assistant_typed_hint)) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(
+            onSearch = {
+                if (heardText.isNotBlank()) onSearchAgain(heardText, mode)
+            },
+        ),
+    )
+    ChartSearchModeSelector(
+        selected = mode,
+        onSelected = { mode = it },
+    )
+    OutlinedButton(
+        onClick = { onSearchAgain(heardText, mode) },
+        enabled = heardText.isNotBlank(),
+    ) {
+        Icon(
+            Icons.Default.Search,
+            contentDescription = null,
+            modifier = Modifier
+                .padding(end = 8.dp)
+                .size(18.dp),
+        )
+        Text(stringResource(R.string.chart_assistant_search_again))
+    }
+    Text(
+        if (playlistName != null) {
+            stringResource(R.string.chart_assistant_playlist_target, playlistName)
+        } else {
+            stringResource(R.string.chart_assistant_archive_target)
+        },
+    )
     Text(stringResource(R.string.chart_assistant_pick_result))
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(results, key = { it.url }) { result ->

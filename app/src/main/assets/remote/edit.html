@@ -214,6 +214,24 @@
         }
         entries = data.entries || [];
         renderList();
+        if (data.orphanedSong) {
+          offerDeleteOrphan(data.orphanedSong);
+        }
+      });
+    }
+
+    function offerDeleteOrphan(song) {
+      var title = song.title || 'This song';
+      var msg = '"' + title + '" is not in any other playlist. Remove it from the song archive too?';
+      if (!window.confirm(msg)) return;
+      if (busy) return;
+      setBusy(true);
+      errorEl.textContent = '';
+      RemoteCompat.postJson('/api/songs/delete', { songId: song.id }, function(ok, data) {
+        setBusy(false);
+        if (!ok) {
+          errorEl.textContent = (data && data.error) ? data.error : 'Delete from archive failed';
+        }
       });
     }
 

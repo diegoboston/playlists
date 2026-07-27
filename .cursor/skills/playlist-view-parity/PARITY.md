@@ -9,7 +9,7 @@ Update this file when adding features or recording **intentional** differences.
 | Row title | `SongDisplay.titleWithKey` | `edit.html` `.song-title` | Align — use `titleWithKey()` in JS |
 | Row subtitle | Notes preview only (`notesLine`) | `metaLine`: key · notes | Align — notes only on line 2; key belongs in title |
 | Deleted song highlight | `errorContainer` | `.row.deleted` | Aligned |
-| Remove from playlist | Trash icon | Remove button | Aligned |
+| Remove from playlist | Trash icon; if song unused elsewhere, offer archive delete | Remove button + same orphan confirm | Aligned |
 | Drag reorder | `DraggableItem` / long-press | HTML5 drag-and-drop | Aligned (different UX, same outcome) |
 | Add from archive | `AddSongDialog` + `searchSongs` | Search input + `/api/songs/search` | Align search row formatting with local |
 | Empty playlist copy | `empty_playlist` string | “No songs in this playlist.” | Aligned (wording may differ slightly) |
@@ -58,10 +58,11 @@ Update this file when adding features or recording **intentional** differences.
 | `POST /api/playlists/{id}/navigate` | prev/next song/page |
 | `GET /api/playlists/{id}/media` | Image/PDF bytes for a page |
 | `POST /api/playlists/{id}/reorder` | Reorder songs in playlist |
-| `POST /api/playlists/{id}/remove` | Remove entry from playlist |
+| `POST /api/playlists/{id}/remove` | Remove entry from playlist; response may include `orphanedSong` |
 | `POST /api/playlists/{id}/add` | Add archive song to playlist |
 | `POST /api/playlists/{id}/add-placeholder` | Add placeholder to playlist |
 | `POST /api/playlists/{id}/upload` | Add song file to catalog **and** playlist |
+| `POST /api/songs/delete` | Delete song from archive (used after orphan offer on remove) |
 
 Local mutations from remote go through `PlayRemoteController` callbacks into the same Room repos as `PlaylistsViewModel`.
 

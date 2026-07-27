@@ -206,7 +206,7 @@ internal fun RemotePlayStartedDialogContent(
     onRefreshDebug: () -> Unit,
 ) {
     val context = LocalContext.current
-    val playlistId = PlayRemoteController.activePlaylistId
+    val playlistId = PlayRemoteController.startupPlaylistId()
     val urlEntries = RemotePlayUrls.collect(context, playlistId)
 
     Column(

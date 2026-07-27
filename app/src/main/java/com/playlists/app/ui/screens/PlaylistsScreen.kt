@@ -281,7 +281,7 @@ fun PlaylistsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     deleteTarget = null
-                    if (PlayRemoteController.isSessionFor(playlist.id)) {
+                    if (PlayRemoteController.startupPlaylistId() == playlist.id) {
                         scope.launch(Dispatchers.IO) { PlayRemoteController.stop() }
                     }
                     viewModel.deletePlaylist(playlist.id)

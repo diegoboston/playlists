@@ -35,6 +35,9 @@ interface PlaylistSongDao {
     @Insert
     suspend fun insert(entry: PlaylistSong): Long
 
+    @Query("SELECT songId FROM playlist_songs WHERE id = :entryId")
+    suspend fun getSongId(entryId: Long): Long?
+
     @Query("DELETE FROM playlist_songs WHERE id = :id")
     suspend fun deleteById(id: Long)
 

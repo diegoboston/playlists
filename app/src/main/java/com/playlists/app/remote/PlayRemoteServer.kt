@@ -34,7 +34,7 @@ class PlayRemoteServer(
     private val onUploadSong: ((title: String, key: String, notes: String, tempFile: File, mimeType: String) -> Result<Unit>)? = null,
     private val onUpload: ((playlistId: Long, title: String, key: String, notes: String, tempFile: File, mimeType: String) -> Result<Unit>)? = null,
     private val onReorder: ((playlistId: Long, entryIds: List<Long>) -> Result<Unit>)? = null,
-    private val onRemove: ((playlistId: Long, entryId: Long) -> Result<Unit>)? = null,
+    private val onRemove: ((playlistId: Long, entryId: Long) -> Result<OrphanedSong?>)? = null,
     private val onAdd: ((playlistId: Long, songId: Long) -> Result<Unit>)? = null,
     private val onAddPlaceholder: ((playlistId: Long, title: String, key: String, notes: String) -> Result<Unit>)? = null,
     private val onSearchSongs: ((query: String) -> List<SearchSong>)? = null,
@@ -42,6 +42,7 @@ class PlayRemoteServer(
     private val onGetSongSortState: (() -> SongSortJson)? = null,
     private val onSortSongs: ((criterion: String) -> Result<Unit>)? = null,
     private val onUpdateSong: ((songId: Long, title: String, key: String, notes: String) -> Result<Unit>)? = null,
+    private val onDeleteSong: ((songId: Long) -> Result<Unit>)? = null,
     private val onListPlaylists: (() -> List<RemotePlaylistSummary>)? = null,
     private val onRenamePlaylist: ((id: Long, name: String) -> Result<Unit>)? = null,
     private val onSetPlaylistColor: ((id: Long, colorArgb: Int?) -> Result<Unit>)? = null,
@@ -92,6 +93,11 @@ class PlayRemoteServer(
     data class SongSortJson(
         val criterion: String,
         val reversed: Boolean,
+    )
+
+    data class OrphanedSong(
+        val id: Long,
+        val title: String,
     )
 
     data class RemotePlaylistSummary(
@@ -164,6 +170,7 @@ class PlayRemoteServer(
             uri == "/api/songs/sort" && session.method == Method.POST -> handleSortSongs(session)
             uri == "/api/songs/upload" && session.method == Method.POST -> handleCatalogUpload(session)
             uri == "/api/songs/update" && session.method == Method.POST -> handleUpdateSong(session)
+            uri == "/api/songs/delete" && session.method == Method.POST -> handleDeleteSong(session)
             uri == "/api/playlists" && session.method == Method.GET -> handleListPlaylists()
             uri == "/api/playlists/reorder" && session.method == Method.POST -> handleReorderPlaylists(session)
             uri == "/api/playlists/create" && session.method == Method.POST -> handleCreatePlaylist(session)
@@ -248,10 +255,10 @@ class PlayRemoteServer(
         return jsonResponse(buildStateJson(loaded, state))
     }
 
-    private fun handleEntries(playlistId: Long): Response {
+    private fun handleEntries(playlistId: Long, orphanedSong: OrphanedSong? = null): Response {
         val loaded = loadPlaylist(playlistId) ?: return jsonError("Playlist not found")
         val state = playback(playlistId)
-        return jsonResponse(buildEntriesJson(loaded, state))
+        return jsonResponse(buildEntriesJson(loaded, state, orphanedSong))
     }
 
     private fun handleNavigate(playlistId: Long, session: IHTTPSession): Response {
@@ -283,8 +290,9 @@ class PlayRemoteServer(
         val handler = onRemove ?: return jsonError("Remove not available")
         val entryId = parseLongField(readPostBody(session), "entryId")
             ?: return jsonError("Missing entryId")
-        return if (handler(playlistId, entryId).isSuccess) {
-            handleEntries(playlistId)
+        val result = handler(playlistId, entryId)
+        return if (result.isSuccess) {
+            handleEntries(playlistId, orphanedSong = result.getOrNull())
         } else {
             jsonError("Remove failed")
         }
@@ -382,6 +390,17 @@ class PlayRemoteServer(
             jsonResponse(buildSongsResponseJson())
         } else {
             jsonError("Song update failed")
+        }
+    }
+
+    private fun handleDeleteSong(session: IHTTPSession): Response {
+        val handler = onDeleteSong ?: return jsonError("Song delete not available")
+        val songId = parseLongField(readPostBody(session), "songId")
+            ?: return jsonError("Missing songId")
+        return if (handler(songId).isSuccess) {
+            jsonResponse("""{"ok":true}""")
+        } else {
+            jsonError("Song delete failed")
         }
     }
 
@@ -804,7 +823,11 @@ class PlayRemoteServer(
         return sb.toString()
     }
 
-    private fun buildEntriesJson(loaded: PlaylistLoad, state: PlaybackState): String {
+    private fun buildEntriesJson(
+        loaded: PlaylistLoad,
+        state: PlaybackState,
+        orphanedSong: OrphanedSong? = null,
+    ): String {
         val sb = StringBuilder()
         sb.append(
             """{"playlistId":${loaded.playlistId},"playlistName":${jsonStr(loaded.playlistName)},"songIndex":${state.songIndex},"entries":[""",
@@ -815,7 +838,13 @@ class PlayRemoteServer(
                 """{"entryId":${song.entryId},"songId":${song.songId},"title":${jsonStr(song.title)},"key":${jsonStr(song.keySignature)},"notes":${jsonStr(song.notes)},"fileType":${jsonStr(song.fileType)},"pageCount":${song.pageCount}}""",
             )
         }
-        sb.append("]}")
+        sb.append(']')
+        if (orphanedSong != null) {
+            sb.append(
+                ""","orphanedSong":{"id":${orphanedSong.id},"title":${jsonStr(orphanedSong.title)}}""",
+            )
+        }
+        sb.append('}')
         return sb.toString()
     }
 

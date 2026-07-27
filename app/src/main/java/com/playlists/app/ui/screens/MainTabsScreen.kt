@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Piano
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +45,8 @@ import com.playlists.app.remote.RemotePlayMode
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.components.PianoDialog
 import com.playlists.app.ui.components.RemotePlayIconButton
+import com.playlists.app.ui.rememberOpenAiKeyReady
+import com.playlists.app.util.AppPrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,6 +60,7 @@ fun MainTabsScreen(
     onNewKey: (Long) -> Unit,
     onQuickstart: () -> Unit,
     onSettings: () -> Unit,
+    onFindChart: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -67,16 +71,16 @@ fun MainTabsScreen(
     var remoteStartGeneration by remember { mutableIntStateOf(0) }
     var showRemoteDebug by remember { mutableStateOf(false) }
     var showPiano by remember { mutableStateOf(false) }
+    val chartSearchReady = rememberOpenAiKeyReady()
 
-    val activePlaylistId = if (remoteRunning) PlayRemoteController.activePlaylistId else null
-    val entries by viewModel.observePlaylistSongs(activePlaylistId ?: 0L)
+    val startupPlaylistId =
+        if (remoteRunning) PlayRemoteController.startupPlaylistId() else null
+    val entries by viewModel.observePlaylistSongs(startupPlaylistId ?: 0L)
         .collectAsStateWithLifecycle()
 
-    LaunchedEffect(entries, remoteRunning, activePlaylistId) {
-        if (!remoteRunning || activePlaylistId == null) return@LaunchedEffect
-        if (PlayRemoteController.isRunningFor(activePlaylistId)) {
-            PlayRemoteController.refreshSongs(entries)
-        }
+    LaunchedEffect(entries, remoteRunning, startupPlaylistId) {
+        if (!remoteRunning || startupPlaylistId == null) return@LaunchedEffect
+        PlayRemoteController.refreshSongs(startupPlaylistId, entries)
     }
 
     fun cancelRemoteFlow() {
@@ -147,6 +151,14 @@ fun MainTabsScreen(
                     ) {
                         Text(stringResource(R.string.app_name))
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (chartSearchReady) {
+                                IconButton(onClick = onFindChart) {
+                                    Icon(
+                                        imageVector = Icons.Default.Bolt,
+                                        contentDescription = stringResource(R.string.find_chart),
+                                    )
+                                }
+                            }
                             RemotePlayIconButton(
                                 active = remoteRunning,
                                 onClick = {
@@ -209,7 +221,9 @@ fun MainTabsScreen(
             onCancel = { cancelRemoteFlow() },
             onCloseStarted = { closeRemoteStartedDialog() },
             onStopRemote = { stopRemoteFlow() },
-            onSelectMode = { mode -> startRemote(null, mode) },
+            onSelectMode = { mode ->
+                startRemote(AppPrefs.getLastPlaylistId(context), mode)
+            },
         )
     }
 

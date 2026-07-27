@@ -18,7 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
 import com.playlists.app.data.Playlist
 import com.playlists.app.data.PlaylistSongWithDetails
+import com.playlists.app.data.Song
 import com.playlists.app.remote.PlayRemoteController
 import com.playlists.app.remote.RemotePlayStartedDialog
 import com.playlists.app.remote.RemotePlayErrorDialog
@@ -105,6 +106,7 @@ fun PlaylistDetailScreen(
     var showColor by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
     var showAddSong by remember { mutableStateOf(false) }
+    var orphanDeleteTarget by remember { mutableStateOf<Song?>(null) }
     var remoteError by remember { mutableStateOf<String?>(null) }
     var remoteFlow by remember { mutableStateOf<RemotePlayFlowState?>(null) }
     var remoteStartGeneration by remember { mutableIntStateOf(0) }
@@ -194,15 +196,14 @@ fun PlaylistDetailScreen(
     }
 
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
-    val remoteSessionHere = remoteRunning && PlayRemoteController.isSessionFor(playlistId)
 
     LaunchedEffect(entries, dragState.draggingKey) {
         syncDisplayedKeys(displayedKeys, dragState.draggingKey, entries.map { "e:${it.id}" })
     }
 
     LaunchedEffect(entries, remoteRunning, playlistId) {
-        if (remoteRunning && PlayRemoteController.isRunningFor(playlistId)) {
-            PlayRemoteController.refreshSongs(entries)
+        if (remoteRunning) {
+            PlayRemoteController.refreshSongs(playlistId, entries)
         }
     }
 
@@ -307,16 +308,16 @@ fun PlaylistDetailScreen(
                         }
                         if (chartSearchReady) {
                             IconButton(onClick = { onFindChart(playlistId) }) {
-                                Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.find_chart))
+                                Icon(Icons.Default.Bolt, contentDescription = stringResource(R.string.find_chart))
                             }
                         }
                         IconButton(onClick = { onPlay(playlistId) }) {
                             Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.play))
                         }
                         RemotePlayIconButton(
-                            active = remoteSessionHere,
+                            active = remoteRunning,
                             onClick = {
-                                if (remoteSessionHere) {
+                                if (remoteRunning) {
                                     showRemoteDebug = true
                                 } else {
                                     remoteFlow = RemotePlayFlowState.ChooseMode
@@ -379,7 +380,11 @@ fun PlaylistDetailScreen(
                     ) {
                         PlaylistSongRow(
                             entry = entry,
-                            onRemove = { viewModel.removeSongFromPlaylist(entry.id) },
+                            onRemove = {
+                                viewModel.removeSongFromPlaylist(entry.id) { orphan ->
+                                    orphanDeleteTarget = orphan
+                                }
+                            },
                         )
                     }
                 }
@@ -459,7 +464,7 @@ fun PlaylistDetailScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showDelete = false
-                    if (PlayRemoteController.isSessionFor(playlistId)) {
+                    if (PlayRemoteController.startupPlaylistId() == playlistId) {
                         scope.launch(Dispatchers.IO) { PlayRemoteController.stop() }
                     }
                     viewModel.deletePlaylist(playlistId)
@@ -471,6 +476,29 @@ fun PlaylistDetailScreen(
             dismissButton = {
                 TextButton(onClick = { showDelete = false }) {
                     Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+
+    orphanDeleteTarget?.let { song ->
+        AlertDialog(
+            onDismissRequest = { orphanDeleteTarget = null },
+            title = { Text(stringResource(R.string.delete_orphan_song_title)) },
+            text = {
+                Text(stringResource(R.string.delete_orphan_song_confirm, song.title))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteSong(song.id)
+                    orphanDeleteTarget = null
+                }) {
+                    Text(stringResource(R.string.delete_song))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { orphanDeleteTarget = null }) {
+                    Text(stringResource(R.string.delete_orphan_song_keep))
                 }
             },
         )

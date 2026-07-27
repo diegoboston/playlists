@@ -4,9 +4,19 @@
 
 ---
 
+## 1.0.72 · `c6c2cb7` — change build strategy
+
+**Released:** 2026-07-26 (12:07 PM EDT) · [commit](https://github.com/diegoboston/playlists/commit/c6c2cb7ffe09ead32e3d83efad1e1d26c0cc99f3)
+
+- CI builds and publishes the GitHub Release in a single job (no Actions artifact upload), so storage quota is not consumed.
+- Releases still attach versioned `app-1.0.N.apk` and stable `app.apk` for in-app updates and the latest download URL.
+- README documents the single-job publish path.
+
+---
+
 ## `1b82431` — push playlist/readme
 
-**2026-07-26 (9:43 AM EDT)** · [commit](https://github.com/diegoboston/playlists/commit/1b82431c328f45da650b8f936dc272cbda5c1de0)
+**Shipped in 1.0.72** · 2026-07-26 (9:43 AM EDT)
 
 - **Push playlist to server** is available as soon as stable redirect keys are validated in Settings — remote play no longer needs to be running.
 - README documents the ungated push flow and shows side-by-side Original / Guido launcher icon previews.

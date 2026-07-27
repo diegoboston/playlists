@@ -197,8 +197,13 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
         withContext(Dispatchers.Main.immediate) { onAdded() }
     }
 
-    fun removeSongFromPlaylist(entryId: Long) = viewModelScope.launch {
-        playlistRepo.removeSong(entryId)
+    fun removeSongFromPlaylist(
+        entryId: Long,
+        onOrphaned: (Song) -> Unit = {},
+    ) = viewModelScope.launch {
+        val orphanId = playlistRepo.removeSong(entryId) ?: return@launch
+        val song = songRepo.getById(orphanId) ?: return@launch
+        withContext(Dispatchers.Main.immediate) { onOrphaned(song) }
     }
 
     fun reorderPlaylistSongs(playlistId: Long, entryIds: List<Long>) = viewModelScope.launch {

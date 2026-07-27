@@ -35,8 +35,6 @@ object PlayRemoteController {
     private var startGeneration = 0
     private var startingRemote: PlayRemoteServer? = null
     private var session: RemotePlaySession? = null
-    var activePlaylistId: Long? = null
-        private set
 
     data class SessionSnapshot(
         val mode: RemotePlayMode,
@@ -44,6 +42,8 @@ object PlayRemoteController {
         val tunnelBaseUrl: String?,
         val publicUrl: String,
         val stableUrlActive: Boolean = false,
+        /** Playlist id baked into the shared URL at start (`?playlist=`), if any. */
+        val startupPlaylistId: Long? = null,
     )
 
     data class TunnelRestartEvent(val publicUrl: String)
@@ -58,6 +58,7 @@ object PlayRemoteController {
         val publicUrl: String,
         val startWarnings: List<String>,
         val stableUrlActive: Boolean = false,
+        val startupPlaylistId: Long? = null,
     )
 
     private val _running = MutableStateFlow(false)
@@ -71,11 +72,8 @@ object PlayRemoteController {
 
     fun isRunning(): Boolean = server?.isAlive == true
 
-    fun isRunningFor(playlistId: Long): Boolean =
-        isRunning() && activePlaylistId == playlistId
-
-    fun isSessionFor(playlistId: Long): Boolean =
-        _running.value && activePlaylistId == playlistId
+    /** Playlist id included in the shared start URL, if remote was started with one. */
+    fun startupPlaylistId(): Long? = session?.startupPlaylistId
 
     fun currentUrl(): String? = if (isRunning()) publicUrl else null
 
@@ -91,6 +89,7 @@ object PlayRemoteController {
                 tunnelBaseUrl = it.tunnelBaseUrl,
                 publicUrl = it.publicUrl,
                 stableUrlActive = it.stableUrlActive,
+                startupPlaylistId = it.startupPlaylistId,
             )
         }
     }
@@ -229,7 +228,7 @@ object PlayRemoteController {
                 runBlocking { mutatePlaylist(id) { app -> app.playlistRepository.reorder(id, entryIds) } }
             },
             onRemove = { id, entryId ->
-                runBlocking { mutatePlaylist(id) { app -> app.playlistRepository.removeSong(entryId) } }
+                runBlocking { removePlaylistEntry(id, entryId) }
             },
             onAdd = { id, songId ->
                 runBlocking { mutatePlaylist(id) { app -> app.playlistRepository.addSong(id, songId) } }
@@ -251,6 +250,9 @@ object PlayRemoteController {
             },
             onUpdateSong = { songId, title, key, notes ->
                 runBlocking { updateSongMetadata(songId, title, key, notes) }
+            },
+            onDeleteSong = { songId ->
+                runBlocking { deleteArchiveSong(songId) }
             },
             onListPlaylists = {
                 runBlocking { listPlaylists() }
@@ -379,7 +381,6 @@ object PlayRemoteController {
                 }
                 startingRemote = null
                 server = remote
-                activePlaylistId = playlistId
                 publicUrl = resolvedPublicUrl
                 session = RemotePlaySession(
                     mode = mode,
@@ -388,6 +389,7 @@ object PlayRemoteController {
                     publicUrl = resolvedPublicUrl,
                     startWarnings = startWarnings,
                     stableUrlActive = stableUrlActive,
+                    startupPlaylistId = playlistId,
                 )
                 _running.value = true
             }
@@ -409,8 +411,7 @@ object PlayRemoteController {
         }
     }
 
-    fun refreshSongs(entries: List<PlaylistSongWithDetails>) {
-        val playlistId = activePlaylistId ?: return
+    fun refreshSongs(playlistId: Long, entries: List<PlaylistSongWithDetails>) {
         val remote = server ?: return
         if (!remote.isAlive) return
         remote.reconcilePlayback(playlistId, entriesToRemoteSongs(entries))
@@ -487,7 +488,6 @@ object PlayRemoteController {
             remoteToStop = server
             server = null
             publicUrl = null
-            activePlaylistId = null
             appContext = null
             session = null
             _running.value = false
@@ -599,7 +599,7 @@ object PlayRemoteController {
         synchronized(stopLock) {
             val active = session ?: return
             val ctx = appContext ?: return
-            val suffix = RemotePlayUrls.playlistSuffix(activePlaylistId)
+            val suffix = RemotePlayUrls.playlistSuffix(active.startupPlaylistId)
             val newPublicUrl = when (active.mode) {
                 RemotePlayMode.STABLE -> {
                     val stableBase = AppPrefs.buildStableRedirectBase(ctx)
@@ -627,7 +627,7 @@ object PlayRemoteController {
     }
 
     private fun buildRemoteUrlsJson(context: Context): String {
-        val entries = RemotePlayUrls.collect(context, activePlaylistId)
+        val entries = RemotePlayUrls.collect(context, session?.startupPlaylistId)
         val sb = StringBuilder("""{"urls":[""")
         entries.forEachIndexed { index, entry ->
             if (index > 0) sb.append(',')
@@ -737,8 +737,39 @@ object PlayRemoteController {
         }
     }
 
-    private suspend fun refreshActivePlaylistSongs() {
-        val playlistId = activePlaylistId ?: return
+    private suspend fun removePlaylistEntry(
+        playlistId: Long,
+        entryId: Long,
+    ): Result<PlayRemoteServer.OrphanedSong?> {
+        val ctx = appContext ?: return Result.failure(IllegalStateException("Server not ready"))
+        val app = PlaylistsApp.from(ctx as android.app.Application)
+        return try {
+            val orphanId = app.playlistRepository.removeSong(entryId)
+            val entries = app.playlistRepository.getSongs(playlistId)
+            server?.reconcilePlayback(playlistId, entriesToRemoteSongs(entries))
+            val orphaned = orphanId?.let { app.songRepository.getById(it) }?.let { song ->
+                PlayRemoteServer.OrphanedSong(id = song.id, title = song.title)
+            }
+            Result.success(orphaned)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun deleteArchiveSong(songId: Long): Result<Unit> {
+        val ctx = appContext ?: return Result.failure(IllegalStateException("Server not ready"))
+        val app = PlaylistsApp.from(ctx as android.app.Application)
+        return try {
+            app.songRepository.delete(songId)
+            refreshStartupPlaylistSongs()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun refreshStartupPlaylistSongs() {
+        val playlistId = session?.startupPlaylistId ?: return
         val ctx = appContext ?: return
         val app = PlaylistsApp.from(ctx as android.app.Application)
         val entries = app.playlistRepository.getSongs(playlistId)
@@ -825,7 +856,7 @@ object PlayRemoteController {
                     notes = notes.trim(),
                 ),
             )
-            refreshActivePlaylistSongs()
+            refreshStartupPlaylistSongs()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -941,8 +972,11 @@ object PlayRemoteController {
         return try {
             app.playlistRepository.delete(id)
             server?.clearPlayback(id)
-            if (activePlaylistId == id) {
-                activePlaylistId = null
+            synchronized(stopLock) {
+                val active = session
+                if (active?.startupPlaylistId == id) {
+                    session = active.copy(startupPlaylistId = null)
+                }
             }
             Result.success(Unit)
         } catch (e: Exception) {

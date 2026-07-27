@@ -204,7 +204,13 @@ class PlaylistRepository(
         )
     }
 
-    suspend fun removeSong(entryId: Long) = playlistSongDao.deleteById(entryId)
+    /** Removes the playlist entry. Returns the song id if it is no longer in any playlist. */
+    suspend fun removeSong(entryId: Long): Long? {
+        val songId = playlistSongDao.getSongId(entryId)
+        playlistSongDao.deleteById(entryId)
+        if (songId == null) return null
+        return if (playlistSongDao.playlistNamesForSong(songId).isEmpty()) songId else null
+    }
 
     suspend fun playlistNamesForSong(songId: Long): List<String> =
         playlistSongDao.playlistNamesForSong(songId)

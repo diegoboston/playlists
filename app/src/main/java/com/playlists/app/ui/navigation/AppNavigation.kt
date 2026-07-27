@@ -223,6 +223,7 @@ fun AppNavigation(
                         onNewKey = { navController.navigate(Routes.songRetranspose(it)) },
                         onQuickstart = { navController.navigate(Routes.QUICKSTART) },
                         onSettings = { navController.navigate(Routes.SETTINGS) },
+                        onFindChart = { navController.navigate(Routes.chartAssistant()) },
                     )
                 }
                 composable(Routes.IMPORT) { entry ->

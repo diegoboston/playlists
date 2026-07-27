@@ -56,7 +56,7 @@ fun RemotePlayIconButton(
             imageVector = Icons.Default.Wifi,
             contentDescription = stringResource(R.string.remote_play),
             tint = if (active) {
-                MaterialTheme.colorScheme.primary
+                RemoteActiveGreen
             } else {
                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
             },
