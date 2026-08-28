@@ -38,6 +38,7 @@ fun EditSongDialog(
     var title by remember(song.id) { mutableStateOf(song.title) }
     var key by remember(song.id) { mutableStateOf(song.keySignature) }
     var notes by remember(song.id) { mutableStateOf(song.notes) }
+    val lyricsOnly = song.isAiLyrics()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -51,13 +52,15 @@ fun EditSongDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = key,
-                    onValueChange = { key = it },
-                    label = { Text(stringResource(R.string.key_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (!lyricsOnly) {
+                    OutlinedTextField(
+                        value = key,
+                        onValueChange = { key = it },
+                        label = { Text(stringResource(R.string.key_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
@@ -72,7 +75,11 @@ fun EditSongDialog(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(stringResource(R.string.song_new_key))
+                        Text(
+                            stringResource(
+                                if (lyricsOnly) R.string.song_reformat else R.string.song_new_key,
+                            ),
+                        )
                     }
                 }
                 Row(

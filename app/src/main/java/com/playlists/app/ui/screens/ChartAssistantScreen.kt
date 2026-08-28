@@ -123,16 +123,13 @@ fun ChartAssistantScreen(
     }
 
     val handleBack = {
-        if (state is ChartAssistantUiState.Preview) {
-            viewModel.cancelPreview()
-        } else {
+        if (!viewModel.handleBack()) {
             onBack()
         }
     }
 
-    if (state is ChartAssistantUiState.Preview) {
-        BackHandler(onBack = handleBack)
-    }
+    // Always intercept so restoring search results does not also pop this screen.
+    BackHandler(onBack = handleBack)
 
     Scaffold(
         topBar = {
@@ -205,6 +202,7 @@ fun ChartAssistantScreen(
                         searchMode = current.intent.searchMode,
                         playlistName = current.playlist?.name,
                         results = current.results,
+                        errorMessage = current.errorMessage,
                         onSelect = viewModel::selectSearchResult,
                         onSearchAgain = { text, mode ->
                             viewModel.searchFromText(text, mode)
@@ -422,6 +420,7 @@ private fun SearchResultsBlock(
     searchMode: ChartSearchMode,
     playlistName: String?,
     results: List<SearchResult>,
+    errorMessage: String?,
     onSelect: (SearchResult) -> Unit,
     onSearchAgain: (String, ChartSearchMode) -> Unit,
 ) {
@@ -465,6 +464,9 @@ private fun SearchResultsBlock(
             stringResource(R.string.chart_assistant_archive_target)
         },
     )
+    if (errorMessage != null) {
+        Text(errorMessage, color = MaterialTheme.colorScheme.error)
+    }
     Text(stringResource(R.string.chart_assistant_pick_result))
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(results, key = { it.url }) { result ->

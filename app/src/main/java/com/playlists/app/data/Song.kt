@@ -14,7 +14,17 @@ data class Song(
     val createdAt: Long = System.currentTimeMillis(),
     val sortOrder: Int = 0,
     val lastViewedAt: Long? = null,
-)
+) {
+    fun isAiLyrics(): Boolean = isAiLyricsNotes(notes)
+
+    companion object {
+        const val NOTES_AI_LYRICS = "AI lyrics"
+        const val NOTES_AI_CHART = "AI chart"
+
+        fun isAiLyricsNotes(notes: String): Boolean =
+            notes.substringBefore(" · ").equals(NOTES_AI_LYRICS, ignoreCase = true)
+    }
+}
 
 enum class FileType {
     IMAGE,

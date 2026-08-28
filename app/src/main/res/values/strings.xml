@@ -194,6 +194,9 @@
     <string name="song_new_key">Change key</string>
     <string name="song_new_key_title">Choose key</string>
     <string name="song_new_key_prompt">Choose a key for “%1$s”</string>
+    <string name="song_reformat">Reformat</string>
+    <string name="song_reformat_title">Reformat</string>
+    <string name="song_reformat_prompt">Reformat “%1$s”</string>
     <string name="export_playlist">Export PDF</string>
     <string name="push_playlist_to_server">Push playlist to server</string>
     <string name="push_playlist_to_server_failed">Could not push playlist to server: %1$s</string>

@@ -208,8 +208,7 @@ class ChartRetransposeViewModel(
                     transposeNote = null,
                     chartKeyGuessed = sourceDraft.isChartKeyGuessed(),
                     bodyTextSize = resolvedSize,
-                    lyricsOnly = song.notes.substringBefore(" · ")
-                        .equals("AI lyrics", ignoreCase = true),
+                    lyricsOnly = song.isAiLyrics(),
                 )
             }
         }.onSuccess { preview ->

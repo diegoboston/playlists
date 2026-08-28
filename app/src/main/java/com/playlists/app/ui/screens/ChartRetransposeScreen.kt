@@ -52,7 +52,14 @@ fun ChartRetransposeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.song_new_key_title)) },
+                title = {
+                    val lyricsOnly = (state as? ChartRetransposeUiState.Preview)?.lyricsOnly == true
+                    Text(
+                        stringResource(
+                            if (lyricsOnly) R.string.song_reformat_title else R.string.song_new_key_title,
+                        ),
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = {
                         viewModel.cancelPreview()
@@ -75,7 +82,10 @@ fun ChartRetransposeScreen(
             }
             is ChartRetransposeUiState.Preview -> ChartKeyPreviewContent(
                 modifier = Modifier.padding(padding),
-                title = stringResource(R.string.song_new_key_prompt, current.song.title),
+                title = stringResource(
+                    if (current.lyricsOnly) R.string.song_reformat_prompt else R.string.song_new_key_prompt,
+                    current.song.title,
+                ),
                 chartKeyLabel = current.sourceDraft.chartKeyLabel(),
                 playKeyLabel = current.draft.displayKeyLabel(),
                 lyricsOnly = current.lyricsOnly,
