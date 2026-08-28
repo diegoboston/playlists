@@ -9,7 +9,7 @@ enum class ChartSearchMode {
 
     fun querySuffix(): String = when (this) {
         ChordsAndLyrics -> "chords lyrics"
-        LyricsOnly -> "lyrics"
+        LyricsOnly -> "lyrics -chords -tabs"
     }
 }
 

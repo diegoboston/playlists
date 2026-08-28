@@ -302,8 +302,8 @@ Find chords and lyrics on the web by **voice or typed title**, turn them into a 
    - **Hold the mic** and speak a song (e.g. “Amazing Grace by John Newton”), or
    - Type `SONG TITLE by ARTIST` (artist optional) and tap **Search**.
 3. After voice, the app shows an editable **Heard** field (parsed title/artist). Fix misheard titles, change the mode if needed, and tap **Search again**.
-4. **Web search** — always builds `{title} {artist} chords lyrics` or `{title} {artist} lyrics` from the selected mode (the suffix is added by the app, not copied from what you said or typed). Tap one of the listed results (title, snippet, URL).
-5. **Extract** — fetches the page and asks OpenAI to pull out a structured chord chart (sections, chord lines, lyrics).
+4. **Web search** — always builds `{title} {artist} chords lyrics` for chord searches, or `{title} {artist} lyrics -chords -tabs` for lyrics-only searches. The suffix is added by the app, not copied from what you said or typed, so lyrics-only searches include lyric sites that do not provide chords or tabs. Tap one of the listed results (title, snippet, URL).
+5. **Extract** — fetches the page and asks OpenAI to pull out a structured chart with sections. Lyrics-only results contain lyric text only, with chords, capo, and key metadata removed.
 6. **Transpose** — if you named a key (e.g. “in C”) and the page is in a different key, chord symbols are transposed to your target key before rendering. The preview subtitle shows `Source: F → Chart: C` when that happened.
 7. **Preview** — fullscreen one-page PDF (same viewer as normal songs). **Add to playlist** / **Add to archive** saves; **Cancel** discards the draft.
 

@@ -28,7 +28,7 @@ class ChartIntentTest {
             playlistName = null,
             searchMode = ChartSearchMode.LyricsOnly,
         )
-        assertEquals("Amazing Grace John Newton lyrics", intent.searchQuery())
+        assertEquals("Amazing Grace John Newton lyrics -chords -tabs", intent.searchQuery())
     }
 
     @Test
@@ -52,7 +52,7 @@ class ChartIntentTest {
         )!!
         assertEquals("Wagon Wheel", intent.songTitle)
         assertNull(intent.artist)
-        assertEquals("Wagon Wheel lyrics", intent.searchQuery())
+        assertEquals("Wagon Wheel lyrics -chords -tabs", intent.searchQuery())
     }
 
     @Test
@@ -69,7 +69,7 @@ class ChartIntentTest {
         assertEquals("Amazing Grace", intent.songTitle)
         assertEquals("G", intent.key)
         assertEquals(ChartSearchMode.LyricsOnly, intent.searchMode)
-        assertEquals("Amazing Grace Traditional lyrics", intent.searchQuery())
+        assertEquals("Amazing Grace Traditional lyrics -chords -tabs", intent.searchQuery())
         assertEquals("Amazing Grace by Traditional", intent.editableQuery())
     }
 }

@@ -65,9 +65,15 @@ class OpenAiClient(
         songTitle: String,
         artist: String?,
         sourceUrl: String,
+        searchMode: ChartSearchMode = ChartSearchMode.ChordsAndLyrics,
     ): ChartDraft? {
+        val lyricsOnly = searchMode == ChartSearchMode.LyricsOnly
         val system = """
-            Extract a chord chart with lyrics from the web page text.
+            ${if (lyricsOnly) {
+            "Extract a lyrics-only song document from the web page text. Preserve section labels such as Verse, Chorus, Bridge, and Intro."
+        } else {
+            "Extract a chord chart with lyrics from the web page text."
+        }}
             Return JSON only:
             {
               "title": "...",
@@ -80,14 +86,17 @@ class OpenAiClient(
               "notes": "optional",
               "sourceUrl": "$sourceUrl"
             }
-            Wrap every chord symbol in angle brackets, e.g. <G>, <Am7>, <F/C>. Never put bare chord letters in lyrics.
-            Chord-only lines should contain only bracketed chords and spaces.
-            Keep chords in the original key from the page (do not transpose).
+            ${if (lyricsOnly) {
+            "For lyrics-only output, do not include any chord symbols, chord-only lines, capo, sourceKey, or key. Put only lyric text in lines and keep meaningful section labels."
+        } else {
+            "Wrap every chord symbol in angle brackets, e.g. <G>, <Am7>, <F/C>. Never put bare chord letters in lyrics. Chord-only lines should contain only bracketed chords and spaces. Keep chords in the original key from the page (do not transpose)."
+        }}
             Use conventional spelling for the key (e.g. Bb not A# in flat keys).
             Song requested: $songTitle ${artist.orEmpty()}
         """.trimIndent()
         val content = chatJson(system, pageText.take(30_000)) ?: return null
         return AiJsonHelper.parseObject(content)?.let { ChartDraft.fromJson(it) }
+            ?.let { draft -> if (lyricsOnly) draft.withoutChords() else draft }
     }
 
     private fun chatJson(system: String, user: String): String? {
@@ -186,6 +195,7 @@ class ChartAssistantService(
             songTitle = intent.songTitle,
             artist = intent.artist,
             sourceUrl = result.url,
+            searchMode = intent.searchMode,
         ) ?: throw ChartAssistantException("Could not extract chart from page")
         val pdf = ChartPdfRenderer.render(draft.copy(sourceUrl = result.url))
         return draft.copy(sourceUrl = result.url) to pdf
@@ -193,3 +203,23 @@ class ChartAssistantService(
 }
 
 class ChartAssistantException(message: String) : Exception(message)
+
+private fun ChartDraft.withoutChords(): ChartDraft? = copy(
+    sourceKey = null,
+    key = null,
+    capo = null,
+    sections = sections.mapNotNull { section ->
+        val lines = section.lines
+            .map { BRACKETED_CHORD.replace(it, "").trim() }
+            .filter { it.isNotEmpty() && !isChordOnlyLine(it) }
+        section.copy(lines = lines).takeIf { it.lines.isNotEmpty() }
+    },
+).takeIf { it.sections.isNotEmpty() }
+
+private fun isChordOnlyLine(line: String): Boolean =
+    line.split(Regex("\\s+")).all { CHORD_TOKEN.matches(it) }
+
+private val BRACKETED_CHORD = Regex("""<[^>]+>""")
+private val CHORD_TOKEN = Regex(
+    """[A-G](?:#|b)?(?:maj|min|m|dim|aug|sus|add)?\d*(?:/[A-G](?:#|b)?)?""",
+)
