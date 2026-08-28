@@ -523,6 +523,7 @@ private fun PreviewContent(
         },
         chartKeyLabel = state.sourceDraft.chartKeyLabel(),
         playKeyLabel = state.draft.displayKeyLabel(),
+        lyricsOnly = state.intent.searchMode == ChartSearchMode.LyricsOnly,
         chartKeyGuessed = state.chartKeyGuessed,
         transposeNote = state.transposeNote,
         previewRevision = state.previewRevision,

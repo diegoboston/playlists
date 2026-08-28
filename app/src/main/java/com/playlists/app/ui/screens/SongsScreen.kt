@@ -46,6 +46,7 @@ import com.playlists.app.data.Song
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDeletePrompt
 import com.playlists.app.ui.SongSortCriterion
+import com.playlists.app.ui.NotesText
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.components.EditSongDialog
@@ -278,8 +279,8 @@ private fun SongRow(
                 )
                 val noteLine = SongDisplay.notesLine(song.notes)
                 if (noteLine.isNotEmpty()) {
-                    Text(
-                        text = noteLine,
+                    NotesText(
+                        notes = song.notes,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

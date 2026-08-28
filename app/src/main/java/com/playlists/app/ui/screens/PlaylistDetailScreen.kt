@@ -66,6 +66,7 @@ import com.playlists.app.remote.RemotePlayStartPhase
 import com.playlists.app.remote.RemotePlayStartingDialog
 import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.rememberOpenAiKeyReady
+import com.playlists.app.ui.NotesText
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.components.PlaylistActionsMenu
@@ -572,8 +573,8 @@ private fun PlaylistSongRow(
                 )
                 val notes = SongDisplay.notesLine(entry.notes)
                 if (notes.isNotEmpty()) {
-                    Text(
-                        notes,
+                    NotesText(
+                        notes = entry.notes,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

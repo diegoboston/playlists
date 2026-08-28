@@ -38,6 +38,7 @@ sealed class ChartRetransposeUiState {
         val spellingPreference: AccidentalSpelling = AccidentalSpelling.Auto,
         val chartKeyGuessed: Boolean = false,
         val bodyTextSize: Float? = null,
+        val lyricsOnly: Boolean = false,
     ) : ChartRetransposeUiState()
     data class Error(val message: String) : ChartRetransposeUiState()
 }
@@ -207,6 +208,8 @@ class ChartRetransposeViewModel(
                     transposeNote = null,
                     chartKeyGuessed = sourceDraft.isChartKeyGuessed(),
                     bodyTextSize = resolvedSize,
+                    lyricsOnly = song.notes.substringBefore(" · ")
+                        .equals("AI lyrics", ignoreCase = true),
                 )
             }
         }.onSuccess { preview ->

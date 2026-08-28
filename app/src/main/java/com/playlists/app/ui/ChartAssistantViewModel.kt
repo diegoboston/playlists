@@ -222,7 +222,7 @@ class ChartAssistantViewModel(
     fun cancelPreview() {
         val state = _uiState.value as? ChartAssistantUiState.Preview ?: return
         state.pdfFile.delete()
-        _uiState.value = if (lastSearchResults.isNotEmpty() && state.playlist != null) {
+        _uiState.value = if (lastSearchResults.isNotEmpty()) {
             ChartAssistantUiState.SearchResults(
                 intent = state.intent,
                 playlist = state.playlist,
@@ -452,7 +452,7 @@ class ChartAssistantViewModel(
     private suspend fun saveChart(state: ChartAssistantUiState.Preview): Long {
         val draft = state.draft
         val key = draft.key.orEmpty()
-        val notes = buildNotes(draft)
+        val notes = buildNotes(draft, state.intent.searchMode)
         val storedFile = FileStorage.storeBytes(state.pdfFile.readBytes(), "pdf")
         val storedPath = SongStoragePaths.toStoredPath(storedFile)
         ChartDraftStore.save(
@@ -473,9 +473,9 @@ class ChartAssistantViewModel(
         return songId
     }
 
-    private fun buildNotes(draft: ChartDraft): String {
+    private fun buildNotes(draft: ChartDraft, searchMode: ChartSearchMode): String {
         return buildList {
-            add("AI chart")
+            add(if (searchMode == ChartSearchMode.LyricsOnly) "AI lyrics" else "AI chart")
             draft.sourceUrl?.let { add(it) }
             draft.artist?.let { add(it) }
         }.joinToString(" · ")

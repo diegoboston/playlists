@@ -49,6 +49,7 @@ fun ChartKeyPreviewContent(
     title: String,
     chartKeyLabel: String?,
     playKeyLabel: String?,
+    lyricsOnly: Boolean = false,
     chartKeyGuessed: Boolean,
     transposeNote: String?,
     previewRevision: Int,
@@ -84,7 +85,7 @@ fun ChartKeyPreviewContent(
     Column(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
-            Row(
+            if (!lyricsOnly) Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
@@ -111,7 +112,7 @@ fun ChartKeyPreviewContent(
                     )
                 }
             }
-            if (chartKeyGuessed) {
+            if (!lyricsOnly && chartKeyGuessed) {
                 Text(
                     text = stringResource(R.string.chart_key_guessed),
                     style = MaterialTheme.typography.bodySmall,
@@ -119,7 +120,7 @@ fun ChartKeyPreviewContent(
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
-            Row(
+            if (!lyricsOnly) Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp),
@@ -193,7 +194,7 @@ fun ChartKeyPreviewContent(
                     onClick = { onNudgeFontSize(1) },
                 )
             }
-            transposeNote?.let {
+            if (!lyricsOnly) transposeNote?.let {
                 Text(
                     it,
                     style = MaterialTheme.typography.bodySmall,
@@ -270,7 +271,7 @@ fun ChartKeyPreviewContent(
         }
     }
 
-    if (showKeyPicker) {
+    if (!lyricsOnly && showKeyPicker) {
         ChartKeyPickerSheet(
             selectedKey = chartKeyLabel,
             onDismiss = { showKeyPicker = false },

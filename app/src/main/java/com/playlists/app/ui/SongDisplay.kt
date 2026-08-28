@@ -2,6 +2,12 @@ package com.playlists.app.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
@@ -39,6 +45,42 @@ object SongDisplay {
 
     fun typeBadge(song: Song, pageCount: Int? = null): String =
         if (pageCount != null) "${song.fileType}\n$pageCount pg" else song.fileType
+}
+
+@Composable
+fun NotesText(
+    notes: String,
+    style: TextStyle,
+    color: Color,
+    maxLines: Int = 1,
+) {
+    val uriHandler = LocalUriHandler.current
+    val urlRegex = Regex("""https?://\S+""")
+    val annotated = AnnotatedString.Builder().apply {
+        var end = 0
+        urlRegex.findAll(notes).forEach { match ->
+            append(notes.substring(end, match.range.first))
+            pushStringAnnotation("URL", match.value.trimEnd('.', ',', ')'))
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
+                append(match.value)
+            }
+            pop()
+            end = match.range.last + 1
+        }
+        append(notes.substring(end))
+    }.toAnnotatedString()
+    ClickableText(
+        text = annotated,
+        style = style.copy(color = color),
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        onClick = { offset ->
+            annotated
+                .getStringAnnotations("URL", offset, offset)
+                .firstOrNull()
+                ?.let { uriHandler.openUri(it.item) }
+        },
+    )
 }
 
 @Composable

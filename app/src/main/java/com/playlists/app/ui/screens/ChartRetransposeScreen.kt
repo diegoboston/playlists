@@ -78,6 +78,7 @@ fun ChartRetransposeScreen(
                 title = stringResource(R.string.song_new_key_prompt, current.song.title),
                 chartKeyLabel = current.sourceDraft.chartKeyLabel(),
                 playKeyLabel = current.draft.displayKeyLabel(),
+                lyricsOnly = current.lyricsOnly,
                 chartKeyGuessed = current.chartKeyGuessed,
                 transposeNote = current.transposeNote,
                 previewRevision = current.previewRevision,
