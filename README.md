@@ -22,7 +22,8 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 ### Song archive
 
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
-- **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores and dashes → spaces, extension dropped, trailing key → Key, trailing instrument → Notes).
+- **Import from the menu** — On the main **Songs** / **Playlists** tabs, the **☰** menu offers **Scan image** (system photo picker: camera plus recent gallery) and **Import file** (images or PDFs, same metadata flow as share). Scan copies the picture, asks OpenAI for a title when an API key is configured, then opens the import panel with that title (empty if there is no key or OCR fails).
+- **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores and dashes → spaces, extension dropped, trailing key → Key, trailing instrument → Notes). Scan-from-camera skips filename hints so the title comes from OCR or stays blank.
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
 - **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. **Search** filters the archive by title, key, or notes. Placeholder songs (no real sheet yet) show a 🚧 after the title. **Sort:** **A-Z**, **Added**, **Viewed** outlined buttons (same style as **New playlist**) — tap to sort the archive (persists order); tap the same button again to reverse. Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. **AI lyrics** songs omit the key field and offer **Reformat** (font size) instead of **Change key**. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
 - **Song viewer** — Tap a song for fullscreen view: images via Coil, or swipe left/right through multi-page PDFs (platform `PdfRenderer`). Pinch to zoom on images and PDF pages. **↓** in the top bar opens the system share sheet to save or send the original image or PDF.
@@ -37,15 +38,15 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Export PDF** — **Pencil** menu on playlist detail or the Playlists tab builds one combined PDF: a set-list table of contents (playlist name + song titles with keys, no page numbers) followed by every chart page in playlist order. PDF charts are merged as **vector pages** (original page size preserved); photos and placeholders are embedded on letter-size pages at full resolution. If a PDF cannot be merged, that page falls back to raster. Opens the system share sheet to save or send the file.
 - **Push playlist to server** — Once stable redirect keys are validated in Settings, the playlist menu offers **Push playlist to server** (arrow up) even when remote play is off: builds the same combined PDF and uploads it as **last.pdf** on the stable Worker (same flow as the auto-upload when starting stable remote play). Shows the “Uploading playlist PDF…” progress dialog.
 - **Playlist detail** — Two-line header: **back + title** on a **colored background** (playlist accent color) on line 1; **tools** on line 2 (+ add, **bolt** find chart, play, remote, **menu** ☰). The menu offers rename (pencil icon), **playlist color** (palette icon), delete, duplicate, export PDF, and (when stable redirect is ready) push playlist to server. Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. If that song is not in any other playlist, a dialog offers to delete it from the song archive too (or keep it). Tap the **green Wi‑Fi** icon while remote is active (pulsing green dot) to reopen connection status and the URL; use the system notification **Stop** to end remote play.
-- **AI find chart** — Voice or typed search for chords/lyrics on the web, one-page PDF preview, transpose to your key, and a reusable result list when backing out of a preview (top-left arrow or system Back). If a page cannot be parsed, that result is dropped from the list. Lyrics-only previews allow font changes without key or transposition controls. From the main **Songs** / **Playlists** tabs (**bolt** in the top bar) the chart is added to the **song archive**; from a **playlist** tool row it is also appended to that playlist. See **AI chart assistant** below.
+- **AI find chart** — Voice or typed search for chords/lyrics on the web, one-page PDF preview, transpose to your key, and a reusable result list when backing out of a preview (top-left arrow or system Back). If a page cannot be parsed, that result is dropped from the list. Lyrics-only previews allow font changes without key or transposition controls. From the main **Songs** / **Playlists** tabs (**☰** → **AI song search**, shown when an OpenAI key is configured) the chart is added to the **song archive**; from a **playlist** tool row (**bolt**) it is also appended to that playlist. See **AI chart assistant** below.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs). **↓** shares the current song file; **↻** in the top bar jumps to the first song and page.
-- **Settings** — **Gear** icon on the main tabs opens **Settings**: under **Remote play**, set one **5-digit code** used as the Cloudflare PIN and the LAN port, plus optional **stable play URL** fields (Workers account subdomain + write secret — builds `https://play.<subdomain>.workers.dev`; see `workers/tunnel-redirect/`). Under **AI chart assistant**, paste your **OpenAI API key** (never stored in git); a **green check** confirms the key works. Tap **OpenAI billing overview** to open your account balance on platform.openai.com. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Under **App icon**, pick **Original** (orchestra conductor) or **Guido** to change the launcher icon (your home screen may take a moment to refresh), then tap **Save**. A **status card** at the bottom shows **installed app version**, **Check for updates** (same GitHub Release flow as the launch snackbar), and **total library storage** under `Music/StageManager` (song files, chart sidecars, database, and state).
+- **Settings** — **☰** on the main tabs → **Settings**: under **Remote play**, set one **5-digit code** used as the Cloudflare PIN and the LAN port, plus optional **stable play URL** fields (Workers account subdomain + write secret — builds `https://play.<subdomain>.workers.dev`; see `workers/tunnel-redirect/`). Under **AI chart assistant**, paste your **OpenAI API key** (never stored in git); a **green check** confirms the key works. Tap **OpenAI billing overview** to open your account balance on platform.openai.com. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Under **App icon**, pick **Original** (orchestra conductor) or **Guido** to change the launcher icon (your home screen may take a moment to refresh), then tap **Save**. A **status card** at the bottom shows **installed app version**, **Check for updates** (same GitHub Release flow as the launch snackbar), and **total library storage** under `Music/StageManager` (song files, chart sidecars, database, and state).
 
   | Original | Guido |
   |:---:|:---:|
   | <img src="app/src/main/res/drawable-nodpi/ic_launcher_foreground.png" width="96" alt="Original launcher icon — orchestra conductor"> | <img src="app/src/main/res/drawable-nodpi/ic_launcher_alt_foreground.png" width="96" alt="Guido launcher icon"> |
 
-- **Remote play** — Tap the **Wi‑Fi** icon and choose **Stable play URL**, **Cloudflare tunnel (internet)**, or **LAN only (same Wi‑Fi)**. **Stable** starts Cloudflare, registers the live tunnel with your Worker, uploads a combined **playlist PDF** to Cloudflare R2 for offline fallback, and bookmarks `https://play.<you>.workers.dev` (requires Settings + R2 bucket — see `workers/tunnel-redirect/`). If the phone goes offline later, that stable URL shows a PIN gate and serves the last uploaded PDF (same PIN as live remote play). **Cloudflare** uses a session `*.trycloudflare.com` URL. **LAN** serves `http://<phone-ip>:code/` on your Wi‑Fi. While remote play is active, the start/status dialog lists **all available URLs** (stable bookmark, Cloudflare session link, and each LAN address — e.g. Wi‑Fi and hotspot when both are up). Each row has a clickable link and **▼** QR chevron. Cloudflare/stable modes still use the **PIN** from Settings. You can start remote from the **main tabs** (uses the last-opened playlist for playback when one exists, or starts in archive-only mode for HTTP API access) or from a **playlist detail** screen (that playlist). **STOP 🛑** ends remote play (**OK** dismisses the dialog without stopping). If Cloudflare setup hits a problem, the dialog adds **connection checks** (local server, tunnel reachability, cloudflared log). Tap the **Wi‑Fi** icon again while remote is active to reopen status. Open the URL on another device (tablet, laptop) for a fullscreen browser view: after the PIN (Cloudflare/stable), the home page lists your playlists with **Play** and **Edit**; tap **Play** to open the slideshow for that playlist. While active, a **foreground notification** shows **Stop** only. The Wi‑Fi icon is **green** when remote play is active (with a pulsing green dot), gray when off. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen). The HTTP API also exposes the full song archive and playlist list for scripting (see **HTTP API** below).
+- **Remote play** — On the main tabs, **☰** → **Web server** (Wi‑Fi icon; green with a pulse on the menu while remote is active). On a playlist, tap the **Wi‑Fi** icon. Choose **Stable play URL**, **Cloudflare tunnel (internet)**, or **LAN only (same Wi‑Fi)**. **Stable** starts Cloudflare, registers the live tunnel with your Worker, uploads a combined **playlist PDF** to Cloudflare R2 for offline fallback, and bookmarks `https://play.<you>.workers.dev` (requires Settings + R2 bucket — see `workers/tunnel-redirect/`). If the phone goes offline later, that stable URL shows a PIN gate and serves the last uploaded PDF (same PIN as live remote play). **Cloudflare** uses a session `*.trycloudflare.com` URL. **LAN** serves `http://<phone-ip>:code/` on your Wi‑Fi. While remote play is active, the start/status dialog lists **all available URLs** (stable bookmark, Cloudflare session link, and each LAN address — e.g. Wi‑Fi and hotspot when both are up). Each row has a clickable link and **▼** QR chevron. Cloudflare/stable modes still use the **PIN** from Settings. You can start remote from the **main tabs** (uses the last-opened playlist for playback when one exists, or starts in archive-only mode for HTTP API access) or from a **playlist detail** screen (that playlist). **STOP 🛑** ends remote play (**OK** dismisses the dialog without stopping). If Cloudflare setup hits a problem, the dialog adds **connection checks** (local server, tunnel reachability, cloudflared log). Open **Web server** again while remote is active (or tap **Wi‑Fi** on playlist detail) to reopen status. Open the URL on another device (tablet, laptop) for a fullscreen browser view: after the PIN (Cloudflare/stable), the home page lists your playlists with **Play** and **Edit**; tap **Play** to open the slideshow for that playlist. While active, a **foreground notification** shows **Stop** only. The **Web server** / **Wi‑Fi** icon is **green** when remote play is active (with a pulsing green dot on the main ☰), gray when off. In the browser, **pencil** opens a web editor to reorder, remove, or add songs from the archive (mirrors the in-app playlist screen). The HTTP API also exposes the full song archive and playlist list for scripting (see **HTTP API** below).
 - **In-app updates** — On cold start, checks GitHub Releases for a newer signed APK; snackbar prompt, download progress banner, then system installer (requires **Install unknown apps** permission for this package).
 
 ### Quickstart playlist
@@ -58,7 +59,7 @@ Sketch of the main flows (not to scale):
 
 ```
 ┌─────────────────────────────────────┐
-│ Stage Manager        ⚡  🟢📶  ⚙ │  ← ⚡ find chart (archive); tap 📶 = status when remote active; start when off
+│ Stage Manager                    ☰ │  ← menu: scan image, import file, AI song search, web server, piano, settings
 ├─────────────────────────────────────┤
 │ [ Songs ]  [ Playlists ]            │
 ├─────────────────────────────────────┤
@@ -79,7 +80,7 @@ Sketch of the main flows (not to scale):
 │                                     │
 └─────────────────────────────────────┘
 
-        share from another app
+        share from another app, or ☰ → Scan image / Import file
                  │
                  ▼
 ┌─────────────────────────────────────┐
@@ -118,7 +119,7 @@ PLAYLISTS TAB
 │ └─────────────────────────────────┘ │
 └─────────────────────────────────────┘
 
-        ⚙ Settings
+        ☰ → Settings
                  │
                  ▼
 ┌─────────────────────────────────────┐
@@ -174,15 +175,15 @@ REMOTE PLAY ACTIVE (notification shade)
 
 ## Usage
 
-1. **Import a song** — Gallery or browser → Share → Stage Manager → fill Title, Key, Notes → Save.
+1. **Import a song** — **☰** → **Scan image** (photo picker: camera or gallery; OCR fills the title when an OpenAI key is set) or **Import file** (image/PDF). Or share from another app. Then fill Title, Key, Notes → Save.
 2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **Sort: A-Z / Added / Viewed** — tap again on the same button to reverse order.
 3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete / duplicate / export from the **menu** (☰) on each colorful block.
 4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (🚧) to add a title-only stand-in sheet.
-5. **Find chart** — Tap **bolt** on the main tabs (Songs or Playlists) to add to the archive, or open a playlist → **bolt** to add there. Hold mic or type `Title by Artist`, pick chords+lyrics or lyrics only → pick a web result → confirm the PDF preview. Back from the preview returns to that result list. See **AI chart assistant** below.
+5. **Find chart** — Main tabs **☰** → **AI song search** (when an OpenAI key is configured) to add to the archive, or open a playlist → **bolt** to add there. Hold mic or type `Title by Artist`, pick chords+lyrics or lyrics only → pick a web result → confirm the PDF preview. Back from the preview returns to that result list. See **AI chart assistant** below.
 6. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 7. **Play** — Open a playlist → **Play** → swipe between songs.
-8. **Remote play** — Main tabs or playlist detail → **Wi‑Fi**. Pick Cloudflare (enter the 5-digit code) or LAN (code is the port in the URL). Main-tab start works without opening a playlist first (shared URL deep-links to the last-opened playlist when available). Tap **Wi‑Fi** while remote is active to reopen connection status and **Copy debug info**. **Stop** works from the start dialog **STOP 🛑**, the system notification, or when deleting the playlist that was used to start remote.
-9. **Settings** — Main tabs → **gear** → set the remote code and OpenAI API key → **Save**. **Check for updates** anytime from the same screen.
+8. **Remote play** — Main tabs **☰** → **Web server**, or playlist detail → **Wi‑Fi**. Pick Cloudflare (enter the 5-digit code) or LAN (code is the port in the URL). Main-tab start works without opening a playlist first (shared URL deep-links to the last-opened playlist when available). Open **Web server** / **Wi‑Fi** while remote is active to reopen connection status and **Copy debug info**. **Stop** works from the start dialog **STOP 🛑**, the system notification, or when deleting the playlist that was used to start remote.
+9. **Settings** — Main tabs **☰** → **Settings** → set the remote code and OpenAI API key → **Save**. **Check for updates** anytime from the same screen.
 10. **Quickstart** — **Playlists** tab → **Quickstart playlist** → paste text → **Match songs** → **Create** (matched only) or **Create with placeholders** (full order).
 11. **Update** — If a newer GitHub Release exists, a snackbar offers **Update now**; allow installs from this app when prompted.
 
@@ -226,8 +227,8 @@ playlists/
 
 | Permission | Why |
 |------------|-----|
-| `INTERNET` | Remote play tunnel, in-app update check/download, AI chart search and OpenAI API |
-| `RECORD_AUDIO` | Voice commands for AI find chart (main tabs or playlist detail **bolt** → hold mic) |
+| `INTERNET` | Remote play tunnel, in-app update check/download, AI chart search, scan-image OCR, and OpenAI API |
+| `RECORD_AUDIO` | Voice commands for AI find chart (main **☰** → **AI song search**, or playlist detail **bolt** → hold mic) |
 | `POST_NOTIFICATIONS` | Remote-play foreground notification (Android 13+) |
 | `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_DATA_SYNC` | Keep remote play alive while tunneled |
 | `REQUEST_INSTALL_PACKAGES` | In-app update installs the downloaded APK |
@@ -293,12 +294,12 @@ Find chords and lyrics on the web by **voice or typed title**, turn them into a 
 
 ### Setup
 
-1. **Settings** (gear on main tabs) → under **AI chart assistant**, paste an [OpenAI API key](https://platform.openai.com/api-keys). A **green check** appears when the key passes a quick API test; **red** if it fails (error text below the field). Tap **OpenAI billing overview** to check your balance on the OpenAI site. Tap **Save** to store the key (encrypted on device).
+1. **Settings** (main tabs **☰** → **Settings**) → under **AI chart assistant**, paste an [OpenAI API key](https://platform.openai.com/api-keys). A **green check** appears when the key passes a quick API test; **red** if it fails (error text below the field). Tap **OpenAI billing overview** to check your balance on the OpenAI site. Tap **Save** to store the key (encrypted on device).
 2. Grant **microphone** permission when the app asks (first voice use of find chart).
 
 ### Flow
 
-1. Tap the **bolt** on the main tabs (Songs or Playlists) to save into the **song archive**, or open a **playlist** and tap **bolt** on the tool row (between **+** and **Play**) to also append to that playlist.
+1. Tap **☰** → **AI song search** on the main tabs (Songs or Playlists) to save into the **song archive**, or open a **playlist** and tap **bolt** on the tool row (between **+** and **Play**) to also append to that playlist.
 2. Choose **Chords + lyrics** or **Lyrics only** (applies to both voice and typed search). Then either:
    - **Hold the mic** and speak a song (e.g. “Amazing Grace by John Newton”), or
    - Type `SONG TITLE by ARTIST` (artist optional) and tap **Search**.
@@ -318,27 +319,27 @@ Voice handles the **command** only when you use the mic. You still **tap** a sea
 
 ### Limits (current version)
 
-- **OpenAI only** (Whisper + `gpt-4o-mini` for intent and extract).
+- **OpenAI only** (Whisper + `gpt-4o-mini` for intent, extract, and scan-image OCR).
 - **DuckDuckGo** HTML search — result quality varies; if extract fails that link is dropped from the list so you can try another.
 - No refine pass yet (“two columns”, “drop chorus”), no “add after song X”, no delete/add-existing voice commands.
 - Not exposed on remote web or HTTP API.
 
 Planning doc: `report/ai-chord-chart-integration.md`.
 
-Implementation: `ChartAssistantScreen.kt`, `ChartAssistantViewModel.kt`, `OpenAiClient.kt`, `ChartAssistantService.kt`, `WebSearchService.kt`, `PageFetcher.kt`, `ChordTransposer.kt`, `ChartPdfRenderer.kt`, `AiCredentialStore.kt`, `AudioRecorder.kt`, `SettingsScreen.kt`.
+Implementation: `ChartAssistantScreen.kt`, `ChartAssistantViewModel.kt`, `OpenAiClient.kt`, `ChartAssistantService.kt`, `WebSearchService.kt`, `PageFetcher.kt`, `ChordTransposer.kt`, `ChartPdfRenderer.kt`, `AiCredentialStore.kt`, `AudioRecorder.kt`, `SettingsScreen.kt`, `LocalFileImport.kt`, `ImportImagePrep.kt`.
 
 ## Remote play
 
 Control playback from a **second screen** over the internet (e.g. iPad on a music stand while the phone sits on a stand).
 
 1. **Settings** — Set the **5-digit code** (Cloudflare PIN + LAN port). Optionally set **Workers account subdomain** (your Cloudflare account — `https://play.<subdomain>.workers.dev`) and **write secret** after deploying `workers/tunnel-redirect/`.
-2. **Start** — Tap **Wi‑Fi**. Pick **Stable play URL** (registers tunnel with Worker and uploads the playlist PDF for offline access), **Cloudflare tunnel**, or **LAN only**. Stable mode shows **Uploading playlist PDF…** while the combined export is pushed to your Worker. The dialog lists every URL that applies: stable bookmark, session Cloudflare link, and each LAN IP (Wi‑Fi / hotspot when present).
+2. **Start** — Main tabs **☰** → **Web server**, or tap **Wi‑Fi** on a playlist. Pick **Stable play URL** (registers tunnel with Worker and uploads the playlist PDF for offline access), **Cloudflare tunnel**, or **LAN only**. Stable mode shows **Uploading playlist PDF…** while the combined export is pushed to your Worker. The dialog lists every URL that applies: stable bookmark, session Cloudflare link, and each LAN IP (Wi‑Fi / hotspot when present).
 3. **Connect** — Cloudflare/stable: open a URL and enter the PIN. LAN: open a LAN URL on the same network — no PIN. If the phone is offline but stable mode was used earlier, the stable bookmark still works: enter the PIN to view or download the last uploaded playlist PDF (`/pdf?download=1`).
 4. **Browser UI** — Fullscreen sheet music / image for the current song and page. Title bar shows playlist name and `3/12: Song title · page 2/3`. **2-up** toggles a two-page spread; the right page is the next page in the playlist (even across songs), and navigation still advances one page at a time. **+** uploads a new file with **Title**, **Key**, and **Notes** pre-filled from the filename (same rules as share/import). **↻** (start over) jumps to the first song and page. **↓** downloads the current song’s original image or PDF file. **Pencil** opens `/edit` to reorder, remove, or add songs from the archive. The playlist picker at `/` includes **Quickstart playlist** (paste → match → create, same flow as the app) and a link to the **song archive** at `/songs`.
 5. **Navigate** — Swipe left/right (or laptop arrow keys) for next/previous song; multi-page PDFs advance page before moving to the next song.
 6. **Edit playlist** — On `/edit`, drag rows to reorder, tap **Remove**, or search the archive to add (results appear only after you type a query). After **Remove**, if the song is not in any other playlist, a confirm asks whether to delete it from the archive too. **Upload** adds a new file to the playlist; **Play** opens the stage view; **Done** returns to the stage view as well. Changes sync to the phone database immediately.
 7. **Stop** — **STOP 🛑** in the start dialog, **Stop** on the system notification, or delete the playlist that was used to start remote.
-8. **Status / debug** — While remote is active, tap the **Wi‑Fi** icon (main tabs or playlist detail) to reopen the URL (with the same **▼** QR chevron), **STOP 🛑**, and connection checks when something looks wrong. **Copy debug info** is available from that panel — useful if the browser says the URL is unreachable.
+8. **Status / debug** — While remote is active, **☰** → **Web server** on the main tabs (or tap **Wi‑Fi** on playlist detail) to reopen the URL (with the same **▼** QR chevron), **STOP 🛑**, and connection checks when something looks wrong. **Copy debug info** is available from that panel — useful if the browser says the URL is unreachable.
 
 Requires **internet** on the phone for Cloudflare/stable modes. LAN mode needs both devices on the same network. Ephemeral Cloudflare URLs change each session; the stable Worker URL stays fixed once configured. Remote web views use ES5 JavaScript (`compat.js` + `XMLHttpRequest`) so playback works on old tablet browsers (e.g. Android 4.x WebKit). On Android 13+, the app requests notification permission so the remote-play foreground notification can appear. CI bundles `cloudflared` via `scripts/fetch-cloudflared.sh` on every release build. Implementation: `PlayRemoteController.kt`, `TunnelRedirectClient.kt`, `CloudflareTunnel.kt`, `NetworkAddresses.kt`, `RemotePlayUrls.kt`, `RemotePlayFlowDialog.kt`, `RemotePlayStartedDialog.kt`, `RemotePlayService.kt`, `RemotePlayNotification.kt`, `PlayRemoteServer.kt`, `SettingsScreen.kt`, `workers/tunnel-redirect/`, `assets/remote/…`.
 

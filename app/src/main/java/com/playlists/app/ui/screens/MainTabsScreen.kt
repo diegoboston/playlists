@@ -1,20 +1,21 @@
 package com.playlists.app.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Piano
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -26,6 +27,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,10 +45,11 @@ import com.playlists.app.remote.RemotePlayFlowDialog
 import com.playlists.app.remote.RemotePlayFlowState
 import com.playlists.app.remote.RemotePlayMode
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.components.MainOverflowMenu
 import com.playlists.app.ui.components.PianoDialog
-import com.playlists.app.ui.components.RemotePlayIconButton
 import com.playlists.app.ui.rememberOpenAiKeyReady
 import com.playlists.app.util.AppPrefs
+import com.playlists.app.util.LocalFileImport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,7 +74,50 @@ fun MainTabsScreen(
     var remoteStartGeneration by remember { mutableIntStateOf(0) }
     var showRemoteDebug by remember { mutableStateOf(false) }
     var showPiano by remember { mutableStateOf(false) }
+    var readingScanTitle by remember { mutableStateOf(false) }
     val chartSearchReady = rememberOpenAiKeyReady()
+    val latestChartSearchReady by rememberUpdatedState(chartSearchReady)
+
+    val scanImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            if (latestChartSearchReady) readingScanTitle = true
+            try {
+                val outcome = withContext(Dispatchers.IO) {
+                    LocalFileImport.fromGalleryImage(context, uri)
+                }
+                val pending = outcome.pending
+                if (pending == null) {
+                    Toast.makeText(context, R.string.import_file_failed, Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+                if (outcome.ocrFailed) {
+                    Toast.makeText(context, R.string.scan_image_ocr_failed, Toast.LENGTH_SHORT).show()
+                }
+                viewModel.setPendingImport(pending)
+            } finally {
+                readingScanTitle = false
+            }
+        }
+    }
+
+    val importFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val pending = withContext(Dispatchers.IO) {
+                LocalFileImport.fromDocument(context, uri)
+            }
+            if (pending == null) {
+                Toast.makeText(context, R.string.import_file_failed, Toast.LENGTH_LONG).show()
+            } else {
+                viewModel.setPendingImport(pending)
+            }
+        }
+    }
 
     val startupPlaylistId =
         if (remoteRunning) PlayRemoteController.startupPlaylistId() else null
@@ -143,46 +189,31 @@ fun MainTabsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(stringResource(R.string.app_name))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (chartSearchReady) {
-                                IconButton(onClick = onFindChart) {
-                                    Icon(
-                                        imageVector = Icons.Default.Bolt,
-                                        contentDescription = stringResource(R.string.find_chart),
-                                    )
-                                }
-                            }
-                            RemotePlayIconButton(
-                                active = remoteRunning,
-                                onClick = {
-                                    if (remoteRunning) {
-                                        showRemoteDebug = true
-                                    } else {
-                                        remoteFlow = RemotePlayFlowState.ChooseMode
-                                    }
-                                },
+                title = { Text(stringResource(R.string.app_name)) },
+                actions = {
+                    MainOverflowMenu(
+                        showAiSearch = chartSearchReady,
+                        showWebServer = true,
+                        webServerActive = remoteRunning,
+                        onScanImage = {
+                            scanImageLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                             )
-                            IconButton(onClick = { showPiano = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.Piano,
-                                    contentDescription = stringResource(R.string.piano_keyboard_label),
-                                )
+                        },
+                        onImportFile = {
+                            importFileLauncher.launch(arrayOf("image/*", "application/pdf"))
+                        },
+                        onAiSearch = onFindChart,
+                        onWebServer = {
+                            if (remoteRunning) {
+                                showRemoteDebug = true
+                            } else {
+                                remoteFlow = RemotePlayFlowState.ChooseMode
                             }
-                            IconButton(onClick = onSettings) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = stringResource(R.string.settings),
-                                )
-                            }
-                        }
-                    }
+                        },
+                        onPiano = { showPiano = true },
+                        onSettings = onSettings,
+                    )
                 },
             )
         },
@@ -242,5 +273,20 @@ fun MainTabsScreen(
 
     if (showPiano) {
         PianoDialog(onDismiss = { showPiano = false })
+    }
+
+    if (readingScanTitle) {
+        BasicAlertDialog(onDismissRequest = {}) {
+            Surface(shape = MaterialTheme.shapes.large) {
+                Row(
+                    modifier = Modifier.padding(24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    Text(stringResource(R.string.scan_image_reading_title))
+                }
+            }
+        }
     }
 }

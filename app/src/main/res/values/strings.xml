@@ -3,7 +3,7 @@
     <string name="app_name">Stage Manager</string>
     <string name="tab_songs">Songs</string>
     <string name="tab_playlists">Playlists</string>
-    <string name="empty_songs">Share a PDF or image to add your first song.</string>
+    <string name="empty_songs">Share a PDF or image, or use the menu to scan or import your first song.</string>
     <string name="sort_label">Sort:</string>
     <string name="sort_songs_alpha">A-Z</string>
     <string name="sort_songs_recently_added">Added</string>
@@ -18,6 +18,14 @@
     <string name="create">Create</string>
     <string name="save">Save</string>
     <string name="import_song">Import song</string>
+    <string name="main_menu">Menu</string>
+    <string name="menu_scan_image">Scan image</string>
+    <string name="menu_import_file">Import file</string>
+    <string name="menu_ai_song_search">AI song search</string>
+    <string name="menu_web_server">Web server</string>
+    <string name="scan_image_reading_title">Reading title…</string>
+    <string name="scan_image_ocr_failed">Could not read a title from the image</string>
+    <string name="import_file_failed">Could not import that file</string>
     <string name="title_hint">Title</string>
     <string name="key_hint">Key</string>
     <string name="notes_hint">Notes</string>

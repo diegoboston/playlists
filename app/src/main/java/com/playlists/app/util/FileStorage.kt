@@ -21,14 +21,17 @@ object FileStorage {
         return file
     }
 
-    fun extensionForMime(mimeType: String?): String = when {
-        mimeType == null -> "bin"
-        mimeType.contains("pdf") -> "pdf"
-        mimeType.contains("png") -> "png"
-        mimeType.contains("jpeg") || mimeType.contains("jpg") -> "jpg"
-        mimeType.contains("gif") -> "gif"
-        mimeType.contains("webp") -> "webp"
-        else -> mimeType.substringAfterLast('/').ifBlank { "bin" }
+    fun extensionForMime(mimeType: String?): String {
+        val mime = mimeType?.lowercase() ?: return "bin"
+        return when {
+            mime.contains("pdf") -> "pdf"
+            mime.contains("png") -> "png"
+            mime.contains("jpeg") || mime.contains("jpg") -> "jpg"
+            mime.contains("gif") -> "gif"
+            mime.contains("webp") -> "webp"
+            mime.startsWith("image/") -> "jpg"
+            else -> mime.substringAfterLast('/').trim().trimStart('*').ifBlank { "bin" }
+        }
     }
 
     fun downloadUrl(urlString: String): Pair<ByteArray, String>? {

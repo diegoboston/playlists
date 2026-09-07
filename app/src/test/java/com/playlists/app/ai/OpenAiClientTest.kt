@@ -4,6 +4,7 @@ import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -55,6 +56,49 @@ class OpenAiClientTest {
             client.validateApiKey()
         }
         assertTrue(error.message!!.contains("did not confirm"))
+    }
+
+    @Test
+    fun extractTitleFromImage_readsTitleJson() {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"choices":[{"message":{"content":"{\"title\":\"Amazing Grace\"}"}}]}""",
+            ),
+        )
+        val client = clientForServer()
+        val title = client.extractTitleFromImage("abc".toByteArray(), "image/jpeg")
+        assertEquals("Amazing Grace", title)
+        val request = server.takeRequest()
+        assertTrue(request.path!!.contains("/chat/completions"))
+        val body = request.body.readUtf8()
+        assertTrue(body.contains("image_url"))
+        assertTrue(body.contains("data:image/jpeg;base64,"))
+        assertTrue(body.contains("YWJj"))
+    }
+
+    @Test
+    fun extractTitleFromImage_emptyWhenModelFindsNone() {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"choices":[{"message":{"content":"{\"title\":\"\"}"}}]}""",
+            ),
+        )
+        val client = clientForServer()
+        assertEquals("", client.extractTitleFromImage("x".toByteArray()))
+    }
+
+    @Test
+    fun extractTitleFromImage_failsOn401() {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(401)
+                .setBody("""{"error":{"message":"Invalid API key"}}"""),
+        )
+        val client = clientForServer()
+        val error = assertThrows(OpenAiException::class.java) {
+            client.extractTitleFromImage("x".toByteArray())
+        }
+        assertTrue(error.message!!.contains("401"))
     }
 
     private fun clientForServer(): OpenAiClient {

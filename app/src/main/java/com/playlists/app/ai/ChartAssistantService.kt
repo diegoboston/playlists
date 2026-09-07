@@ -99,7 +99,41 @@ class OpenAiClient(
             ?.let { draft -> if (lyricsOnly) draft.withoutChords() else draft }
     }
 
-    private fun chatJson(system: String, user: String): String? {
+    /**
+     * Read a song title from a chart/set-list photo. Returns empty string when none is readable.
+     */
+    fun extractTitleFromImage(imageBytes: ByteArray, mimeType: String = "image/jpeg"): String {
+        val b64 = java.util.Base64.getEncoder().encodeToString(imageBytes)
+        val dataUrl = "data:$mimeType;base64,$b64"
+        val system = """
+            You read a photo of sheet music, a chord chart, a lyric sheet, or a set list.
+            Return JSON only: {"title":"..."}.
+            Put the most prominent printed song title in title.
+            Do not include key, artist, page numbers, or filenames unless that text is the title.
+            If no title is readable, return {"title":""}.
+        """.trimIndent()
+        val userContent = JSONArray()
+            .put(JSONObject().put("type", "text").put("text", "What is the song title on this page?"))
+            .put(
+                JSONObject()
+                    .put("type", "image_url")
+                    .put(
+                        "image_url",
+                        JSONObject()
+                            .put("url", dataUrl)
+                            .put("detail", "low"),
+                    ),
+            )
+        val content = chatJson(system, userContent, maxTokens = 200, temperature = 0.0) ?: return ""
+        return AiJsonHelper.parseObject(content)?.optString("title")?.trim().orEmpty()
+    }
+
+    private fun chatJson(
+        system: String,
+        userContent: Any,
+        maxTokens: Int? = null,
+        temperature: Double? = null,
+    ): String? {
         val payload = JSONObject()
             .put("model", CHAT_MODEL)
             .put("response_format", JSONObject().put("type", "json_object"))
@@ -107,8 +141,10 @@ class OpenAiClient(
                 "messages",
                 JSONArray()
                     .put(JSONObject().put("role", "system").put("content", system))
-                    .put(JSONObject().put("role", "user").put("content", user)),
+                    .put(JSONObject().put("role", "user").put("content", userContent)),
             )
+        if (maxTokens != null) payload.put("max_tokens", maxTokens)
+        if (temperature != null) payload.put("temperature", temperature)
         val request = Request.Builder()
             .url("$API_BASE/chat/completions")
             .header("Authorization", "Bearer $apiKey")

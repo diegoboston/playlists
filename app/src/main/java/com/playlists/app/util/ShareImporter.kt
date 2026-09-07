@@ -47,7 +47,7 @@ object ShareImporter {
                     Intent.EXTRA_STREAM,
                     Uri::class.java,
                 ) ?: return null
-                SharePayload.FileImport(importFromUri(context, uri, type) ?: return null)
+                SharePayload.FileImport(importFromUri(context, uri, mimeType = type) ?: return null)
             }
             else -> null
         }
@@ -60,25 +60,66 @@ object ShareImporter {
             return SharePayload.ChartUrl(url, titleHintFromUrl(url))
         }
         val type = intent.type ?: context.contentResolver.getType(uri) ?: return null
-        return SharePayload.FileImport(importFromUri(context, uri, type) ?: return null)
+        return SharePayload.FileImport(importFromUri(context, uri, mimeType = type) ?: return null)
     }
 
-    private fun importFromUri(context: Context, uri: Uri, mimeType: String): PendingImport? {
+    /**
+     * Copy a content [uri] into song storage. When [useFilenameHints] is false (scan-from-camera),
+     * title/key/notes stay empty so OCR or the user can fill them.
+     */
+    fun importFromUri(
+        context: Context,
+        uri: Uri,
+        mimeType: String? = null,
+        useFilenameHints: Boolean = true,
+    ): PendingImport? {
         val resolver = context.contentResolver
-        val ext = FileStorage.extensionForMime(mimeType)
+        val resolvedMime = mimeType?.takeIf { it.isNotBlank() && it != "*/*" }
+            ?: resolver.getType(uri)
+            ?: mimeFromDisplayName(rawTitleFromUri(resolver, uri, fallbackName = null))
+            ?: return null
+        val fileType = fileTypeForMime(resolvedMime) ?: return null
+        val ext = FileStorage.extensionForMime(resolvedMime)
         val file = resolver.openInputStream(uri)?.use { stream ->
             FileStorage.storeStream(stream, ext)
         } ?: return null
-        val fileType = if (mimeType.contains("pdf")) FileType.PDF else FileType.IMAGE
-        val rawTitle = rawTitleFromUri(resolver, uri, file)
+        if (!useFilenameHints) {
+            return PendingImport(
+                filePath = file.absolutePath,
+                fileType = fileType,
+                suggestedTitle = "",
+            )
+        }
+        val rawTitle = rawTitleFromUri(resolver, uri, fallbackName = file.name)
         return PendingImport.fromRawTitle(file, fileType, rawTitle)
     }
 
-    private fun rawTitleFromUri(resolver: ContentResolver, uri: Uri, file: File): String {
+    fun fileTypeForMime(mimeType: String): FileType? {
+        val mime = mimeType.lowercase()
+        return when {
+            mime.contains("pdf") -> FileType.PDF
+            mime.startsWith("image/") -> FileType.IMAGE
+            else -> null
+        }
+    }
+
+    internal fun mimeFromDisplayName(name: String?): String? {
+        val lower = name?.substringAfterLast('/')?.lowercase() ?: return null
+        return when {
+            lower.endsWith(".pdf") -> "application/pdf"
+            lower.endsWith(".png") -> "image/png"
+            lower.endsWith(".jpg") || lower.endsWith(".jpeg") -> "image/jpeg"
+            lower.endsWith(".gif") -> "image/gif"
+            lower.endsWith(".webp") -> "image/webp"
+            else -> null
+        }
+    }
+
+    private fun rawTitleFromUri(resolver: ContentResolver, uri: Uri, fallbackName: String?): String {
         val displayName = resolver.query(uri, arrayOf("_display_name"), null, null, null)?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
-        return displayName ?: file.name
+        return displayName ?: fallbackName.orEmpty().ifBlank { uri.lastPathSegment.orEmpty() }
     }
 
     suspend fun saveSong(

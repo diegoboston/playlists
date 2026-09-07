@@ -32,7 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.playlists.app.R
 
-private val RemoteActiveGreen = Color(0xFF4CAF50)
+internal val RemoteActiveGreen = Color(0xFF4CAF50)
 
 @Composable
 fun RemotePlayIconButton(
@@ -52,14 +52,9 @@ fun RemotePlayIconButton(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = Icons.Default.Wifi,
+        RemotePlayWifiIcon(
+            active = active,
             contentDescription = stringResource(R.string.remote_play),
-            tint = if (active) {
-                RemoteActiveGreen
-            } else {
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-            },
         )
         if (active) {
             RemotePlayPulseDot(
@@ -72,7 +67,25 @@ fun RemotePlayIconButton(
 }
 
 @Composable
-private fun RemotePlayPulseDot(modifier: Modifier = Modifier) {
+fun RemotePlayWifiIcon(
+    active: Boolean,
+    modifier: Modifier = Modifier,
+    contentDescription: String?,
+) {
+    Icon(
+        imageVector = Icons.Default.Wifi,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        tint = if (active) {
+            RemoteActiveGreen
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        },
+    )
+}
+
+@Composable
+internal fun RemotePlayPulseDot(modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "remotePulse")
     val scale by transition.animateFloat(
         initialValue = 0.8f,
