@@ -109,7 +109,7 @@ class OpenAiClient(
         val body = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("model", IMAGE_EDIT_MODEL)
-            .addFormDataPart("prompt", .FLATTEN_IMAGE)
+            .addFormDataPart("prompt", AiPrompts.FLATTEN_IMAGE)
             .addFormDataPart("n", "1")
             .addFormDataPart(
                 "image",
