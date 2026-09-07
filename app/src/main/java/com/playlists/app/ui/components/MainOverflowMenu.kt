@@ -3,14 +3,16 @@ package com.playlists.app.ui.components
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Piano
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -27,11 +29,13 @@ import com.playlists.app.R
 
 @Composable
 fun MainOverflowMenu(
+    showTakeImage: Boolean,
     showAiSearch: Boolean,
     showWebServer: Boolean,
     webServerActive: Boolean,
-    onScanImage: () -> Unit,
-    onImportFile: () -> Unit,
+    onTakeImage: () -> Unit,
+    onImportFromGallery: () -> Unit,
+    onImportFromStorage: () -> Unit,
     onAiSearch: () -> Unit,
     onWebServer: () -> Unit,
     onPiano: () -> Unit,
@@ -60,26 +64,39 @@ fun MainOverflowMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
+            if (showTakeImage) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.menu_import_from_camera)) },
+                    leadingIcon = {
+                        Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                    },
+                    onClick = {
+                        expanded = false
+                        onTakeImage()
+                    },
+                )
+            }
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.menu_scan_image)) },
+                text = { Text(stringResource(R.string.menu_import_from_gallery)) },
                 leadingIcon = {
-                    Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = null)
                 },
                 onClick = {
                     expanded = false
-                    onScanImage()
+                    onImportFromGallery()
                 },
             )
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.menu_import_file)) },
+                text = { Text(stringResource(R.string.menu_import_from_storage)) },
                 leadingIcon = {
-                    Icon(Icons.Default.Add, contentDescription = null)
+                    Icon(Icons.Default.FolderOpen, contentDescription = null)
                 },
                 onClick = {
                     expanded = false
-                    onImportFile()
+                    onImportFromStorage()
                 },
             )
+            HorizontalDivider()
             if (showAiSearch) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.menu_ai_song_search)) },

@@ -49,7 +49,10 @@ import com.playlists.app.ui.components.MainOverflowMenu
 import com.playlists.app.ui.components.PianoDialog
 import com.playlists.app.ui.rememberOpenAiKeyReady
 import com.playlists.app.util.AppPrefs
+import com.playlists.app.util.CaptureImageContract
+import com.playlists.app.util.CaptureImageStore
 import com.playlists.app.util.LocalFileImport
+import com.playlists.app.util.ScanImportOutcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -77,29 +80,44 @@ fun MainTabsScreen(
     var readingScanTitle by remember { mutableStateOf(false) }
     val chartSearchReady = rememberOpenAiKeyReady()
     val latestChartSearchReady by rememberUpdatedState(chartSearchReady)
+    val canTakePhoto = remember(context) { CaptureImageStore.hasCameraApp(context) }
+
+    fun applyScanOutcome(outcome: ScanImportOutcome) {
+        val pending = outcome.pending
+        if (pending == null) {
+            Toast.makeText(context, R.string.import_file_failed, Toast.LENGTH_LONG).show()
+            return
+        }
+        if (outcome.ocrFailed) {
+            Toast.makeText(context, R.string.scan_image_ocr_failed, Toast.LENGTH_SHORT).show()
+        }
+        viewModel.setPendingImport(pending)
+    }
+
+    fun importScanned(load: () -> ScanImportOutcome) {
+        scope.launch {
+            if (latestChartSearchReady) readingScanTitle = true
+            try {
+                applyScanOutcome(withContext(Dispatchers.IO) { load() })
+            } finally {
+                readingScanTitle = false
+            }
+        }
+    }
 
     val scanImageLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            if (latestChartSearchReady) readingScanTitle = true
-            try {
-                val outcome = withContext(Dispatchers.IO) {
-                    LocalFileImport.fromGalleryImage(context, uri)
-                }
-                val pending = outcome.pending
-                if (pending == null) {
-                    Toast.makeText(context, R.string.import_file_failed, Toast.LENGTH_LONG).show()
-                    return@launch
-                }
-                if (outcome.ocrFailed) {
-                    Toast.makeText(context, R.string.scan_image_ocr_failed, Toast.LENGTH_SHORT).show()
-                }
-                viewModel.setPendingImport(pending)
-            } finally {
-                readingScanTitle = false
-            }
+        importScanned { LocalFileImport.fromGalleryImage(context, uri) }
+    }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        CaptureImageContract(),
+    ) { success ->
+        if (!success) return@rememberLauncherForActivityResult
+        importScanned {
+            LocalFileImport.fromCapturedImage(context, CaptureImageStore.pendingFile(context))
         }
     }
 
@@ -192,15 +210,32 @@ fun MainTabsScreen(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
                     MainOverflowMenu(
+                        showTakeImage = canTakePhoto,
                         showAiSearch = chartSearchReady,
                         showWebServer = true,
                         webServerActive = remoteRunning,
-                        onScanImage = {
+                        onTakeImage = {
+                            val launched = runCatching {
+                                takePictureLauncher.launch(
+                                    CaptureImageStore.prepareNewCapture(context),
+                                )
+                            }.isSuccess
+                            if (!launched) {
+                                Toast.makeText(
+                                    context,
+                                    R.string.scan_image_camera_failed,
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
+                        },
+                        onImportFromGallery = {
                             scanImageLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                ),
                             )
                         },
-                        onImportFile = {
+                        onImportFromStorage = {
                             importFileLauncher.launch(arrayOf("image/*", "application/pdf"))
                         },
                         onAiSearch = onFindChart,

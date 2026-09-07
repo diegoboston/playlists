@@ -22,7 +22,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 ### Song archive
 
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
-- **Import from the menu** — On the main **Songs** / **Playlists** tabs, the **☰** menu offers **Scan image** (system photo picker: camera plus recent gallery) and **Import file** (images or PDFs, same metadata flow as share). Scan copies the picture, asks OpenAI for a title when an API key is configured, then opens the import panel with that title (empty if there is no key or OCR fails).
+- **Import from the menu** — On the main **Songs** / **Playlists** tabs, the **☰** menu offers **Import from camera** (system camera), **Import from gallery** (Android photo picker), and **Import from storage** (images or PDFs via the document picker, same metadata flow as share). Camera and gallery copies are sent to OpenAI for a title when an API key is configured, then the import panel opens with that title (empty if there is no key or OCR fails).
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores and dashes → spaces, extension dropped, trailing key → Key, trailing instrument → Notes). Scan-from-camera skips filename hints so the title comes from OCR or stays blank.
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
 - **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. **Search** filters the archive by title, key, or notes. Placeholder songs (no real sheet yet) show a 🚧 after the title. **Sort:** **A-Z**, **Added**, **Viewed** outlined buttons (same style as **New playlist**) — tap to sort the archive (persists order); tap the same button again to reverse. Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. **AI lyrics** songs omit the key field and offer **Reformat** (font size) instead of **Change key**. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
@@ -59,7 +59,7 @@ Sketch of the main flows (not to scale):
 
 ```
 ┌─────────────────────────────────────┐
-│ Stage Manager                    ☰ │  ← menu: scan image, import file, AI song search, web server, piano, settings
+│ Stage Manager                    ☰ │  ← menu: camera, gallery, storage, AI, web server, piano, settings
 ├─────────────────────────────────────┤
 │ [ Songs ]  [ Playlists ]            │
 ├─────────────────────────────────────┤
@@ -80,7 +80,7 @@ Sketch of the main flows (not to scale):
 │                                     │
 └─────────────────────────────────────┘
 
-        share from another app, or ☰ → Scan image / Import file
+        share from another app, or ☰ → camera / gallery / storage
                  │
                  ▼
 ┌─────────────────────────────────────┐
@@ -175,7 +175,7 @@ REMOTE PLAY ACTIVE (notification shade)
 
 ## Usage
 
-1. **Import a song** — **☰** → **Scan image** (photo picker: camera or gallery; OCR fills the title when an OpenAI key is set) or **Import file** (image/PDF). Or share from another app. Then fill Title, Key, Notes → Save.
+1. **Import a song** — **☰** → **Import from camera**, **Import from gallery**, or **Import from storage** (image/PDF). Camera and gallery OCR-fill the title when an OpenAI key is set. Or share from another app. Then fill Title, Key, Notes → Save.
 2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **Sort: A-Z / Added / Viewed** — tap again on the same button to reverse order.
 3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete / duplicate / export from the **menu** (☰) on each colorful block.
 4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (🚧) to add a title-only stand-in sheet.
