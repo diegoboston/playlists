@@ -43,18 +43,8 @@ class OpenAiClient(
         playlistsContextJson: String,
         searchMode: ChartSearchMode = ChartSearchMode.ChordsAndLyrics,
     ): ChartIntent? {
-        val system = """
-            You parse voice commands for a chord-chart assistant app.
-            Return JSON only with fields:
-            action (always "find_chart" for now),
-            songTitle (required),
-            artist (optional),
-            playlistName (optional).
-            Do not ask for or require a musical key — transposition happens in the preview UI.
-            Ignore whether the user asked for chords, lyrics, or both — the app adds that to the search query itself.
-            Context: $playlistsContextJson
-        """.trimIndent()
-        val content = chatJson(system, transcript) ?: return null
+        val content = chatJson(AiPrompts.parseIntentSystem(playlistsContextJson), transcript)
+            ?: return null
         return AiJsonHelper.parseObject(content)?.let {
             ChartIntent.fromJson(it, transcript, searchMode)
         }
@@ -68,33 +58,15 @@ class OpenAiClient(
         searchMode: ChartSearchMode = ChartSearchMode.ChordsAndLyrics,
     ): ChartDraft? {
         val lyricsOnly = searchMode == ChartSearchMode.LyricsOnly
-        val system = """
-            ${if (lyricsOnly) {
-            "Extract a lyrics-only song document from the web page text. Preserve section labels such as Verse, Chorus, Bridge, and Intro."
-        } else {
-            "Extract a chord chart with lyrics from the web page text."
-        }}
-            Return JSON only:
-            {
-              "title": "...",
-              "artist": "...",
-              "sourceKey": "key on page if stated",
-              "key": "same as sourceKey",
-              "capo": null or string,
-              "columns": 1,
-              "sections": [{"label":"Verse 1","lines":["<G>  <C>  <G>","When I <Am> find myself in times of trouble"]}],
-              "notes": "optional",
-              "sourceUrl": "$sourceUrl"
-            }
-            ${if (lyricsOnly) {
-            "For lyrics-only output, do not include any chord symbols, chord-only lines, capo, sourceKey, or key. Put only lyric text in lines and keep meaningful section labels."
-        } else {
-            "Wrap every chord symbol in angle brackets, e.g. <G>, <Am7>, <F/C>. Never put bare chord letters in lyrics. Chord-only lines should contain only bracketed chords and spaces. Keep chords in the original key from the page (do not transpose)."
-        }}
-            Use conventional spelling for the key (e.g. Bb not A# in flat keys).
-            Song requested: $songTitle ${artist.orEmpty()}
-        """.trimIndent()
-        val content = chatJson(system, pageText.take(30_000)) ?: return null
+        val content = chatJson(
+            AiPrompts.extractChartSystem(
+                lyricsOnly = lyricsOnly,
+                sourceUrl = sourceUrl,
+                songTitle = songTitle,
+                artist = artist,
+            ),
+            pageText.take(30_000),
+        ) ?: return null
         return AiJsonHelper.parseObject(content)?.let { ChartDraft.fromJson(it) }
             ?.let { draft -> if (lyricsOnly) draft.withoutChords() else draft }
     }
@@ -105,15 +77,10 @@ class OpenAiClient(
     fun extractTitleFromImage(imageBytes: ByteArray, mimeType: String = "image/jpeg"): String {
         val b64 = java.util.Base64.getEncoder().encodeToString(imageBytes)
         val dataUrl = "data:$mimeType;base64,$b64"
-        val system = """
-            You read a photo of sheet music, a chord chart, a lyric sheet, or a set list.
-            Return JSON only: {"title":"..."}.
-            Put the most prominent printed song title in title.
-            Do not include key, artist, page numbers, or filenames unless that text is the title.
-            If no title is readable, return {"title":""}.
-        """.trimIndent()
         val userContent = JSONArray()
-            .put(JSONObject().put("type", "text").put("text", "What is the song title on this page?"))
+            .put(
+                JSONObject().put("type", "text").put("text", AiPrompts.EXTRACT_TITLE_FROM_IMAGE_USER),
+            )
             .put(
                 JSONObject()
                     .put("type", "image_url")
@@ -124,8 +91,56 @@ class OpenAiClient(
                             .put("detail", "low"),
                     ),
             )
-        val content = chatJson(system, userContent, maxTokens = 200, temperature = 0.0) ?: return ""
+        val content = chatJson(
+            AiPrompts.EXTRACT_TITLE_FROM_IMAGE_SYSTEM,
+            userContent,
+            maxTokens = 200,
+            temperature = 0.0,
+        ) ?: return ""
         return AiJsonHelper.parseObject(content)?.optString("title")?.trim().orEmpty()
+    }
+
+    /**
+     * Deskew / flatten a photo of a chart into a clean document scan.
+     * Returns image bytes (JPEG or PNG) from the Images API.
+     */
+    fun flattenAndCleanupImage(imageBytes: ByteArray, mimeType: String = "image/jpeg"): ByteArray {
+        val filename = if (mimeType.contains("png")) "page.png" else "page.jpg"
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("model", IMAGE_EDIT_MODEL)
+            .addFormDataPart("prompt", .FLATTEN_IMAGE)
+            .addFormDataPart("n", "1")
+            .addFormDataPart(
+                "image",
+                filename,
+                imageBytes.toRequestBody(mimeType.toMediaType()),
+            )
+            .build()
+        val request = Request.Builder()
+            .url("$API_BASE/images/edits")
+            .header("Authorization", "Bearer $apiKey")
+            .post(body)
+            .build()
+        val json = postJson(request)
+        val data = json.optJSONArray("data")?.optJSONObject(0)
+            ?: throw OpenAiException("OpenAI did not return a cleaned image")
+        val b64 = data.optString("b64_json").trim()
+        if (b64.isNotEmpty()) {
+            return java.util.Base64.getDecoder().decode(b64)
+        }
+        val url = data.optString("url").trim()
+        if (url.isEmpty()) {
+            throw OpenAiException("OpenAI did not return a cleaned image")
+        }
+        val download = Request.Builder().url(url).get().build()
+        httpClient.newCall(download).execute().use { response ->
+            val bytes = response.body?.bytes()
+            if (!response.isSuccessful || bytes == null || bytes.isEmpty()) {
+                throw OpenAiException("OpenAI cleaned image download failed")
+            }
+            return bytes
+        }
     }
 
     private fun chatJson(
@@ -204,6 +219,7 @@ class OpenAiClient(
     companion object {
         private const val API_BASE = "https://api.openai.com/v1"
         private const val CHAT_MODEL = "gpt-4o-mini"
+        private const val IMAGE_EDIT_MODEL = "gpt-image-1"
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)

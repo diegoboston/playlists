@@ -46,4 +46,15 @@ object ImportImagePrep {
             bitmap.recycle()
         }
     }
+
+    fun writeJpegFile(file: File, imageBytes: ByteArray, quality: Int = 85): Boolean {
+        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size) ?: return false
+        return try {
+            file.outputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+            }
+        } finally {
+            bitmap.recycle()
+        }
+    }
 }

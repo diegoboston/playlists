@@ -129,13 +129,14 @@ object ShareImporter {
         keySignature: String,
         notes: String,
     ): Long {
+        val ready = LocalFileImport.materializeForSave(pending)
         return repository.insert(
             Song(
-                title = title.trim().ifBlank { pending.suggestedTitle },
-                keySignature = keySignature.trim().ifBlank { pending.suggestedKey },
-                notes = notes.trim().ifBlank { pending.suggestedNotes },
-                filePath = SongStoragePaths.toStoredPath(pending.file),
-                fileType = pending.fileType.name,
+                title = title.trim().ifBlank { ready.suggestedTitle },
+                keySignature = keySignature.trim().ifBlank { ready.suggestedKey },
+                notes = notes.trim().ifBlank { ready.suggestedNotes },
+                filePath = SongStoragePaths.toStoredPath(ready.file),
+                fileType = ready.fileType.name,
             ),
         )
     }

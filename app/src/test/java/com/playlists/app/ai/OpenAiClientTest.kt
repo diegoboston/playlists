@@ -74,6 +74,8 @@ class OpenAiClientTest {
         assertTrue(body.contains("image_url"))
         assertTrue(body.contains("data:image/jpeg;base64,"))
         assertTrue(body.contains("YWJj"))
+        assertTrue(body.contains(AiPrompts.EXTRACT_TITLE_FROM_IMAGE_USER))
+        assertTrue(body.contains("most prominent printed song title"))
     }
 
     @Test
@@ -97,6 +99,36 @@ class OpenAiClientTest {
         val client = clientForServer()
         val error = assertThrows(OpenAiException::class.java) {
             client.extractTitleFromImage("x".toByteArray())
+        }
+        assertTrue(error.message!!.contains("401"))
+    }
+
+    @Test
+    fun flattenAndCleanupImage_readsB64Json() {
+        val png = java.util.Base64.getEncoder().encodeToString(byteArrayOf(1, 2, 3, 4))
+        server.enqueue(
+            MockResponse().setBody("""{"data":[{"b64_json":"$png"}]}"""),
+        )
+        val client = clientForServer()
+        val bytes = client.flattenAndCleanupImage("abc".toByteArray())
+        assertEquals(listOf<Byte>(1, 2, 3, 4), bytes.toList())
+        val request = server.takeRequest()
+        assertTrue(request.path!!.contains("/images/edits"))
+        val body = request.body.readUtf8()
+        assertTrue(body.contains("gpt-image-1"))
+        assertTrue(body.contains(AiPrompts.FLATTEN_IMAGE))
+    }
+
+    @Test
+    fun flattenAndCleanupImage_failsOn401() {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(401)
+                .setBody("""{"error":{"message":"Invalid API key"}}"""),
+        )
+        val client = clientForServer()
+        val error = assertThrows(OpenAiException::class.java) {
+            client.flattenAndCleanupImage("x".toByteArray())
         }
         assertTrue(error.message!!.contains("401"))
     }

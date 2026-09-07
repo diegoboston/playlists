@@ -12,8 +12,15 @@ data class PendingImport(
     val suggestedTitle: String,
     val suggestedKey: String = "",
     val suggestedNotes: String = "",
+    val extraPagePaths: List<String> = emptyList(),
+    val allowAddPages: Boolean = false,
 ) : Parcelable {
     val file: File get() = File(filePath)
+
+    val allPageFiles: List<File>
+        get() = listOf(file) + extraPagePaths.map { File(it) }
+
+    val pageCount: Int get() = 1 + extraPagePaths.size
 
     companion object {
         fun fromRawTitle(file: File, fileType: FileType, rawTitle: String): PendingImport {

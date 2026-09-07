@@ -319,7 +319,15 @@ fun MainTabsScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                    Text(stringResource(R.string.scan_image_reading_title))
+                    Text(
+                        stringResource(
+                            if (latestChartSearchReady) {
+                                R.string.scan_image_cleaning_and_title
+                            } else {
+                                R.string.scan_image_reading_title
+                            },
+                        ),
+                    )
                 }
             }
         }

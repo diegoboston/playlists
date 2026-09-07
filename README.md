@@ -22,7 +22,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 ### Song archive
 
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
-- **Import from the menu** — On the main **Songs** / **Playlists** tabs, the **☰** menu offers **Import from camera** (system camera), **Import from gallery** (Android photo picker), and **Import from storage** (images or PDFs via the document picker, same metadata flow as share). Camera and gallery copies are sent to OpenAI for a title when an API key is configured, then the import panel opens with that title (empty if there is no key or OCR fails).
+- **Import from the menu** — On the main **Songs** / **Playlists** tabs, the **☰** menu offers **Import from camera** (system camera), **Import from gallery** (Android photo picker), and **Import from storage** (images or PDFs via the document picker, same metadata flow as share). Camera pages: if an OpenAI key is configured, each photo is flattened and cleaned up, then the first page is OCR’d for a title (empty if there is no key or OCR fails). On the import panel, **Add page** takes another photo; two or more pages are saved as one multi-page PDF. Gallery still OCR’s a single image for the title.
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores and dashes → spaces, extension dropped, trailing key → Key, trailing instrument → Notes). Scan-from-camera skips filename hints so the title comes from OCR or stays blank.
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
 - **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. **Search** filters the archive by title, key, or notes. Placeholder songs (no real sheet yet) show a 🚧 after the title. **Sort:** **A-Z**, **Added**, **Viewed** outlined buttons (same style as **New playlist**) — tap to sort the archive (persists order); tap the same button again to reverse. Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. **AI lyrics** songs omit the key field and offer **Reformat** (font size) instead of **Change key**. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
@@ -89,6 +89,8 @@ Sketch of the main flows (not to scale):
 │ Title  [________________]           │
 │ Key    [________________]           │
 │ Notes  [________________]         │
+│  1 page                             │  ← camera import: Add page for extra sheets
+│         [ Add page ]                │
 │              [ Save ]               │
 └─────────────────────────────────────┘
 
@@ -175,7 +177,7 @@ REMOTE PLAY ACTIVE (notification shade)
 
 ## Usage
 
-1. **Import a song** — **☰** → **Import from camera**, **Import from gallery**, or **Import from storage** (image/PDF). Camera and gallery OCR-fill the title when an OpenAI key is set. Or share from another app. Then fill Title, Key, Notes → Save.
+1. **Import a song** — **☰** → **Import from camera**, **Import from gallery**, or **Import from storage** (image/PDF). Camera and gallery OCR-fill the title when an OpenAI key is set. From camera, **Add page** captures extra sheets into one PDF. Or share from another app. Then fill Title, Key, Notes → Save.
 2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **Sort: A-Z / Added / Viewed** — tap again on the same button to reverse order.
 3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete / duplicate / export from the **menu** (☰) on each colorful block.
 4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (🚧) to add a title-only stand-in sheet.
@@ -206,7 +208,7 @@ playlists/
 │       │   └── remote/             # index.html, play.html, edit.html, pin.html, compat.js, song-display.js
 │       └── java/com/playlists/app/
 │           ├── data/               # Room: Song, Playlist, PlaylistSong
-│           ├── ai/                 # OpenAI client, chart intent/draft, playlist name resolve
+│           ├── ai/                 # OpenAI client, AiPrompts, chart intent/draft, playlist name resolve
 │           ├── find/               # Web search + page fetch for chord sites
 │           ├── render/             # Chart renderer + vector playlist PDF export
 │           ├── remote/             # HTTP server, tunnel, foreground service, notification
@@ -227,7 +229,7 @@ playlists/
 
 | Permission | Why |
 |------------|-----|
-| `INTERNET` | Remote play tunnel, in-app update check/download, AI chart search, scan-image OCR, and OpenAI API |
+| `INTERNET` | Remote play tunnel, in-app update check/download, AI chart search, scan-image OCR, camera page cleanup, and OpenAI API |
 | `RECORD_AUDIO` | Voice commands for AI find chart (main **☰** → **AI song search**, or playlist detail **bolt** → hold mic) |
 | `POST_NOTIFICATIONS` | Remote-play foreground notification (Android 13+) |
 | `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_DATA_SYNC` | Keep remote play alive while tunneled |
@@ -319,14 +321,14 @@ Voice handles the **command** only when you use the mic. You still **tap** a sea
 
 ### Limits (current version)
 
-- **OpenAI only** (Whisper + `gpt-4o-mini` for intent, extract, and scan-image OCR).
+- **OpenAI only** (Whisper + `gpt-4o-mini` for intent, extract, and scan-image OCR; `gpt-image-1` to flatten camera pages).
 - **DuckDuckGo** HTML search — result quality varies; if extract fails that link is dropped from the list so you can try another.
 - No refine pass yet (“two columns”, “drop chorus”), no “add after song X”, no delete/add-existing voice commands.
 - Not exposed on remote web or HTTP API.
 
 Planning doc: `report/ai-chord-chart-integration.md`.
 
-Implementation: `ChartAssistantScreen.kt`, `ChartAssistantViewModel.kt`, `OpenAiClient.kt`, `ChartAssistantService.kt`, `WebSearchService.kt`, `PageFetcher.kt`, `ChordTransposer.kt`, `ChartPdfRenderer.kt`, `AiCredentialStore.kt`, `AudioRecorder.kt`, `SettingsScreen.kt`, `LocalFileImport.kt`, `ImportImagePrep.kt`.
+Implementation: `ChartAssistantScreen.kt`, `ChartAssistantViewModel.kt`, `OpenAiClient.kt`, `ChartAssistantService.kt`, `AiPrompts.kt`, `WebSearchService.kt`, `PageFetcher.kt`, `ChordTransposer.kt`, `ChartPdfRenderer.kt`, `AiCredentialStore.kt`, `AudioRecorder.kt`, `SettingsScreen.kt`, `LocalFileImport.kt`, `ImportImagePrep.kt`, `ImagePagesPdf.kt`.
 
 ## Remote play
 
@@ -431,6 +433,7 @@ Project-local skills under `.cursor/skills/` guide automated edits:
 | ----- | ----------- |
 | **rebuild-app** | After any app change — run `rebuild-app.sh` (Java 17 env, compile, unit tests, debug APK; must print `VERIFY OK`) |
 | **compile-kotlin** | Fast Kotlin-only check (no APK) when explicitly requested |
+| **ai-prompts** | When adding or editing OpenAI prompts — put named constants in `AiPrompts.kt` and import them from there |
 | **playlist-view-parity** | When changing playlist detail, playback, remote HTML, or `PlayRemoteServer` — keep local Compose and remote web views aligned |
 | **remote-play-back-compat** | When changing remote play web assets — try to maintain back compat with old devices (Nexus 10, Android 4.3); play fullscreen is the main target |
 | **update-readme** | After user-facing or structural changes — keeps this README accurate |

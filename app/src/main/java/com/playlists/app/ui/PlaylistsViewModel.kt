@@ -213,7 +213,9 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     fun saveImport(title: String, keySignature: String, notes: String, onSaved: (Long) -> Unit = {}) =
         viewModelScope.launch {
             val pending = _pendingImport.value ?: return@launch
-            val id = ShareImporter.saveSong(songRepo, pending, title, keySignature, notes)
+            val id = withContext(Dispatchers.IO) {
+                ShareImporter.saveSong(songRepo, pending, title, keySignature, notes)
+            }
             _pendingImport.value = null
             withContext(Dispatchers.Main.immediate) { onSaved(id) }
         }
