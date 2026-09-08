@@ -26,10 +26,15 @@
     <string name="menu_ai_song_search">AI song search</string>
     <string name="menu_web_server">Web server</string>
     <string name="scan_image_reading_title">Reading title…</string>
-    <string name="scan_image_cleaning">Cleaning page…</string>
-    <string name="scan_image_cleaning_and_title">Cleaning page and reading title…</string>
     <string name="scan_image_adding_page">Adding page…</string>
     <string name="scan_image_ocr_failed">Could not read a title from the image</string>
+    <string name="adjust_page_title">Adjust page</string>
+    <string name="adjust_page_use_original">Use original</string>
+    <string name="adjust_page_use_page">Use page</string>
+    <string name="adjust_page_working">Working…</string>
+    <string name="adjust_page_warp_failed">Could not straighten that crop — try again or use the original photo</string>
+    <string name="settings_adjust_page">Adjust page after camera</string>
+    <string name="settings_adjust_page_hint">After each camera photo, drag the page corners to straighten the chart. Off by default.</string>
     <string name="import_file_failed">Could not import that file</string>
     <string name="import_add_page">Add page</string>
     <plurals name="import_page_count">

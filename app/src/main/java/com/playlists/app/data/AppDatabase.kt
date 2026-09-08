@@ -1,6 +1,7 @@
 package com.playlists.app.data
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -20,7 +21,32 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
     abstract fun playlistSongDao(): PlaylistSongDao
 
+    /** Merge WAL into playlists.db so a copied library folder is self-contained. */
+    fun checkpointWal() {
+        runCatching {
+            openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
+                if (!cursor.moveToFirst()) {
+                    Log.w(TAG, "WAL checkpoint returned no row")
+                    return@use
+                }
+                val busy = cursor.getInt(0)
+                val logFrames = cursor.getInt(1)
+                val checkpointed = cursor.getInt(2)
+                if (busy != 0) {
+                    Log.w(
+                        TAG,
+                        "WAL checkpoint busy=$busy log=$logFrames checkpointed=$checkpointed",
+                    )
+                } else {
+                    Log.i(TAG, "WAL checkpoint log=$logFrames checkpointed=$checkpointed")
+                }
+            }
+        }.onFailure { Log.w(TAG, "WAL checkpoint failed", it) }
+    }
+
     companion object {
+        private const val TAG = "AppDatabase"
+
         @Volatile
         private var instance: AppDatabase? = null
 

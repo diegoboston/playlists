@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.app.Application
+import android.widget.Toast
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavType
@@ -38,6 +39,7 @@ import com.playlists.app.remote.PlayRemoteController
 import com.playlists.app.ui.AppUpdateInProgressBanner
 import com.playlists.app.ui.AppUpdateUiState
 import com.playlists.app.ui.PlaylistsViewModel
+import com.playlists.app.ui.screens.AdjustPageScreen
 import com.playlists.app.ui.screens.ChartAssistantScreen
 import com.playlists.app.ui.screens.ImportSongScreen
 import com.playlists.app.ui.screens.MainTabsScreen
@@ -53,6 +55,7 @@ import java.io.File
 object Routes {
     const val MAIN = "main"
     const val IMPORT = "import"
+    const val ADJUST_PAGE = "adjust-page"
     const val QUICKSTART = "quickstart"
     const val SETTINGS = "settings"
     const val SONG = "song/{songId}"
@@ -124,10 +127,17 @@ fun AppNavigation(
     val context = LocalContext.current
     val updateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
     val pendingImport by viewModel.pendingImport.collectAsStateWithLifecycle()
+    val pendingPageAdjust by viewModel.pendingPageAdjust.collectAsStateWithLifecycle()
     val pendingChartImport by viewModel.pendingChartImport.collectAsStateWithLifecycle()
 
     LaunchedEffect(navBackStackEntry) {
         viewModel.setOpenPlaylistId(openPlaylistIdFromRoute(navBackStackEntry))
+    }
+
+    LaunchedEffect(pendingPageAdjust) {
+        if (pendingPageAdjust != null && navController.currentDestination?.route != Routes.ADJUST_PAGE) {
+            navController.navigate(Routes.ADJUST_PAGE)
+        }
     }
 
     LaunchedEffect(pendingImport) {
@@ -238,6 +248,46 @@ fun AppNavigation(
                         onSaved = { songId ->
                             navController.popBackStack(Routes.MAIN, false)
                             navController.navigate(Routes.song(songId))
+                        },
+                    )
+                }
+                composable(Routes.ADJUST_PAGE) { entry ->
+                    val pending = pendingPageAdjust
+                    if (pending == null) {
+                        return@composable
+                    }
+                    val onBack = rememberGuardedBackHandler(entry) {
+                        File(pending.filePath).delete()
+                        viewModel.clearPendingPageAdjust()
+                        if (!navController.popBackStack()) {
+                            navController.navigate(Routes.MAIN)
+                        }
+                    }
+                    AdjustPageScreen(
+                        pending = pending,
+                        onCancel = onBack,
+                        onFinished = { outcome ->
+                            viewModel.clearPendingPageAdjust()
+                            if (!navController.popBackStack()) {
+                                navController.navigate(Routes.MAIN)
+                            }
+                            val next = outcome.pending
+                            if (next == null) {
+                                Toast.makeText(
+                                    context,
+                                    R.string.import_file_failed,
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            } else {
+                                if (outcome.ocrFailed) {
+                                    Toast.makeText(
+                                        context,
+                                        R.string.scan_image_ocr_failed,
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                                viewModel.setPendingImport(next)
+                            }
                         },
                     )
                 }

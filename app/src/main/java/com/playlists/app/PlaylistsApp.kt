@@ -57,6 +57,7 @@ class PlaylistsApp : Application() {
             StageManagerState.exportFromSharedPreferences(this)
             PDFBoxResourceLoader.init(applicationContext)
             val db = AppDatabase.get(this)
+            db.checkpointWal()
             val songDao = db.songDao()
             runBlocking {
                 SongFileMigration.sync(songDao)

@@ -41,10 +41,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
 import com.playlists.app.ui.PlaylistsViewModel
-import com.playlists.app.ui.rememberOpenAiKeyReady
 import com.playlists.app.util.CaptureImageContract
 import com.playlists.app.util.CaptureImageStore
+import com.playlists.app.util.CapturePageStart
 import com.playlists.app.util.LocalFileImport
+import com.playlists.app.util.PendingPageAdjust
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -69,7 +70,6 @@ fun ImportSongScreen(
     var key by remember(currentPending.filePath) { mutableStateOf(currentPending.suggestedKey) }
     var notes by remember(currentPending.filePath) { mutableStateOf(currentPending.suggestedNotes) }
     var addingPage by remember { mutableStateOf(false) }
-    val chartSearchReady = rememberOpenAiKeyReady()
     val latestPending by rememberUpdatedState(currentPending)
     val canTakePhoto = remember(context) { CaptureImageStore.hasCameraApp(context) }
 
@@ -80,18 +80,31 @@ fun ImportSongScreen(
         scope.launch {
             addingPage = true
             try {
-                val outcome = withContext(Dispatchers.IO) {
-                    LocalFileImport.addCapturedPage(
-                        context,
-                        CaptureImageStore.pendingFile(context),
-                        latestPending,
-                    )
-                }
-                val next = outcome.pending
-                if (next == null) {
-                    Toast.makeText(context, R.string.import_file_failed, Toast.LENGTH_LONG).show()
-                } else {
-                    viewModel.setPendingImport(next)
+                when (
+                    val start = withContext(Dispatchers.IO) {
+                        LocalFileImport.beginCapturedPage(
+                            context,
+                            CaptureImageStore.pendingFile(context),
+                            latestPending,
+                        )
+                    }
+                ) {
+                    CapturePageStart.Failed -> {
+                        Toast.makeText(context, R.string.import_file_failed, Toast.LENGTH_LONG).show()
+                    }
+                    is CapturePageStart.NeedsAdjust -> {
+                        viewModel.setPendingPageAdjust(
+                            PendingPageAdjust(start.stored.absolutePath, existingImport = latestPending),
+                        )
+                    }
+                    is CapturePageStart.Ready -> {
+                        val next = start.outcome.pending
+                        if (next == null) {
+                            Toast.makeText(context, R.string.import_file_failed, Toast.LENGTH_LONG).show()
+                        } else {
+                            viewModel.setPendingImport(next)
+                        }
+                    }
                 }
             } finally {
                 addingPage = false
@@ -200,15 +213,7 @@ fun ImportSongScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                    Text(
-                        stringResource(
-                            if (chartSearchReady) {
-                                R.string.scan_image_cleaning
-                            } else {
-                                R.string.scan_image_adding_page
-                            },
-                        ),
-                    )
+                    Text(stringResource(R.string.scan_image_adding_page))
                 }
             }
         }

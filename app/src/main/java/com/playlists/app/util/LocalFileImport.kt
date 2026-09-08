@@ -24,7 +24,33 @@ object LocalFileImport {
     }
 
     fun fromCapturedImage(context: Context, file: File): ScanImportOutcome {
-        val stored = storeCapturedPage(context, file) ?: return ScanImportOutcome(pending = null)
+        val stored = storeCapturedPage(file) ?: return ScanImportOutcome(pending = null)
+        return finishStoredCapture(context, stored)
+    }
+
+    fun addCapturedPage(captureFile: File, existing: PendingImport): ScanImportOutcome {
+        val stored = storeCapturedPage(captureFile) ?: return ScanImportOutcome(pending = null)
+        return addStoredPage(stored, existing)
+    }
+
+    fun beginCapturedPage(
+        context: Context,
+        captureFile: File,
+        existing: PendingImport? = null,
+    ): CapturePageStart {
+        val stored = storeCapturedPage(captureFile) ?: return CapturePageStart.Failed
+        if (AppPrefs.isAdjustPageEnabled(context)) {
+            return CapturePageStart.NeedsAdjust(stored)
+        }
+        val outcome = if (existing == null) {
+            finishStoredCapture(context, stored)
+        } else {
+            addStoredPage(stored, existing)
+        }
+        return CapturePageStart.Ready(outcome)
+    }
+
+    fun finishStoredCapture(context: Context, stored: File): ScanImportOutcome {
         val pending = PendingImport(
             filePath = stored.absolutePath,
             fileType = FileType.IMAGE,
@@ -34,8 +60,7 @@ object LocalFileImport {
         return finishWithOcr(context, pending)
     }
 
-    fun addCapturedPage(context: Context, captureFile: File, existing: PendingImport): ScanImportOutcome {
-        val stored = storeCapturedPage(context, captureFile) ?: return ScanImportOutcome(pending = null)
+    fun addStoredPage(stored: File, existing: PendingImport): ScanImportOutcome {
         val extra = existing.extraPagePaths + stored.absolutePath
         return ScanImportOutcome(
             pending = existing.copy(extraPagePaths = extra, allowAddPages = true),
@@ -57,24 +82,9 @@ object LocalFileImport {
         )
     }
 
-    private fun storeCapturedPage(context: Context, captureFile: File): File? {
+    fun storeCapturedPage(captureFile: File): File? {
         if (!CaptureImageStore.isUsableCapture(captureFile)) return null
-        val stored = captureFile.inputStream().use { FileStorage.storeStream(it, "jpg") }
-        flattenIfReady(context, stored)
-        return stored
-    }
-
-    private fun flattenIfReady(context: Context, file: File) {
-        if (!AiCredentialStore.isOpenAiKeyReady(context)) return
-        val apiKey = AiCredentialStore.getOpenAiApiKey(context) ?: return
-        runCatching {
-            val jpeg = ImportImagePrep.jpegBytesForOcr(file, maxEdge = 2048, quality = 85)
-                ?: file.readBytes()
-            val cleaned = OpenAiClient(apiKey).flattenAndCleanupImage(jpeg)
-            if (!ImportImagePrep.writeJpegFile(file, cleaned)) {
-                error("Could not write cleaned image")
-            }
-        }
+        return captureFile.inputStream().use { FileStorage.storeStream(it, "jpg") }
     }
 
     private fun finishWithOcr(context: Context, pending: PendingImport): ScanImportOutcome {
@@ -94,4 +104,10 @@ object LocalFileImport {
             ocrFailed = ocr.isFailure,
         )
     }
+}
+
+sealed class CapturePageStart {
+    data object Failed : CapturePageStart()
+    data class NeedsAdjust(val stored: File) : CapturePageStart()
+    data class Ready(val outcome: ScanImportOutcome) : CapturePageStart()
 }

@@ -22,7 +22,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 ### Song archive
 
 - **Share to import** — Share an image, PDF, or URL from another app. Stage Manager appears in the share sheet (single launcher activity handles share intents).
-- **Import from the menu** — On the main **Songs** / **Playlists** tabs, the **☰** menu offers **Import from camera** (system camera), **Import from gallery** (Android photo picker), and **Import from storage** (images or PDFs via the document picker, same metadata flow as share). Camera pages: if an OpenAI key is configured, each photo is flattened and cleaned up, then the first page is OCR’d for a title (empty if there is no key or OCR fails). On the import panel, **Add page** takes another photo; two or more pages are saved as one multi-page PDF. Gallery still OCR’s a single image for the title.
+- **Import from the menu** — On the main **Songs** / **Playlists** tabs, the **☰** menu offers **Import from camera** (system camera), **Import from gallery** (Android photo picker), and **Import from storage** (images or PDFs via the document picker, same metadata flow as share). Camera and gallery: if an OpenAI key is configured, the first page is OCR’d for a title (empty if there is no key or OCR fails). On the import panel, **Add page** takes another photo; two or more pages are saved as one multi-page PDF. If **Adjust page after camera** is on in Settings (off by default), each camera photo opens **Adjust page**: drag four corners to mark the paper, then **Use page** (perspective-warp and crop, no AI redraw) or **Use original**.
 - **Metadata on import** — Each import prompts for **Title**, **Key**, and **Notes**, pre-filled from the filename (underscores and dashes → spaces, extension dropped, trailing key → Key, trailing instrument → Notes). Scan-from-camera skips filename hints so the title comes from OCR or stays blank.
 - **Duplicate entries** — The same file can be imported multiple times with different Key/Notes (separate archive rows).
 - **Song list** — Compact rows: **Title (Key)** on the first line, notes preview on the second. **Search** filters the archive by title, key, or notes. Placeholder songs (no real sheet yet) show a 🚧 after the title. **Sort:** **A-Z**, **Added**, **Viewed** outlined buttons (same style as **New playlist**) — tap to sort the archive (persists order); tap the same button again to reverse. Opening a song in the viewer or playlist playback records its last-viewed time. **Pencil** opens edit (title, key, notes) with a **Delete** action and confirmation. **AI lyrics** songs omit the key field and offer **Reformat** (font size) instead of **Change key**. If the song is used in playlists, the dialog lists those playlist names; confirming removes the archive entry, drops it from those playlists, and deletes its file (unless another archive row shares the same path).
@@ -40,7 +40,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Playlist detail** — Two-line header: **back + title** on a **colored background** (playlist accent color) on line 1; **tools** on line 2 (+ add, **bolt** find chart, play, remote, **menu** ☰). The menu offers rename (pencil icon), **playlist color** (palette icon), delete, duplicate, export PDF, and (when stable redirect is ready) push playlist to server. Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. If that song is not in any other playlist, a dialog offers to delete it from the song archive too (or keep it). Tap the **green Wi‑Fi** icon while remote is active (pulsing green dot) to reopen connection status and the URL; use the system notification **Stop** to end remote play.
 - **AI find chart** — Voice or typed search for chords/lyrics on the web, one-page PDF preview, transpose to your key, and a reusable result list when backing out of a preview (top-left arrow or system Back). If a page cannot be parsed, that result is dropped from the list. Lyrics-only previews allow font changes without key or transposition controls. From the main **Songs** / **Playlists** tabs (**☰** → **AI song search**, shown when an OpenAI key is configured) the chart is added to the **song archive**; from a **playlist** tool row (**bolt**) it is also appended to that playlist. See **AI chart assistant** below.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs). **↓** shares the current song file; **↻** in the top bar jumps to the first song and page.
-- **Settings** — **☰** on the main tabs → **Settings**: under **Remote play**, set one **5-digit code** used as the Cloudflare PIN and the LAN port, plus optional **stable play URL** fields (Workers account subdomain + write secret — builds `https://play.<subdomain>.workers.dev`; see `workers/tunnel-redirect/`). Under **AI chart assistant**, paste your **OpenAI API key** (never stored in git); a **green check** confirms the key works. Tap **OpenAI billing overview** to open your account balance on platform.openai.com. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Under **App icon**, pick **Original** (orchestra conductor) or **Guido** to change the launcher icon (your home screen may take a moment to refresh), then tap **Save**. A **status card** at the bottom shows **installed app version**, **Check for updates** (same GitHub Release flow as the launch snackbar), and **total library storage** under `Music/StageManager` (song files, chart sidecars, database, and state).
+- **Settings** — **☰** on the main tabs → **Settings**: under **Remote play**, set one **5-digit code** used as the Cloudflare PIN and the LAN port, plus optional **stable play URL** fields (Workers account subdomain + write secret — builds `https://play.<subdomain>.workers.dev`; see `workers/tunnel-redirect/`). **Adjust page after camera** is a switch (off by default, saved immediately) that shows the corner-drag crop screen after each camera photo. Under **AI chart assistant**, paste your **OpenAI API key** (never stored in git); a **green check** confirms the key works. Tap **OpenAI billing overview** to open your account balance on platform.openai.com. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Under **App icon**, pick **Original** (orchestra conductor) or **Guido** to change the launcher icon (your home screen may take a moment to refresh), then tap **Save**. A **status card** at the bottom shows **installed app version**, **Check for updates** (same GitHub Release flow as the launch snackbar), and **total library storage** under `Music/StageManager` (song files, chart sidecars, database, and state).
 
   | Original | Guido |
   |:---:|:---:|
@@ -81,6 +81,15 @@ Sketch of the main flows (not to scale):
 └─────────────────────────────────────┘
 
         share from another app, or ☰ → camera / gallery / storage
+                 │
+                 ▼  (camera + Adjust page on in Settings)
+┌─────────────────────────────────────┐
+│ ← Adjust page                       │
+│     •─────────────────•             │
+│    /   chart photo     \            │
+│   •─────────────────────•           │
+│ [ Use original ]  [ Use page ]      │
+└─────────────────────────────────────┘
                  │
                  ▼
 ┌─────────────────────────────────────┐
@@ -129,6 +138,7 @@ PLAYLISTS TAB
 ├─────────────────────────────────────┤
 │ Remote play                         │
 │ Code [_____]                        │
+│ Adjust page after camera      [off] │
 │ OpenAI key [________________]     │
 │ OpenAI billing overview             │
 │              [ Save ]               │
@@ -177,7 +187,7 @@ REMOTE PLAY ACTIVE (notification shade)
 
 ## Usage
 
-1. **Import a song** — **☰** → **Import from camera**, **Import from gallery**, or **Import from storage** (image/PDF). Camera and gallery OCR-fill the title when an OpenAI key is set. From camera, **Add page** captures extra sheets into one PDF. Or share from another app. Then fill Title, Key, Notes → Save.
+1. **Import a song** — **☰** → **Import from camera**, **Import from gallery**, or **Import from storage** (image/PDF). Camera and gallery OCR-fill the title when an OpenAI key is set. From camera, **Add page** captures extra sheets into one PDF. Turn on **Adjust page after camera** in Settings to drag page corners after each photo. Or share from another app. Then fill Title, Key, Notes → Save.
 2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **Sort: A-Z / Added / Viewed** — tap again on the same button to reverse order.
 3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete / duplicate / export from the **menu** (☰) on each colorful block.
 4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (🚧) to add a title-only stand-in sheet.
@@ -185,7 +195,7 @@ REMOTE PLAY ACTIVE (notification shade)
 6. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 7. **Play** — Open a playlist → **Play** → swipe between songs.
 8. **Remote play** — Main tabs **☰** → **Web server**, or playlist detail → **Wi‑Fi**. Pick Cloudflare (enter the 5-digit code) or LAN (code is the port in the URL). Main-tab start works without opening a playlist first (shared URL deep-links to the last-opened playlist when available). Open **Web server** / **Wi‑Fi** while remote is active to reopen connection status and **Copy debug info**. **Stop** works from the start dialog **STOP 🛑**, the system notification, or when deleting the playlist that was used to start remote.
-9. **Settings** — Main tabs **☰** → **Settings** → set the remote code and OpenAI API key → **Save**. **Check for updates** anytime from the same screen.
+9. **Settings** — Main tabs **☰** → **Settings** → set the remote code and OpenAI API key → **Save**. **Adjust page after camera** is a switch (saved immediately). **Check for updates** anytime from the same screen.
 10. **Quickstart** — **Playlists** tab → **Quickstart playlist** → paste text → **Match songs** → **Create** (matched only) or **Create with placeholders** (full order).
 11. **Update** — If a newer GitHub Release exists, a snackbar offers **Update now**; allow installs from this app when prompted.
 
@@ -195,8 +205,10 @@ REMOTE PLAY ACTIVE (notification shade)
 playlists/
 ├── .cursor/skills/                 # Cursor agent skills (compile, README sync)
 ├── .github/workflows/android.yml   # CI: test → cloudflared → release → GitHub Release
+├── .githooks/pre-push              # Optional: compile-kotlin before push (install-git-hooks.sh)
 ├── scripts/
-│   └── fetch-cloudflared.sh        # Build cloudflared for Android arm64 (CI + local release)
+│   ├── fetch-cloudflared.sh        # Build cloudflared for Android arm64 (CI + local release)
+│   └── install-git-hooks.sh        # Copy .githooks into .git/hooks
 ├── update.sh                       # Interactive rsync sync, commit, push
 ├── gradlew                         # Gradle wrapper (committed)
 ├── app/
@@ -229,7 +241,7 @@ playlists/
 
 | Permission | Why |
 |------------|-----|
-| `INTERNET` | Remote play tunnel, in-app update check/download, AI chart search, scan-image OCR, camera page cleanup, and OpenAI API |
+| `INTERNET` | Remote play tunnel, in-app update check/download, AI chart search, scan-image OCR, and OpenAI API |
 | `RECORD_AUDIO` | Voice commands for AI find chart (main **☰** → **AI song search**, or playlist detail **bolt** → hold mic) |
 | `POST_NOTIFICATIONS` | Remote-play foreground notification (Android 13+) |
 | `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_DATA_SYNC` | Keep remote play alive while tunneled |
@@ -252,6 +264,21 @@ Requires Android SDK (API 34 platform + build-tools 34.0.0) and JDK 17. Set `sdk
 
 The Gradle wrapper (`gradlew`, `gradle/wrapper/`) is committed so `./gradlew` works after clone. Keep `local.properties` (SDK path) out of git — it is in `.gitignore`.
 
+Local verify (same compile + unit tests as CI; `rebuild-app` also packages a debug APK):
+
+```bash
+bash .cursor/skills/compile-kotlin/scripts/compile-kotlin.sh
+bash .cursor/skills/rebuild-app/scripts/rebuild-app.sh
+```
+
+CI always compiles from a clean checkout. A local Gradle `UP-TO-DATE` from an earlier green run does not compile a later edit — run verify again after the last change, or install a pre-push hook that runs `compile-kotlin` before `git push`:
+
+```bash
+bash scripts/install-git-hooks.sh
+```
+
+`SKIP_COMPILE_HOOK=1` skips the hook for a single push.
+
 ## Signing
 
 Both debug and release use the same repo-checked keystore so sideload updates install without uninstalling:
@@ -268,7 +295,8 @@ This is a personal sideload key, not a Play Store key.
 
 On push to `main` or `master`, GitHub Actions (`.github/workflows/android.yml`):
 
-1. Compiles and runs unit tests
+1. Compiles and runs unit tests (clean checkout — no local Gradle incremental cache)
+2. Builds `cloudflared` for Android arm64 with CGO + NDK (`scripts/fetch-cloudflared.sh`, Go 1.22, `ndk;26.1.10909125`)
 2. Builds `cloudflared` for Android arm64 with CGO + NDK (`scripts/fetch-cloudflared.sh`, Go 1.22, `ndk;26.1.10909125`)
 3. Builds an arm64-v8a release APK
 4. Publishes a GitHub Release tagged `v1.0.<run>` with:
@@ -321,14 +349,14 @@ Voice handles the **command** only when you use the mic. You still **tap** a sea
 
 ### Limits (current version)
 
-- **OpenAI only** (Whisper + `gpt-4o-mini` for intent, extract, and scan-image OCR; `gpt-image-1` to flatten camera pages).
+- **OpenAI only** (Whisper + `gpt-4o-mini` for intent, extract, and scan-image OCR).
 - **DuckDuckGo** HTML search — result quality varies; if extract fails that link is dropped from the list so you can try another.
 - No refine pass yet (“two columns”, “drop chorus”), no “add after song X”, no delete/add-existing voice commands.
 - Not exposed on remote web or HTTP API.
 
 Planning doc: `report/ai-chord-chart-integration.md`.
 
-Implementation: `ChartAssistantScreen.kt`, `ChartAssistantViewModel.kt`, `OpenAiClient.kt`, `ChartAssistantService.kt`, `AiPrompts.kt`, `WebSearchService.kt`, `PageFetcher.kt`, `ChordTransposer.kt`, `ChartPdfRenderer.kt`, `AiCredentialStore.kt`, `AudioRecorder.kt`, `SettingsScreen.kt`, `LocalFileImport.kt`, `ImportImagePrep.kt`, `ImagePagesPdf.kt`.
+Implementation: `ChartAssistantScreen.kt`, `ChartAssistantViewModel.kt`, `OpenAiClient.kt`, `ChartAssistantService.kt`, `AiPrompts.kt`, `WebSearchService.kt`, `PageFetcher.kt`, `ChordTransposer.kt`, `ChartPdfRenderer.kt`, `AiCredentialStore.kt`, `AudioRecorder.kt`, `SettingsScreen.kt`, `LocalFileImport.kt`, `ImportImagePrep.kt`, `ImagePagesPdf.kt`, `AdjustPageScreen.kt`, `PageWarper.kt`, `PageDetector.kt`.
 
 ## Remote play
 
@@ -453,9 +481,10 @@ Files and app state live on shared storage under **`Music/StageManager/`** (typi
 |------|----------|
 | `songs/` | PDF and image sheet music (paths in the DB are stored as `Music/StageManager/songs/{filename}`) |
 | `playlists.db` | Room database (songs, playlists, order) |
+| `playlists.db-wal` / `-shm` | SQLite write-ahead log (unmerged writes while the app is running) |
 | `state.json` | Remote-play code and last-opened playlist |
 
-On first launch the app shows a **storage access** screen and does not open the library until **All files access** is granted for `Music/StageManager/`. Uninstalling and reinstalling the app restores your library from that folder as long as it is intact. Song paths in the database are stored as `Music/StageManager/songs/{filename}`.
+On first launch the app shows a **storage access** screen and does not open the library until **All files access** is granted for `Music/StageManager/`. After that grant, startup runs a SQLite WAL checkpoint so committed data is merged into `playlists.db` (a copied folder is then more likely to restore on another device). Uninstalling and reinstalling the app restores your library from that folder as long as it is intact. Song paths in the database are stored as `Music/StageManager/songs/{filename}`. Copy the folder after opening the app once; include `-wal` and `-shm` if those files are still present and non-empty.
 
 ## Tech stack
 

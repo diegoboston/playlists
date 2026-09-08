@@ -11,6 +11,7 @@ import com.playlists.app.data.Song
 import com.playlists.app.render.PlaylistPdfExporter
 import com.playlists.app.util.AppUpdate
 import com.playlists.app.util.PendingImport
+import com.playlists.app.util.PendingPageAdjust
 import com.playlists.app.util.PendingChartImport
 import com.playlists.app.util.QuickstartMatcher
 import com.playlists.app.util.ShareImporter
@@ -39,6 +40,9 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _pendingImport = MutableStateFlow<PendingImport?>(null)
     val pendingImport: StateFlow<PendingImport?> = _pendingImport.asStateFlow()
+
+    private val _pendingPageAdjust = MutableStateFlow<PendingPageAdjust?>(null)
+    val pendingPageAdjust: StateFlow<PendingPageAdjust?> = _pendingPageAdjust.asStateFlow()
 
     private val _pendingChartImport = MutableStateFlow<PendingChartImport?>(null)
     val pendingChartImport: StateFlow<PendingChartImport?> = _pendingChartImport.asStateFlow()
@@ -70,6 +74,14 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearPendingImport() {
         _pendingImport.value = null
+    }
+
+    fun setPendingPageAdjust(pending: PendingPageAdjust?) {
+        _pendingPageAdjust.value = pending
+    }
+
+    fun clearPendingPageAdjust() {
+        _pendingPageAdjust.value = null
     }
 
     fun setOpenPlaylistId(playlistId: Long?) {

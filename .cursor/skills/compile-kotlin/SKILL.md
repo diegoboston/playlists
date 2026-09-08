@@ -63,6 +63,7 @@ Do **not** skip because a change "looks trivial" or "only touches tests."
 | Run `./gradlew` without sourcing `env.sh` | Uses Java 11; compile fails or behaves differently |
 | Run only `:app:compileDebugKotlin` | Broken main code can still compile while tests never run |
 | Trust stale `BUILD SUCCESSFUL` from an old terminal | Artifacts may predate your edits |
+| Skip the script after a last-minute edit | CI is a clean compile; local incremental UP-TO-DATE can hide a broken last change |
 | Say "tests should pass" without running the script | Skill requires proof in this session |
 | Mark done when Gradle failed at compile | Tests never execute if compile fails |
 
@@ -81,3 +82,4 @@ Alternatively set `ANDROID_HOME` and `JAVA_HOME` (17+) yourself, or add
 - Instrumented tests (`connectedDebugAndroidTest`) are **not** part of this skill.
 - Deprecation warnings are OK; compile errors and test failures are not.
 - KSP (Room) runs as part of compile.
+- A green run is only valid for the sources that existed when you launched the script. Re-run after any later edit; CI is a clean checkout.

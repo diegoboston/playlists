@@ -72,6 +72,7 @@ use **compile-kotlin** instead. It does **not** replace `rebuild-app` for task c
 | Run `./gradlew` without sourcing `env.sh` | Uses Java 11; compile fails or behaves differently |
 | Run only `:app:compileDebugKotlin` | Resources/packaging errors are missed; tests may not run |
 | Trust stale `BUILD SUCCESSFUL` from an old terminal | Artifacts may predate your edits |
+| Skip the script after a last-minute edit | CI is a clean compile; local incremental UP-TO-DATE can hide a broken last change |
 | Say "should build" without running the script | Skill requires proof in this session |
 | Mark done when Gradle failed at compile | Tests and APK never execute if compile fails |
 
@@ -87,6 +88,7 @@ Alternatively set `ANDROID_HOME` and `JAVA_HOME` (17+) yourself, or add
 ## Notes
 
 - Matches CI's compile + unit-test gate; CI also runs `assembleRelease` separately.
+- A green run is only valid for the sources that existed when you launched the script. Re-run after any later edit; CI is a clean checkout.
 - Instrumented tests (`connectedDebugAndroidTest`) are **not** part of this skill.
 - Deprecation warnings are OK; compile errors, test failures, and APK failures are not.
 - KSP (Room) runs as part of compile.

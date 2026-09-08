@@ -62,12 +62,4 @@ object AiPrompts {
     """.trimIndent()
 
     const val EXTRACT_TITLE_FROM_IMAGE_USER = "What is the song title on this page?"
-
-    val FLATTEN_IMAGE = """
-        This is a photo of sheet music, a chord chart, or lyrics on paper.
-        Produce a clean flattened top-down document scan: correct perspective and skew,
-        even lighting, high contrast black ink on white paper, crop to the page,
-        remove table, hands, and background.
-        Preserve every note, lyric, chord symbol, and title exactly — do not invent or omit content.
-    """.trimIndent()
 }

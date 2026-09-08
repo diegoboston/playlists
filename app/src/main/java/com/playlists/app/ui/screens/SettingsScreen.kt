@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -110,6 +111,7 @@ fun SettingsScreen(
     var openAiKeyStatus by remember { mutableStateOf<FieldValidationStatus>(FieldValidationStatus.Unknown) }
     var librarySizeLabel by remember { mutableStateOf<String?>(null) }
     var selectedAppIcon by remember { mutableStateOf(AppIconManager.getSelected(context)) }
+    var adjustPageEnabled by remember { mutableStateOf(AppPrefs.isAdjustPageEnabled(context)) }
     var advancedExpanded by remember { mutableStateOf(false) }
     val savedOpenAiKey = remember { AiCredentialStore.getOpenAiApiKey(context).orEmpty() }
     val savedSubdomain = remember { AppPrefs.getTunnelRedirectSubdomain(context).orEmpty() }
@@ -230,6 +232,32 @@ fun SettingsScreen(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_adjust_page),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_adjust_page_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                Switch(
+                    checked = adjustPageEnabled,
+                    onCheckedChange = { enabled ->
+                        adjustPageEnabled = enabled
+                        AppPrefs.setAdjustPageEnabled(context, enabled)
+                    },
+                )
+            }
             SettingsAdvancedPanel(
                 expanded = advancedExpanded,
                 onToggleExpanded = { advancedExpanded = !advancedExpanded },

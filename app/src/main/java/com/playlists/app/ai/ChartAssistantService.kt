@@ -100,49 +100,6 @@ class OpenAiClient(
         return AiJsonHelper.parseObject(content)?.optString("title")?.trim().orEmpty()
     }
 
-    /**
-     * Deskew / flatten a photo of a chart into a clean document scan.
-     * Returns image bytes (JPEG or PNG) from the Images API.
-     */
-    fun flattenAndCleanupImage(imageBytes: ByteArray, mimeType: String = "image/jpeg"): ByteArray {
-        val filename = if (mimeType.contains("png")) "page.png" else "page.jpg"
-        val body = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("model", IMAGE_EDIT_MODEL)
-            .addFormDataPart("prompt", AiPrompts.FLATTEN_IMAGE)
-            .addFormDataPart("n", "1")
-            .addFormDataPart(
-                "image",
-                filename,
-                imageBytes.toRequestBody(mimeType.toMediaType()),
-            )
-            .build()
-        val request = Request.Builder()
-            .url("$API_BASE/images/edits")
-            .header("Authorization", "Bearer $apiKey")
-            .post(body)
-            .build()
-        val json = postJson(request)
-        val data = json.optJSONArray("data")?.optJSONObject(0)
-            ?: throw OpenAiException("OpenAI did not return a cleaned image")
-        val b64 = data.optString("b64_json").trim()
-        if (b64.isNotEmpty()) {
-            return java.util.Base64.getDecoder().decode(b64)
-        }
-        val url = data.optString("url").trim()
-        if (url.isEmpty()) {
-            throw OpenAiException("OpenAI did not return a cleaned image")
-        }
-        val download = Request.Builder().url(url).get().build()
-        httpClient.newCall(download).execute().use { response ->
-            val bytes = response.body?.bytes()
-            if (!response.isSuccessful || bytes == null || bytes.isEmpty()) {
-                throw OpenAiException("OpenAI cleaned image download failed")
-            }
-            return bytes
-        }
-    }
-
     private fun chatJson(
         system: String,
         userContent: Any,
@@ -219,7 +176,6 @@ class OpenAiClient(
     companion object {
         private const val API_BASE = "https://api.openai.com/v1"
         private const val CHAT_MODEL = "gpt-4o-mini"
-        private const val IMAGE_EDIT_MODEL = "gpt-image-1"
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)

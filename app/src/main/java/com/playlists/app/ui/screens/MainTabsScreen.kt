@@ -51,7 +51,9 @@ import com.playlists.app.ui.rememberOpenAiKeyReady
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.CaptureImageContract
 import com.playlists.app.util.CaptureImageStore
+import com.playlists.app.util.CapturePageStart
 import com.playlists.app.util.LocalFileImport
+import com.playlists.app.util.PendingPageAdjust
 import com.playlists.app.util.ScanImportOutcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -116,8 +118,31 @@ fun MainTabsScreen(
         CaptureImageContract(),
     ) { success ->
         if (!success) return@rememberLauncherForActivityResult
-        importScanned {
-            LocalFileImport.fromCapturedImage(context, CaptureImageStore.pendingFile(context))
+        scope.launch {
+            val adjustEnabled = AppPrefs.isAdjustPageEnabled(context)
+            if (!adjustEnabled && latestChartSearchReady) readingScanTitle = true
+            try {
+                when (
+                    val start = withContext(Dispatchers.IO) {
+                        LocalFileImport.beginCapturedPage(
+                            context,
+                            CaptureImageStore.pendingFile(context),
+                        )
+                    }
+                ) {
+                    CapturePageStart.Failed -> {
+                        Toast.makeText(context, R.string.import_file_failed, Toast.LENGTH_LONG).show()
+                    }
+                    is CapturePageStart.NeedsAdjust -> {
+                        viewModel.setPendingPageAdjust(
+                            PendingPageAdjust(start.stored.absolutePath, existingImport = null),
+                        )
+                    }
+                    is CapturePageStart.Ready -> applyScanOutcome(start.outcome)
+                }
+            } finally {
+                readingScanTitle = false
+            }
         }
     }
 
@@ -320,13 +345,7 @@ fun MainTabsScreen(
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(32.dp))
                     Text(
-                        stringResource(
-                            if (latestChartSearchReady) {
-                                R.string.scan_image_cleaning_and_title
-                            } else {
-                                R.string.scan_image_reading_title
-                            },
-                        ),
+                        stringResource(R.string.scan_image_reading_title),
                     )
                 }
             }

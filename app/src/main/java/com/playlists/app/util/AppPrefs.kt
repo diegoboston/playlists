@@ -67,4 +67,11 @@ object AppPrefs {
         StageManagerState.writeTunnelRedirectSubdomain(context, normalizedSubdomain)
         StageManagerState.writeTunnelRedirectSecret(context, normalizedSecret)
     }
+
+    fun isAdjustPageEnabled(context: Context): Boolean =
+        StageManagerState.readAdjustPageEnabled(context)
+
+    fun setAdjustPageEnabled(context: Context, enabled: Boolean) {
+        StageManagerState.writeAdjustPageEnabled(context, enabled)
+    }
 }
