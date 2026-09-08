@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Compile + JVM unit tests before push so a clean CI checkout cannot fail on
+# Kotlin that never recompiled locally (Gradle UP-TO-DATE from an earlier run).
+set -euo pipefail
+
+if [[ "${SKIP_COMPILE_HOOK:-}" == "1" ]]; then
+  echo "pre-push: skipped (SKIP_COMPILE_HOOK=1)"
+  exit 0
+fi
+
+ROOT="$(git rev-parse --show-toplevel)"
+exec bash "$ROOT/.cursor/skills/compile-kotlin/scripts/compile-kotlin.sh"
