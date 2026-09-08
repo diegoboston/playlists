@@ -3,7 +3,6 @@ package com.playlists.app.ai
 import com.playlists.app.find.PageFetcher
 import com.playlists.app.find.SearchResult
 import com.playlists.app.find.WebSearchService
-import com.playlists.app.render.ChartPdfRenderer
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -66,8 +65,9 @@ class OpenAiClient(
                 artist = artist,
             ),
             pageText.take(30_000),
+            jsonObject = false,
         ) ?: return null
-        return AiJsonHelper.parseObject(content)?.let { ChartDraft.fromJson(it) }
+        return ChartTextParser.parse(content, sourceUrl = sourceUrl, fallbackTitle = songTitle)
             ?.let { draft -> if (lyricsOnly) draft.withoutChords() else draft }
     }
 
@@ -105,16 +105,19 @@ class OpenAiClient(
         userContent: Any,
         maxTokens: Int? = null,
         temperature: Double? = null,
+        jsonObject: Boolean = true,
     ): String? {
         val payload = JSONObject()
             .put("model", CHAT_MODEL)
-            .put("response_format", JSONObject().put("type", "json_object"))
             .put(
                 "messages",
                 JSONArray()
                     .put(JSONObject().put("role", "system").put("content", system))
                     .put(JSONObject().put("role", "user").put("content", userContent)),
             )
+        if (jsonObject) {
+            payload.put("response_format", JSONObject().put("type", "json_object"))
+        }
         if (maxTokens != null) payload.put("max_tokens", maxTokens)
         if (temperature != null) payload.put("temperature", temperature)
         val request = Request.Builder()
@@ -192,21 +195,20 @@ class ChartAssistantService(
 ) {
     fun searchWeb(query: String): List<SearchResult> = WebSearchService.search(query)
 
-    fun fetchAndBuildChart(
+    fun fetchAndExtractChart(
         result: SearchResult,
         intent: ChartIntent,
-    ): Pair<ChartDraft, ByteArray> {
+    ): ChartDraft {
         val pageText = PageFetcher.fetchText(result.url)
             ?: throw ChartAssistantException("Could not fetch page")
         val draft = openAiClient.extractChart(
-            pageText = pageText,
+            pageText = PageFetcher.withSearchSnippet(result.snippet, pageText),
             songTitle = intent.songTitle,
             artist = intent.artist,
             sourceUrl = result.url,
             searchMode = intent.searchMode,
         ) ?: throw ChartAssistantException("Could not extract chart from page")
-        val pdf = ChartPdfRenderer.render(draft.copy(sourceUrl = result.url))
-        return draft.copy(sourceUrl = result.url) to pdf
+        return draft.copy(sourceUrl = result.url)
     }
 }
 

@@ -5,10 +5,12 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.json.JSONObject
 
 class OpenAiClientTest {
     private lateinit var server: MockWebServer
@@ -101,6 +103,62 @@ class OpenAiClientTest {
             client.extractTitleFromImage("x".toByteArray())
         }
         assertTrue(error.message!!.contains("401"))
+    }
+
+    @Test
+    fun extractChart_parsesLineOrientedChart() {
+        val chart = """
+            TITLE: X Colpa Di Chi?
+            ARTIST: Zucchero
+
+            [Verse 1]
+            Funky gallo, come sono bello stamattina
+        """.trimIndent()
+        server.enqueue(
+            MockResponse().setBody(
+                """{"choices":[{"finish_reason":"stop","message":{"content":${JSONObject.quote(chart)}}}]}""",
+            ),
+        )
+        val draft = clientForServer().extractChart(
+            pageText = "Funky gallo, come sono bello stamattina",
+            songTitle = "X Colpa di chi",
+            artist = "Zucchero",
+            sourceUrl = "https://www.lyrics.com/example",
+            searchMode = ChartSearchMode.LyricsOnly,
+        )
+        assertEquals("X Colpa Di Chi?", draft!!.title)
+        assertEquals("Zucchero", draft.artist)
+        assertEquals("Funky gallo, come sono bello stamattina", draft.sections[0].lines[0])
+        val body = server.takeRequest().body.readUtf8()
+        assertTrue(body.contains("TITLE:"))
+        assertFalse(body.contains("json_object"))
+    }
+
+    @Test
+    fun extractChart_keepsCompleteLinesWhenTruncated() {
+        val truncated = """
+            TITLE: X Colpa Di Chi?
+            ARTIST: Zucchero
+
+            [Verse 1]
+            Funky gallo, come sono bello stamattina
+
+            [Chorus
+        """.trimIndent()
+        server.enqueue(
+            MockResponse().setBody(
+                """{"choices":[{"finish_reason":"content_filter","message":{"content":${JSONObject.quote(truncated)}}}]}""",
+            ),
+        )
+        val draft = clientForServer().extractChart(
+            pageText = "Funky gallo, come sono bello stamattina",
+            songTitle = "X Colpa di chi",
+            artist = "Zucchero",
+            sourceUrl = "https://www.lyrics.com/example",
+            searchMode = ChartSearchMode.LyricsOnly,
+        )
+        assertEquals("X Colpa Di Chi?", draft!!.title)
+        assertEquals("Funky gallo, come sono bello stamattina", draft.sections[0].lines[0])
     }
 
     private fun clientForServer(): OpenAiClient {

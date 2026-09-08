@@ -38,7 +38,7 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Export PDF** — **Pencil** menu on playlist detail or the Playlists tab builds one combined PDF: a set-list table of contents (playlist name + song titles with keys, no page numbers) followed by every chart page in playlist order. PDF charts are merged as **vector pages** (original page size preserved); photos and placeholders are embedded on letter-size pages at full resolution. If a PDF cannot be merged, that page falls back to raster. Opens the system share sheet to save or send the file.
 - **Push playlist to server** — Once stable redirect keys are validated in Settings, the playlist menu offers **Push playlist to server** (arrow up) even when remote play is off: builds the same combined PDF and uploads it as **last.pdf** on the stable Worker (same flow as the auto-upload when starting stable remote play). Shows the “Uploading playlist PDF…” progress dialog.
 - **Playlist detail** — Two-line header: **back + title** on a **colored background** (playlist accent color) on line 1; **tools** on line 2 (+ add, **bolt** find chart, play, remote, **menu** ☰). The menu offers rename (pencil icon), **playlist color** (palette icon), delete, duplicate, export PDF, and (when stable redirect is ready) push playlist to server. Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. If that song is not in any other playlist, a dialog offers to delete it from the song archive too (or keep it). Tap the **green Wi‑Fi** icon while remote is active (pulsing green dot) to reopen connection status and the URL; use the system notification **Stop** to end remote play.
-- **AI find chart** — Voice or typed search for chords/lyrics on the web, one-page PDF preview, transpose to your key, and a reusable result list when backing out of a preview (top-left arrow or system Back). If a page cannot be parsed, that result is dropped from the list. Lyrics-only previews allow font changes without key or transposition controls. From the main **Songs** / **Playlists** tabs (**☰** → **AI song search**, shown when an OpenAI key is configured) the chart is added to the **song archive**; from a **playlist** tool row (**bolt**) it is also appended to that playlist. See **AI chart assistant** below.
+- **AI find chart** — Voice or typed search for chords/lyrics on the web. After search, the app parses the first web result and shows a PDF preview with **Is this correct?** — **Yes** saves, **Try next** parses the following result, **Cancel** leaves the flow. Pages that cannot be parsed are skipped automatically. Lyrics-only previews allow font changes without key or transposition controls. From the main **Songs** / **Playlists** tabs (**☰** → **AI song search**, shown when an OpenAI key is configured) the chart is added to the **song archive**; from a **playlist** tool row (**bolt**) it is also appended to that playlist. See **AI chart assistant** below.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs). **↓** shares the current song file; **↻** in the top bar jumps to the first song and page.
 - **Settings** — **☰** on the main tabs → **Settings**: under **Remote play**, set one **5-digit code** used as the Cloudflare PIN and the LAN port, plus optional **stable play URL** fields (Workers account subdomain + write secret — builds `https://play.<subdomain>.workers.dev`; see `workers/tunnel-redirect/`). **Adjust page after camera** is a switch (off by default, saved immediately) that shows the corner-drag crop screen after each camera photo. Under **AI chart assistant**, paste your **OpenAI API key** (never stored in git); a **green check** confirms the key works. Tap **OpenAI billing overview** to open your account balance on platform.openai.com. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Under **App icon**, pick **Original** (orchestra conductor) or **Guido** to change the launcher icon (your home screen may take a moment to refresh), then tap **Save**. A **status card** at the bottom shows **installed app version**, **Check for updates** (same GitHub Release flow as the launch snackbar), and **total library storage** under `Music/StageManager` (song files, chart sidecars, database, and state).
 
@@ -174,14 +174,9 @@ REMOTE PLAY ACTIVE (notification shade)
 │  (Chords+lyrics) (Lyrics only)      │
 │                         [ Search ]  │
 ├─────────────────────────────────────┤
-│  Heard: [editable text        ]     │
-│  (Chords+lyrics) (Lyrics only)      │
-│                    [ Search again ] │
-│  Pick a web result:                 │
-│  ┌─────────────────────────────┐    │
-│  │ Ultimate Guitar — Lean on Me│    │
-│  └─────────────────────────────┘    │
-│  → PDF preview → Add to playlist    │
+│  Is this correct?                   │
+│  (PDF preview)                      │
+│  [ Yes ]  [ Try next ]  [ Cancel ]  │
 └─────────────────────────────────────┘
 ```
 
@@ -191,7 +186,7 @@ REMOTE PLAY ACTIVE (notification shade)
 2. **Browse** — **Songs** tab lists the archive; tap to open fullscreen. Use **Sort: A-Z / Added / Viewed** — tap again on the same button to reverse order.
 3. **New playlist** — **Playlists** tab → **New playlist** → enter name (opens the new playlist). Or rename / recolor / delete / duplicate / export from the **menu** (☰) on each colorful block.
 4. **Add songs** — Open a playlist → **+** → search → tap a result. If the song is missing, tap **Add placeholder page** (🚧) to add a title-only stand-in sheet.
-5. **Find chart** — Main tabs **☰** → **AI song search** (when an OpenAI key is configured) to add to the archive, or open a playlist → **bolt** to add there. Hold mic or type `Title by Artist`, pick chords+lyrics or lyrics only → pick a web result → confirm the PDF preview. Back from the preview returns to that result list. See **AI chart assistant** below.
+5. **Find chart** — Main tabs **☰** → **AI song search** (when an OpenAI key is configured) to add to the archive, or open a playlist → **bolt** to add there. Hold mic or type `Title by Artist`, pick chords+lyrics or lyrics only → the first web result is parsed → **Yes** / **Try next** / **Cancel**. See **AI chart assistant** below.
 6. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 7. **Play** — Open a playlist → **Play** → swipe between songs.
 8. **Remote play** — Main tabs **☰** → **Web server**, or playlist detail → **Wi‑Fi**. Pick Cloudflare (enter the 5-digit code) or LAN (code is the port in the URL). Main-tab start works without opening a playlist first (shared URL deep-links to the last-opened playlist when available). Open **Web server** / **Wi‑Fi** while remote is active to reopen connection status and **Copy debug info**. **Stop** works from the start dialog **STOP 🛑**, the system notification, or when deleting the playlist that was used to start remote.
@@ -205,10 +200,13 @@ REMOTE PLAY ACTIVE (notification shade)
 playlists/
 ├── .cursor/skills/                 # Cursor agent skills (compile, README sync)
 ├── .github/workflows/android.yml   # CI: test → cloudflared → release → GitHub Release
-├── .githooks/pre-push              # Optional: compile-kotlin before push (install-git-hooks.sh)
+├── .githooks/pre-push              # Off by default; RUN_COMPILE_HOOK=1 git push
 ├── scripts/
 │   ├── fetch-cloudflared.sh        # Build cloudflared for Android arm64 (CI + local release)
-│   └── install-git-hooks.sh        # Copy .githooks into .git/hooks
+│   ├── install-git-hooks.sh        # Copy .githooks into .git/hooks
+│   └── ai-song-search.sh           # Local CLI: same AI web-search + extract path as the app
+├── tools/
+│   └── ai-song-search/             # JVM CLI; compiles shared search/extract Kotlin from app/
 ├── update.sh                       # Interactive rsync sync, commit, push
 ├── gradlew                         # Gradle wrapper (committed)
 ├── app/
@@ -264,20 +262,14 @@ Requires Android SDK (API 34 platform + build-tools 34.0.0) and JDK 17. Set `sdk
 
 The Gradle wrapper (`gradlew`, `gradle/wrapper/`) is committed so `./gradlew` works after clone. Keep `local.properties` (SDK path) out of git — it is in `.gitignore`.
 
-Local verify (same compile + unit tests as CI; `rebuild-app` also packages a debug APK):
+After app changes, local verify is the **rebuild-app** skill (compile, unit tests, debug APK). **compile-kotlin** is the faster compile + unit-test subset when you do not need an APK:
 
 ```bash
-bash .cursor/skills/compile-kotlin/scripts/compile-kotlin.sh
 bash .cursor/skills/rebuild-app/scripts/rebuild-app.sh
+bash .cursor/skills/compile-kotlin/scripts/compile-kotlin.sh
 ```
 
-CI always compiles from a clean checkout. A local Gradle `UP-TO-DATE` from an earlier green run does not compile a later edit — run verify again after the last change, or install a pre-push hook that runs `compile-kotlin` before `git push`:
-
-```bash
-bash scripts/install-git-hooks.sh
-```
-
-`SKIP_COMPILE_HOOK=1` skips the hook for a single push.
+`git push` does not compile unless you opt in: `RUN_COMPILE_HOOK=1 git push` (requires `bash scripts/install-git-hooks.sh` once per clone). CI always compiles from a clean checkout.
 
 ## Signing
 
@@ -296,7 +288,6 @@ This is a personal sideload key, not a Play Store key.
 On push to `main` or `master`, GitHub Actions (`.github/workflows/android.yml`):
 
 1. Compiles and runs unit tests (clean checkout — no local Gradle incremental cache)
-2. Builds `cloudflared` for Android arm64 with CGO + NDK (`scripts/fetch-cloudflared.sh`, Go 1.22, `ndk;26.1.10909125`)
 2. Builds `cloudflared` for Android arm64 with CGO + NDK (`scripts/fetch-cloudflared.sh`, Go 1.22, `ndk;26.1.10909125`)
 3. Builds an arm64-v8a release APK
 4. Publishes a GitHub Release tagged `v1.0.<run>` with:
@@ -333,13 +324,13 @@ Find chords and lyrics on the web by **voice or typed title**, turn them into a 
 2. Choose **Chords + lyrics** or **Lyrics only** (applies to both voice and typed search). Then either:
    - **Hold the mic** and speak a song (e.g. “Amazing Grace by John Newton”), or
    - Type `SONG TITLE by ARTIST` (artist optional) and tap **Search**.
-3. After voice, the app shows an editable **Heard** field (parsed title/artist). Fix misheard titles, change the mode if needed, and tap **Search again**.
-4. **Web search** — always builds `{title} {artist} chords lyrics` for chord searches, or `{title} {artist} lyrics -chords -tabs` for lyrics-only searches. The suffix is added by the app, not copied from what you said or typed, so lyrics-only searches include lyric sites that do not provide chords or tabs. Tap one of the listed results (title, snippet, URL).
-5. **Extract** — fetches the page and asks OpenAI to pull out a structured chart with sections. Lyrics-only results contain lyric text only, with chords, capo, and key metadata removed; their preview keeps font controls but hides key and transposition controls. The top-left back arrow and the system Back button both return to the same saved web-result list (from a preview, while a result is loading, or after an extract error). If a page cannot be parsed, that result is removed from the list and the error is shown so you can pick another. **Cancel** on the preview does the same restore.
-6. **Transpose** — if you named a key (e.g. “in C”) and the page is in a different key, chord symbols are transposed to your target key before rendering. The preview subtitle shows `Source: F → Chart: C` when that happened.
-7. **Preview** — fullscreen one-page PDF (same viewer as normal songs). **Add to playlist** / **Add to archive** saves; **Cancel** discards the draft.
+3. After voice, the app shows **Heard** while it searches. Typed search skips that and searches immediately.
+4. **Web search** — always builds `{title} {artist} chords lyrics` for chord searches, or `{title} {artist} lyrics -chords -tabs` for lyrics-only searches. The suffix is added by the app. The **first** result is fetched and parsed automatically (no result list to tap).
+5. **Extract** — fetches the page (preferring a lyric/chart block when the HTML has one, and including the search snippet) and asks OpenAI for a **line-oriented chart** (`TITLE:` / `ARTIST:` / `[Verse 1]` …), not JSON. If the reply is cut off, complete lines already returned are kept. Lyrics-only results strip chords, capo, and key. If a page cannot be parsed, that result is skipped and the next hit is tried.
+6. **Is this correct?** — PDF preview (transpose and font as before). **Yes** saves to the archive (and the playlist when opened from a playlist). **Try next** parses the following search hit. **Cancel** (or Back from the preview) leaves Find chart.
+7. **Preview** — same PDF viewer as songs. Saving still writes the chart file as before.
 
-Voice handles the **command** only when you use the mic. You still **tap** a search result and **confirm** before anything is saved.
+Voice handles the **command** only when you use the mic. You still confirm with **Yes** before anything is saved.
 
 ### What gets stored
 
@@ -349,14 +340,30 @@ Voice handles the **command** only when you use the mic. You still **tap** a sea
 
 ### Limits (current version)
 
-- **OpenAI only** (Whisper + `gpt-4o-mini` for intent, extract, and scan-image OCR).
-- **DuckDuckGo** HTML search — result quality varies; if extract fails that link is dropped from the list so you can try another.
+- **OpenAI only** (Whisper + `gpt-4o-mini` for intent, extract, and scan-image OCR). Extract asks for a line-oriented chart so a truncated reply can still keep complete verses. The page fetch prefers a lyric block when the HTML has one (e.g. lyrics.com `pre#lyric-body-text`).
+- **DuckDuckGo** HTML search — result quality varies; unreadable pages are skipped and **Try next** walks the remaining hits.
 - No refine pass yet (“two columns”, “drop chorus”), no “add after song X”, no delete/add-existing voice commands.
 - Not exposed on remote web or HTTP API.
 
+### Local search simulator
+
+`scripts/ai-song-search.sh` runs the same typed-search path on your laptop: `ChartIntent.fromTypedQuery`, DuckDuckGo, parse the **first** hit via `ChartAssistantService.fetchAndExtractChart` (line-oriented OpenAI extract), then **Is this correct?** — `yes` / `next` / `cancel`. It does not save a PDF or write to the song archive.
+
+Requires JDK 17 (same `JAVA_HOME` / `~/tmp/android-build/env.sh` as other Gradle tasks). Parsing needs `OPENAI_API_KEY` in the environment — the phone key in Settings is not readable from the desktop.
+
+```bash
+export OPENAI_API_KEY=sk-...
+bash scripts/ai-song-search.sh
+bash scripts/ai-song-search.sh --lyrics Volare
+bash scripts/ai-song-search.sh --lyrics --yes "X Colpa di chi"
+bash scripts/ai-song-search.sh --help
+```
+
+With no arguments the script prompts for the song text (same as the app field) and **Chords + lyrics** / **Lyrics only**. `--yes` accepts the first chart that parses (also the default when there is no TTY). **Try next** parses the following hit. Failed pages are skipped, matching the app.
+
 Planning doc: `report/ai-chord-chart-integration.md`.
 
-Implementation: `ChartAssistantScreen.kt`, `ChartAssistantViewModel.kt`, `OpenAiClient.kt`, `ChartAssistantService.kt`, `AiPrompts.kt`, `WebSearchService.kt`, `PageFetcher.kt`, `ChordTransposer.kt`, `ChartPdfRenderer.kt`, `AiCredentialStore.kt`, `AudioRecorder.kt`, `SettingsScreen.kt`, `LocalFileImport.kt`, `ImportImagePrep.kt`, `ImagePagesPdf.kt`, `AdjustPageScreen.kt`, `PageWarper.kt`, `PageDetector.kt`.
+Implementation: `ChartAssistantScreen.kt`, `ChartAssistantViewModel.kt`, `OpenAiClient` / `ChartAssistantService.kt`, `ChartTextParser.kt`, `AiPrompts.kt`, `WebSearchService.kt`, `PageFetcher.kt`, `ChordTransposer.kt`, `ChartPdfRenderer.kt`, `AiCredentialStore.kt`, `AudioRecorder.kt`, `SettingsScreen.kt`, `LocalFileImport.kt`, `ImportImagePrep.kt`, `ImagePagesPdf.kt`, `AdjustPageScreen.kt`, `PageWarper.kt`, `PageDetector.kt`, `scripts/ai-song-search.sh`, `tools/ai-song-search/`.
 
 ## Remote play
 

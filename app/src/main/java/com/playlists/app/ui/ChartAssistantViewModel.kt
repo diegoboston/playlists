@@ -69,6 +69,8 @@ sealed class ChartAssistantUiState {
         val spellingPreference: AccidentalSpelling = AccidentalSpelling.Auto,
         val chartKeyGuessed: Boolean = false,
         val bodyTextSize: Float? = null,
+        val remainingResults: List<SearchResult> = emptyList(),
+        val sourceResult: SearchResult? = null,
     ) : ChartAssistantUiState()
     data class Error(val message: String) : ChartAssistantUiState()
 }
@@ -88,7 +90,6 @@ class ChartAssistantViewModel(
     private val _savedSongId = MutableSharedFlow<Long>()
     val savedSongId: SharedFlow<Long> = _savedSongId.asSharedFlow()
 
-    private var lastSearch: ChartAssistantUiState.SearchResults? = null
     private var workJob: Job? = null
     private var pendingSearchMode: ChartSearchMode = ChartSearchMode.ChordsAndLyrics
 
@@ -125,20 +126,11 @@ class ChartAssistantViewModel(
         ) {
             return
         }
-        val keepPlaylist = when (val state = _uiState.value) {
-            is ChartAssistantUiState.SearchResults -> state.playlist to true
-            is ChartAssistantUiState.IntentReady -> state.playlist to true
-            else -> null to false
-        }
         _uiState.value = ChartAssistantUiState.Processing
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val playlist = if (keepPlaylist.second) {
-                        keepPlaylist.first
-                    } else {
-                        playlistId?.let { playlistRepo.getById(it) }
-                    }
+                    val playlist = playlistId?.let { playlistRepo.getById(it) }
                     val intent = ChartIntent.fromTypedQuery(
                         text = text,
                         searchMode = searchMode,
@@ -156,45 +148,44 @@ class ChartAssistantViewModel(
 
     fun retrySearch() {
         val state = _uiState.value
-        if (state is ChartAssistantUiState.SearchResults || state is ChartAssistantUiState.IntentReady) {
-            val intent = when (state) {
-                is ChartAssistantUiState.SearchResults -> state.intent
-                is ChartAssistantUiState.IntentReady -> state.intent
-                else -> return
-            }
-            val playlist = when (state) {
-                is ChartAssistantUiState.SearchResults -> state.playlist
-                is ChartAssistantUiState.IntentReady -> state.playlist
-                else -> return
-            }
-            searchForIntent(intent, playlist)
+        if (state is ChartAssistantUiState.IntentReady) {
+            searchForIntent(state.intent, state.playlist)
         }
     }
 
-    fun selectSearchResult(result: SearchResult) {
-        val state = _uiState.value as? ChartAssistantUiState.SearchResults ?: return
-        lastSearch = state.copy(errorMessage = null)
+    fun tryNextResult() {
+        val state = _uiState.value as? ChartAssistantUiState.Preview ?: return
+        if (state.remainingResults.isEmpty()) {
+            _uiState.value = ChartAssistantUiState.Error("No more search results")
+            return
+        }
+        state.pdfFile.delete()
         _uiState.value = ChartAssistantUiState.Processing
         launchWork {
-            extractFromResult(state.intent, state.playlist, result)
+            extractFromQueue(state.intent, state.playlist, state.remainingResults)
         }
     }
 
     /**
      * Handle in-screen back. Returns true when the assistant should stay
-     * (e.g. restore the web-result list after a preview).
+     * (cancel in-flight work or leave an error). Preview and Cancel leave Find chart.
      */
     fun handleBack(): Boolean {
         val current = _uiState.value
         val next = chartAssistantStateAfterBack(
             state = current,
-            savedSearch = lastSearch,
             workInFlight = workJob?.isActive == true,
-        ) ?: return false
+        )
         when (current) {
             is ChartAssistantUiState.Preview -> current.pdfFile.delete()
             is ChartAssistantUiState.Processing -> workJob?.cancel()
             else -> Unit
+        }
+        if (next == null) {
+            if (current is ChartAssistantUiState.Preview) {
+                _uiState.value = ChartAssistantUiState.Idle
+            }
+            return false
         }
         _uiState.value = next
         return true
@@ -216,10 +207,10 @@ class ChartAssistantViewModel(
                 playlistName = playlist?.name,
             )
             _uiState.value = ChartAssistantUiState.Processing
-            extractFromResult(
+            extractFromQueue(
                 intent,
                 playlist,
-                SearchResult(title = titleHint, url = url, snippet = ""),
+                listOf(SearchResult(title = titleHint, url = url, snippet = "")),
             )
         }
     }
@@ -241,13 +232,16 @@ class ChartAssistantViewModel(
     }
 
     fun dismissError() {
-        _uiState.value = lastSearch ?: ChartAssistantUiState.Idle
+        _uiState.value = ChartAssistantUiState.Idle
     }
 
     fun cancelPreview() {
-        if (_uiState.value is ChartAssistantUiState.Preview) {
-            handleBack()
+        val current = _uiState.value
+        if (current is ChartAssistantUiState.Preview) {
+            current.pdfFile.delete()
         }
+        workJob?.cancel()
+        _uiState.value = ChartAssistantUiState.Idle
     }
 
     fun nudgePreviewKey(semitones: Int) {
@@ -386,7 +380,10 @@ class ChartAssistantViewModel(
                 }
                 val intent = client.parseIntent(
                     transcript = transcript,
-                    playlistsContextJson = AiJsonHelper.playlistsContext(playlists, playlistId),
+                    playlistsContextJson = AiJsonHelper.playlistsContext(
+                        playlists.map { it.id to it.name },
+                        playlistId,
+                    ),
                     searchMode = searchMode,
                 ) ?: throw ChartAssistantException("Could not parse command")
                 val playlist = PlaylistNameResolver.resolve(
@@ -412,40 +409,51 @@ class ChartAssistantViewModel(
     private fun searchForIntent(intent: ChartIntent, playlist: Playlist?) {
         _uiState.value = ChartAssistantUiState.Processing
         launchWork {
-            runCatching {
+            val results = runCatching {
                 withContext(Dispatchers.IO) {
                     WebSearchService.search(intent.searchQuery())
                 }
-            }.onSuccess { results ->
-                if (results.isEmpty()) {
-                    _uiState.value = ChartAssistantUiState.Error("No search results")
-                } else {
-                    val saved = ChartAssistantUiState.SearchResults(intent, playlist, results)
-                    lastSearch = saved
-                    _uiState.value = saved
-                }
-            }.onFailure {
+            }.getOrElse {
                 if (it is CancellationException) throw it
                 _uiState.value = ChartAssistantUiState.Error(it.message ?: "Search failed")
+                return@launchWork
             }
+            if (results.isEmpty()) {
+                _uiState.value = ChartAssistantUiState.Error("No search results")
+                return@launchWork
+            }
+            extractFromQueue(intent, playlist, results)
         }
+    }
+
+    private suspend fun extractFromQueue(
+        intent: ChartIntent,
+        playlist: Playlist?,
+        queue: List<SearchResult>,
+    ) {
+        if (queue.isEmpty()) {
+            _uiState.value = ChartAssistantUiState.Error("Could not extract chart from page")
+            return
+        }
+        extractFromResult(intent, playlist, queue.first(), remaining = queue.drop(1))
     }
 
     private suspend fun extractFromResult(
         intent: ChartIntent,
         playlist: Playlist?,
         result: SearchResult,
+        remaining: List<SearchResult>,
     ) {
         val context = getApplication<Application>()
         val apiKey = AiCredentialStore.getOpenAiApiKey(context)
             ?: run {
-                restoreSearchAfterExtractFailure("Add OpenAI API key in Settings")
+                _uiState.value = ChartAssistantUiState.Error("Add OpenAI API key in Settings")
                 return
             }
         runCatching {
             withContext(Dispatchers.IO) {
                 val service = ChartAssistantService(OpenAiClient(apiKey))
-                val (draft, pdfBytes) = service.fetchAndBuildChart(result, intent)
+                val draft = service.fetchAndExtractChart(result, intent)
                 val previewFile = File(context.cacheDir, "chart-preview-${System.currentTimeMillis()}.pdf")
                 val resolvedSize = ChartPdfRenderer.resolvedBodyTextSize(draft)
                 previewFile.writeBytes(ChartPdfRenderer.render(draft, resolvedSize))
@@ -462,19 +470,17 @@ class ChartAssistantViewModel(
                 transposeNote = null,
                 chartKeyGuessed = draft.isChartKeyGuessed(),
                 bodyTextSize = bundle.bodyTextSize,
+                remainingResults = remaining,
+                sourceResult = result,
             )
         }.onFailure {
             if (it is CancellationException) throw it
-            restoreSearchAfterExtractFailure(it.userMessage(), failedUrl = result.url)
+            if (remaining.isNotEmpty()) {
+                extractFromQueue(intent, playlist, remaining)
+            } else {
+                _uiState.value = ChartAssistantUiState.Error(it.userMessage())
+            }
         }
-    }
-
-    private fun restoreSearchAfterExtractFailure(message: String, failedUrl: String? = null) {
-        val next = chartAssistantStateAfterExtractFailure(lastSearch, message, failedUrl)
-        if (next is ChartAssistantUiState.SearchResults) {
-            lastSearch = next.copy(errorMessage = null)
-        }
-        _uiState.value = next
     }
 
     private fun launchWork(block: suspend () -> Unit) {
@@ -526,30 +532,11 @@ class ChartAssistantViewModel(
 /** Next UI state after in-screen back, or null to leave the assistant. */
 internal fun chartAssistantStateAfterBack(
     state: ChartAssistantUiState,
-    savedSearch: ChartAssistantUiState.SearchResults?,
     workInFlight: Boolean,
 ): ChartAssistantUiState? = when (state) {
-    is ChartAssistantUiState.Preview ->
-        savedSearch?.copy(intent = state.intent, playlist = state.playlist)
-            ?: ChartAssistantUiState.Idle
+    is ChartAssistantUiState.Preview -> null
     is ChartAssistantUiState.Processing ->
-        savedSearch.takeIf { workInFlight }
-    is ChartAssistantUiState.Error ->
-        savedSearch?.copy(errorMessage = state.message)
+        ChartAssistantUiState.Idle.takeIf { workInFlight }
+    is ChartAssistantUiState.Error -> ChartAssistantUiState.Idle
     else -> null
-}
-
-/** Restore the web-result list after extract fails, dropping the unusable link. */
-internal fun chartAssistantStateAfterExtractFailure(
-    savedSearch: ChartAssistantUiState.SearchResults?,
-    message: String,
-    failedUrl: String? = null,
-): ChartAssistantUiState {
-    if (savedSearch == null) return ChartAssistantUiState.Error(message)
-    val remaining = if (failedUrl == null) {
-        savedSearch.results
-    } else {
-        savedSearch.results.filterNot { it.url == failedUrl }
-    }
-    return savedSearch.copy(results = remaining, errorMessage = message)
 }

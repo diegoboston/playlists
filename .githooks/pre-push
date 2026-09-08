@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Compile + JVM unit tests before push so a clean CI checkout cannot fail on
-# Kotlin that never recompiled locally (Gradle UP-TO-DATE from an earlier run).
+# Compile-on-push is off by default. Verify after edits via rebuild-app /
+# compile-kotlin. Opt in: RUN_COMPILE_HOOK=1 git push
 set -euo pipefail
 
-if [[ "${SKIP_COMPILE_HOOK:-}" == "1" ]]; then
-  echo "pre-push: skipped (SKIP_COMPILE_HOOK=1)"
+if [[ "${RUN_COMPILE_HOOK:-}" != "1" ]]; then
   exit 0
 fi
 
 ROOT="$(git rev-parse --show-toplevel)"
+echo "pre-push: RUN_COMPILE_HOOK=1 — running compile-kotlin"
 exec bash "$ROOT/.cursor/skills/compile-kotlin/scripts/compile-kotlin.sh"

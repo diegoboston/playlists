@@ -24,7 +24,7 @@ Always add the prompt constant to `app/src/main/java/com/playlists/app/ai/AiProm
 | Constant / function | Used by |
 | ------------------- | ------- |
 | `parseIntentSystem` | Chart assistant voice intent |
-| `extractChartSystem` (+ `EXTRACT_CHART_*` fragments) | Chart assistant page extract |
+| `extractChartSystem` (+ `EXTRACT_CHART_*` fragments) | Chart assistant page extract (line-oriented chart text) |
 | `EXTRACT_TITLE_FROM_IMAGE_SYSTEM` / `_USER` | Camera / gallery title OCR |
 
 ## After changing prompts

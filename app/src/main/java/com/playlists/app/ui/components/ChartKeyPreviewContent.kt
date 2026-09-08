@@ -64,6 +64,10 @@ fun ChartKeyPreviewContent(
     onPreferSharps: () -> Unit = {},
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
+    onTryNext: (() -> Unit)? = null,
+    tryNextEnabled: Boolean = false,
+    tryNextLabel: String? = null,
+    cancelLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
     var showKeyPicker by remember { mutableStateOf(false) }
@@ -265,8 +269,17 @@ fun ChartKeyPreviewContent(
             Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) {
                 Text(confirmLabel)
             }
+            if (onTryNext != null) {
+                FilledTonalButton(
+                    onClick = onTryNext,
+                    enabled = tryNextEnabled,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(tryNextLabel ?: stringResource(R.string.chart_assistant_try_next))
+                }
+            }
             OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.cancel))
+                Text(cancelLabel ?: stringResource(R.string.cancel))
             }
         }
     }

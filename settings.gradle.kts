@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Stage Manager"
 include(":app")
+include(":tools:ai-song-search")

@@ -16,7 +16,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -30,15 +29,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -67,7 +63,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
@@ -76,7 +71,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.playlists.app.R
 import com.playlists.app.ai.ChartSearchMode
-import com.playlists.app.find.SearchResult
 import com.playlists.app.ui.ChartAssistantUiState
 import com.playlists.app.ui.ChartAssistantViewModel
 import com.playlists.app.ui.ChartAssistantViewModelFactory
@@ -128,7 +122,7 @@ fun ChartAssistantScreen(
         }
     }
 
-    // Always intercept so restoring search results does not also pop this screen.
+    // Preview Back leaves Find chart; Cancel on the confirm panel does the same.
     BackHandler(onBack = handleBack)
 
     Scaffold(
@@ -153,7 +147,11 @@ fun ChartAssistantScreen(
                 onPreferFlats = { viewModel.setSpellingPreference(AccidentalSpelling.Flats) },
                 onPreferSharps = { viewModel.setSpellingPreference(AccidentalSpelling.Sharps) },
                 onConfirm = viewModel::confirmSave,
-                onCancel = viewModel::cancelPreview,
+                onTryNext = viewModel::tryNextResult,
+                onCancel = {
+                    viewModel.cancelPreview()
+                    onBack()
+                },
             )
             else -> Column(
                 modifier = Modifier
@@ -197,17 +195,7 @@ fun ChartAssistantScreen(
                         Text(stringResource(R.string.chart_assistant_heard, current.intent.transcript))
                         ProcessingBlock()
                     }
-                    is ChartAssistantUiState.SearchResults -> SearchResultsBlock(
-                        queryText = current.intent.editableQuery(),
-                        searchMode = current.intent.searchMode,
-                        playlistName = current.playlist?.name,
-                        results = current.results,
-                        errorMessage = current.errorMessage,
-                        onSelect = viewModel::selectSearchResult,
-                        onSearchAgain = { text, mode ->
-                            viewModel.searchFromText(text, mode)
-                        },
-                    )
+                    is ChartAssistantUiState.SearchResults -> ProcessingBlock()
                     is ChartAssistantUiState.Error -> {
                         Text(current.message, color = MaterialTheme.colorScheme.error)
                         OutlinedButton(onClick = viewModel::dismissError) {
@@ -415,89 +403,6 @@ private fun ProcessingBlock() {
 }
 
 @Composable
-private fun SearchResultsBlock(
-    queryText: String,
-    searchMode: ChartSearchMode,
-    playlistName: String?,
-    results: List<SearchResult>,
-    errorMessage: String?,
-    onSelect: (SearchResult) -> Unit,
-    onSearchAgain: (String, ChartSearchMode) -> Unit,
-) {
-    var heardText by remember(queryText) { mutableStateOf(queryText) }
-    var mode by remember(searchMode) { mutableStateOf(searchMode) }
-    Text(stringResource(R.string.chart_assistant_heard_label))
-    OutlinedTextField(
-        value = heardText,
-        onValueChange = { heardText = it },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(stringResource(R.string.chart_assistant_typed_hint)) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(
-            onSearch = {
-                if (heardText.isNotBlank()) onSearchAgain(heardText, mode)
-            },
-        ),
-    )
-    ChartSearchModeSelector(
-        selected = mode,
-        onSelected = { mode = it },
-    )
-    OutlinedButton(
-        onClick = { onSearchAgain(heardText, mode) },
-        enabled = heardText.isNotBlank(),
-    ) {
-        Icon(
-            Icons.Default.Search,
-            contentDescription = null,
-            modifier = Modifier
-                .padding(end = 8.dp)
-                .size(18.dp),
-        )
-        Text(stringResource(R.string.chart_assistant_search_again))
-    }
-    Text(
-        if (playlistName != null) {
-            stringResource(R.string.chart_assistant_playlist_target, playlistName)
-        } else {
-            stringResource(R.string.chart_assistant_archive_target)
-        },
-    )
-    if (errorMessage != null) {
-        Text(errorMessage, color = MaterialTheme.colorScheme.error)
-    }
-    Text(stringResource(R.string.chart_assistant_pick_result))
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(results, key = { it.url }) { result ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelect(result) },
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(result.title, style = MaterialTheme.typography.titleSmall)
-                    if (result.snippet.isNotEmpty()) {
-                        Text(
-                            result.snippet,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Text(
-                        result.url,
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun PreviewContent(
     modifier: Modifier = Modifier,
     state: ChartAssistantUiState.Preview,
@@ -507,22 +412,12 @@ private fun PreviewContent(
     onPreferFlats: () -> Unit,
     onPreferSharps: () -> Unit,
     onConfirm: () -> Unit,
+    onTryNext: () -> Unit,
     onCancel: () -> Unit,
 ) {
     ChartKeyPreviewContent(
         modifier = modifier,
-        title = if (state.playlist != null) {
-            stringResource(
-                R.string.chart_assistant_confirm_add,
-                state.draft.title,
-                state.playlist.name,
-            )
-        } else {
-            stringResource(
-                R.string.chart_assistant_confirm_add_archive,
-                state.draft.title,
-            )
-        },
+        title = stringResource(R.string.chart_assistant_is_correct),
         chartKeyLabel = state.sourceDraft.chartKeyLabel(),
         playKeyLabel = state.draft.displayKeyLabel(),
         lyricsOnly = state.intent.searchMode == ChartSearchMode.LyricsOnly,
@@ -531,13 +426,7 @@ private fun PreviewContent(
         previewRevision = state.previewRevision,
         pdfFile = state.pdfFile,
         bodyTextSize = state.bodyTextSize,
-        confirmLabel = stringResource(
-            if (state.playlist != null) {
-                R.string.chart_assistant_confirm
-            } else {
-                R.string.chart_assistant_confirm_archive
-            },
-        ),
+        confirmLabel = stringResource(R.string.chart_assistant_yes),
         onNudgeKey = onNudgeKey,
         onNudgeFontSize = onNudgeFontSize,
         onSelectChartKey = onSelectChartKey,
@@ -545,6 +434,8 @@ private fun PreviewContent(
         onPreferFlats = onPreferFlats,
         onPreferSharps = onPreferSharps,
         onConfirm = onConfirm,
+        onTryNext = onTryNext,
+        tryNextEnabled = state.remainingResults.isNotEmpty(),
         onCancel = onCancel,
     )
 }

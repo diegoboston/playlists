@@ -20,8 +20,33 @@ object PageFetcher {
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return null
             val html = response.body?.string().orEmpty()
-            return htmlToText(html).take(40_000)
+            val focused = lyricRegionHtml(html) ?: html
+            return htmlToText(focused).take(40_000)
         }
+    }
+
+    /** Prepend the search snippet so extract still sees lyrics when the page chrome is noisy. */
+    fun withSearchSnippet(snippet: String, pageText: String): String {
+        val trimmed = snippet.trim()
+        if (trimmed.isEmpty()) return pageText
+        return "Search result snippet:\n$trimmed\n\nPage text:\n$pageText"
+    }
+
+    /**
+     * Prefer a known lyric/chart container so nav, bios, and ads are not sent to the LLM.
+     * Returns null when no substantial lyric block is found.
+     */
+    internal fun lyricRegionHtml(html: String): String? {
+        val extractors = listOf(
+            Regex("""(?is)<pre[^>]*id=["']lyric-body-text["'][^>]*>(.*?)</pre>"""),
+            Regex("""(?is)<pre[^>]*class=["'][^"']*lyric-body[^"']*["'][^>]*>(.*?)</pre>"""),
+            Regex("""(?is)<!--\s*Usage of azlyrics\.com content.*?-->(.*?)(?:<!--|<div class="noprint"|<script)"""),
+            Regex("""(?is)<div[^>]*data-lyrics-container=["']true["'][^>]*>(.*?)</div>"""),
+            Regex("""(?is)<div[^>]*id=["'](?:lyrics-content|lyric-body)["'][^>]*>(.*?)</div>"""),
+        )
+        return extractors.mapNotNull { pattern ->
+            pattern.find(html)?.groupValues?.get(1)?.takeIf { it.length >= 80 }
+        }.maxByOrNull { it.length }
     }
 
     internal fun htmlToText(html: String): String {
@@ -36,6 +61,9 @@ object PageFetcher {
             .replace("&gt;", ">")
             .replace("&quot;", "\"")
             .replace("&#39;", "'")
+            .replace("&#039;", "'")
+            .replace("&#x27;", "'")
+            .replace("&raquo;", "»")
         return text.replace(Regex("[ \\t\\x0B\\f\\r]+"), " ")
             .replace(Regex("\\n{3,}"), "\n\n")
             .trim()
@@ -106,5 +134,10 @@ object WebSearchService {
     }
 
     private fun stripTags(html: String): String =
-        html.replace(Regex("<[^>]+>"), "").replace("&amp;", "&").trim()
+        html.replace(Regex("<[^>]+>"), "")
+            .replace("&#x27;", "'")
+            .replace("&#39;", "'")
+            .replace("&quot;", "\"")
+            .replace("&amp;", "&")
+            .trim()
 }

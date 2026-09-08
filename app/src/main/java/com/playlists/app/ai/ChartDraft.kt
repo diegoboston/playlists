@@ -87,12 +87,16 @@ data class ChartDraft(
             for (i in 0 until arr.length()) {
                 val section = arr.optJSONObject(i) ?: continue
                 val label = section.optString("label").trim()
-                val linesArr = section.optJSONArray("lines") ?: JSONArray()
-                val lines = buildList {
-                    for (j in 0 until linesArr.length()) {
-                        val line = linesArr.optString(j).trim()
-                        if (line.isNotEmpty()) add(line)
+                val linesArr = section.optJSONArray("lines")
+                val lines = if (linesArr != null) {
+                    buildList {
+                        for (j in 0 until linesArr.length()) {
+                            val line = linesArr.optString(j).trim()
+                            if (line.isNotEmpty()) add(line)
+                        }
                     }
+                } else {
+                    section.optString("lines").lines().map { it.trim() }.filter { it.isNotEmpty() }
                 }
                 if (lines.isNotEmpty()) {
                     sections.add(ChartSection(label, lines))

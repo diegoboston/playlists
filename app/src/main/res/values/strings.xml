@@ -205,6 +205,9 @@
     <string name="chart_assistant_playlist_target">Playlist: %1$s</string>
     <string name="chart_assistant_archive_target">Song archive</string>
     <string name="chart_assistant_pick_result">Pick a web result:</string>
+    <string name="chart_assistant_is_correct">Is this correct?</string>
+    <string name="chart_assistant_yes">Yes</string>
+    <string name="chart_assistant_try_next">Try next</string>
     <string name="chart_assistant_no_api_key">Add your OpenAI API key in Settings first.</string>
     <string name="chart_assistant_try_again">Try again</string>
     <string name="chart_assistant_confirm">Add to playlist</string>

@@ -29,33 +29,24 @@ class ChartAssistantBackTest {
     )
 
     @Test
-    fun previewWithSavedSearch_restoresResults() {
-        val next = chartAssistantStateAfterBack(
-            state = previewState(),
-            savedSearch = savedSearch,
-            workInFlight = false,
+    fun preview_leavesAssistant() {
+        assertNull(
+            chartAssistantStateAfterBack(
+                state = previewState(),
+                workInFlight = false,
+            ),
         )
-        assertEquals(savedSearch, next)
     }
 
     @Test
-    fun previewWithoutSavedSearch_staysIdle() {
-        val next = chartAssistantStateAfterBack(
-            state = previewState(),
-            savedSearch = null,
-            workInFlight = false,
+    fun processingWithInFlightExtract_goesIdle() {
+        assertEquals(
+            ChartAssistantUiState.Idle,
+            chartAssistantStateAfterBack(
+                state = ChartAssistantUiState.Processing,
+                workInFlight = true,
+            ),
         )
-        assertEquals(ChartAssistantUiState.Idle, next)
-    }
-
-    @Test
-    fun processingWithInFlightExtract_restoresResults() {
-        val next = chartAssistantStateAfterBack(
-            state = ChartAssistantUiState.Processing,
-            savedSearch = savedSearch,
-            workInFlight = true,
-        )
-        assertEquals(savedSearch, next)
     }
 
     @Test
@@ -63,49 +54,18 @@ class ChartAssistantBackTest {
         assertNull(
             chartAssistantStateAfterBack(
                 state = ChartAssistantUiState.Processing,
-                savedSearch = savedSearch,
                 workInFlight = false,
             ),
         )
     }
 
     @Test
-    fun extractError_restoresResultsWithMessage() {
-        val next = chartAssistantStateAfterBack(
-            state = ChartAssistantUiState.Error("Could not extract chart from page"),
-            savedSearch = savedSearch,
-            workInFlight = false,
-        )
+    fun extractError_returnsToIdle() {
         assertEquals(
-            savedSearch.copy(errorMessage = "Could not extract chart from page"),
-            next,
-        )
-    }
-
-    @Test
-    fun extractFailure_dropsUnparseableResult() {
-        val failed = SearchResult("Bad page", "https://example.com/bad", "")
-        val keep = SearchResult("Good page", "https://example.com/good", "chords")
-        val search = savedSearch.copy(results = listOf(failed, keep))
-        val next = chartAssistantStateAfterExtractFailure(
-            savedSearch = search,
-            message = "Could not extract chart from page",
-            failedUrl = failed.url,
-        )
-        assertEquals(
-            search.copy(results = listOf(keep), errorMessage = "Could not extract chart from page"),
-            next,
-        )
-    }
-
-    @Test
-    fun extractFailure_withoutSavedSearch_isError() {
-        assertEquals(
-            ChartAssistantUiState.Error("Could not extract chart from page"),
-            chartAssistantStateAfterExtractFailure(
-                savedSearch = null,
-                message = "Could not extract chart from page",
-                failedUrl = "https://example.com/bad",
+            ChartAssistantUiState.Idle,
+            chartAssistantStateAfterBack(
+                state = ChartAssistantUiState.Error("Could not extract chart from page"),
+                workInFlight = false,
             ),
         )
     }
@@ -115,7 +75,6 @@ class ChartAssistantBackTest {
         assertNull(
             chartAssistantStateAfterBack(
                 state = savedSearch,
-                savedSearch = savedSearch,
                 workInFlight = false,
             ),
         )
@@ -126,7 +85,6 @@ class ChartAssistantBackTest {
         assertNull(
             chartAssistantStateAfterBack(
                 state = ChartAssistantUiState.Idle,
-                savedSearch = savedSearch,
                 workInFlight = false,
             ),
         )
