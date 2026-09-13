@@ -1,6 +1,7 @@
 package com.playlists.app.ui.components
 
 import android.content.Intent
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -9,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -26,8 +28,13 @@ import com.playlists.app.util.FileStamp
 import com.playlists.app.util.SongAnnotate
 import com.playlists.app.util.SongStoragePaths
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val LAUNCH_RESUME_IGNORE_MS = 400L
+private const val RESUME_SETTLE_MS = 500L
 
 @Composable
 fun AnnotateHost(
@@ -43,23 +50,27 @@ fun AnnotateHost(
     var showXodoPrompt by remember { mutableStateOf(false) }
     var beforeStamp by remember { mutableStateOf<FileStamp?>(null) }
     var destSong by remember { mutableStateOf<Song?>(null) }
+    var launchedAtElapsed by remember { mutableLongStateOf(0L) }
+    var settleJob by remember { mutableStateOf<Job?>(null) }
 
     fun finishSession(song: Song?, before: FileStamp?) {
-        destSong = null
-        beforeStamp = null
+        settleJob?.cancel()
+        settleJob = null
         if (song == null || before == null) {
+            destSong = null
+            beforeStamp = null
             onFinished(null)
             return
         }
-        scope.launch {
+        settleJob = scope.launch {
+            delay(RESUME_SETTLE_MS)
+            destSong = null
+            beforeStamp = null
             val dest = SongStoragePaths.resolve(song.filePath)
-            val changed = withContext(Dispatchers.IO) {
-                val did = SongAnnotate.stampChanged(dest, before)
-                if (did) PdfHelper.invalidate(dest)
-                did
-            }
-            if (!changed) {
-                Toast.makeText(context, R.string.annotate_unchanged, Toast.LENGTH_SHORT).show()
+            withContext(Dispatchers.IO) {
+                if (SongAnnotate.stampChanged(dest, before)) {
+                    PdfHelper.invalidate(dest)
+                }
             }
             onFinished(viewModel.getSong(song.id))
         }
@@ -74,9 +85,16 @@ fun AnnotateHost(
         var sawPause = false
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> sawPause = true
+                Lifecycle.Event.ON_PAUSE -> {
+                    sawPause = true
+                    settleJob?.cancel()
+                    settleJob = null
+                }
                 Lifecycle.Event.ON_RESUME -> {
-                    if (sawPause) finishSession(song, before)
+                    val sinceLaunch = SystemClock.elapsedRealtime() - launchedAtElapsed
+                    if (sawPause && sinceLaunch >= LAUNCH_RESUME_IGNORE_MS) {
+                        finishSession(song, before)
+                    }
                 }
                 else -> Unit
             }
@@ -96,6 +114,7 @@ fun AnnotateHost(
         }
         destSong = song
         beforeStamp = SongAnnotate.stampOf(source)
+        launchedAtElapsed = SystemClock.elapsedRealtime()
         runCatching {
             context.startActivity(SongAnnotate.editorIntent(context, uri, targetPackage))
         }.onFailure {

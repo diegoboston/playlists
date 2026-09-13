@@ -7,8 +7,10 @@ package com.playlists.app.render
 internal object ChartPdfLayout {
     const val MIN_TEXT_SIZE = 9f
     const val MAX_TITLE_SIZE = 28f
+    /** Auto-fit start and fallback when a chart must paginate. */
     const val MAX_BODY_SIZE = 14f
-    const val MAX_FONT_SIZE = 14f
+    /** User-adjustable ceiling in AI chart / Reformat previews. */
+    const val MAX_FONT_SIZE = 20f
 
     data class Block(val label: String, val lines: List<String>)
 

@@ -39,9 +39,9 @@ Designed for sideloading on recent 64-bit ARM phones. CI builds a signed arm64 r
 - **Export PDF** — **Pencil** menu on playlist detail or the Playlists tab builds one combined PDF: a set-list table of contents (playlist name + song titles with keys, no page numbers) followed by every chart page in playlist order. PDF charts are merged as **vector pages** (original page size preserved); photos and placeholders are embedded on letter-size pages at full resolution. If a PDF cannot be merged, that page falls back to raster. Opens the system share sheet to save or send the file.
 - **Push playlist to server** — Once stable redirect keys are validated in Settings, the playlist menu offers **Push playlist to server** (arrow up) even when remote play is off: builds the same combined PDF and uploads it as **last.pdf** on the stable Worker (same flow as the auto-upload when starting stable remote play). Shows the “Uploading playlist PDF…” progress dialog.
 - **Playlist detail** — Two-line header: **back + title** on a **colored background** (playlist accent color) on line 1; **tools** on line 2 (+ add, **bolt** find chart, play, remote, **menu** ☰). The menu offers rename (pencil icon), **playlist color** (palette icon), delete, duplicate, export PDF, and (when stable redirect is ready) push playlist to server. Compact song rows: **Title (Key)** + notes, small **trash** to remove from the playlist. If that song is not in any other playlist, a dialog offers to delete it from the song archive too (or keep it). Tap the **green Wi‑Fi** icon while remote is active (pulsing green dot) to reopen connection status and the URL; use the system notification **Stop** to end remote play.
-- **AI find chart** — Voice or typed search for chords/lyrics on the web. After search, the app parses the first web result and shows a PDF preview with **Is this correct?** — **Yes** saves, **Try next** parses the following result, **Cancel** leaves the flow. Pages that cannot be parsed are skipped automatically. Lyrics-only previews allow font changes without key or transposition controls. From the main **Songs** / **Playlists** tabs (**☰** → **AI song search**, shown when an OpenAI key is configured) the chart is added to the **song archive**; from a **playlist** tool row (**bolt**) it is also appended to that playlist. See **AI chart assistant** below.
+- **AI find chart** — Voice or typed search for chords/lyrics on the web. After search, the app parses the first web result and shows a PDF preview with **Is this correct?** — **Yes** saves, **Try next** parses the following result, **Cancel** leaves the flow. Pages that cannot be parsed are skipped automatically. Lyrics-only previews allow font changes without key or transposition controls. Preview and **Reformat** font size can go from 9 to 20 (auto-fit still starts at 14). From the main **Songs** / **Playlists** tabs (**☰** → **AI song search**, shown when an OpenAI key is configured) the chart is added to the **song archive**; from a **playlist** tool row (**bolt**) it is also appended to that playlist. See **AI chart assistant** below.
 - **Playback mode** — Swipe horizontally through each song in the playlist (images and PDFs). **↓** shares the current song file unless **Hide song share button** is on in Settings; **↻** in the top bar jumps to the first song and page.
-- **Settings** — **☰** on the main tabs → **Settings**: under **Remote play**, set one **5-digit code** used as the Cloudflare PIN and the LAN port, plus optional **stable play URL** fields (Workers account subdomain + write secret — builds `https://play.<subdomain>.workers.dev`; see `workers/tunnel-redirect/`). **Adjust page after camera** is a switch (off by default, saved immediately) that shows the corner-drag crop screen after each camera photo. **Hide song share button** is a switch (off by default, saved immediately) that removes the download/share icon from song view and playlist playback. Under **AI chart assistant**, paste your **OpenAI API key** (never stored in git); a **green check** confirms the key works. Tap **OpenAI billing overview** to open your account balance on platform.openai.com. The screen notes IANA’s dynamic/private port band (49152–65535) if you want to avoid common services. Under **App icon**, pick **Original** (orchestra conductor) or **Guido** to change the launcher icon (your home screen may take a moment to refresh), then tap **Save**. A **status card** at the bottom shows **installed app version**, **Check for updates** (same GitHub Release flow as the launch snackbar), and **total library storage** under `Music/StageManager` (song files, chart sidecars, database, and state).
+- **Settings** — **☰** on the main tabs → **Settings**. Changes save immediately (no Save button). Compact rows: **PIN for remote play, 5 digits** with the code box on the same line (hint below: also the LAN port; IANA dynamic range 49152–65535), then **Show UI to adjust page after camera** and **Hide song share button** switches, then **App icon** with the **Original** and **Guido** previews on the same line. **Advanced** (stable Worker URL + OpenAI API key) sits just above the **status card** (version, **Check for updates**, library storage). The 5-digit code is the Cloudflare PIN and LAN port. Optional **stable play URL** fields (Workers account subdomain + write secret) build `https://play.<subdomain>.workers.dev` (see `workers/tunnel-redirect/`). **Show UI to adjust page after camera** (off by default) shows the corner-drag crop screen after each camera photo. **Hide song share button** (off by default) removes the download/share icon from song view and playlist playback. Under Advanced, paste your **OpenAI API key** (never stored in git); a **green check** confirms the key works. Tap **OpenAI billing overview** to open your account balance on platform.openai.com. Pick **Original** (orchestra conductor) or **Guido** to change the launcher icon (your home screen may take a moment to refresh).
 
   | Original | Guido |
   |:---:|:---:|
@@ -137,16 +137,12 @@ PLAYLISTS TAB
 ┌─────────────────────────────────────┐
 │ ← Settings                          │
 ├─────────────────────────────────────┤
-│ Remote play                         │
-│ Code [_____]                        │
-│ Adjust page after camera      [off] │
-│ Hide song share button        [off] │
-│ OpenAI key [________________]     │
-│ OpenAI billing overview             │
-│              [ Save ]               │
-│ App icon                            │
-│  [Original]  [Guido]                │
-│              [ Save ]               │
+│ PIN for remote play, 5 digits. [___]│
+│ (also LAN port; 49152–65535)        │
+│ Show UI to adjust page after cam [ ]│
+│ Hide song share button           [ ]│
+│ App icon  [Original] [Guido]        │
+│ Advanced                         ▾ │
 │ ┌─────────────────────────────────┐ │
 │ │ App version              1.0.42 │ │
 │ │ Updates    [ Check for updates ]│ │
@@ -192,7 +188,7 @@ REMOTE PLAY ACTIVE (notification shade)
 6. **Reorder** — Long-press a row and drag (Songs, Playlists, or playlist detail).
 7. **Play** — Open a playlist → **Play** → swipe between songs.
 8. **Remote play** — Main tabs **☰** → **Web server**, or playlist detail → **Wi‑Fi**. Pick Cloudflare (enter the 5-digit code) or LAN (code is the port in the URL). Main-tab start works without opening a playlist first (shared URL deep-links to the last-opened playlist when available). Open **Web server** / **Wi‑Fi** while remote is active to reopen connection status and **Copy debug info**. **Stop** works from the start dialog **STOP 🛑**, the system notification, or when deleting the playlist that was used to start remote.
-9. **Settings** — Main tabs **☰** → **Settings** → set the remote code and OpenAI API key → **Save**. **Adjust page after camera** and **Hide song share button** are switches (saved immediately). **Check for updates** anytime from the same screen.
+9. **Settings** — Main tabs **☰** → **Settings**. PIN, switches, app icon, and Advanced fields save as you change them. **Check for updates** anytime from the same screen.
 10. **Quickstart** — **Playlists** tab → **Quickstart playlist** → paste text → **Match songs** → **Create** (matched only) or **Create with placeholders** (full order).
 11. **Update** — If a newer GitHub Release exists, a snackbar offers **Update now**; allow installs from this app when prompted.
 
@@ -317,7 +313,7 @@ Find chords and lyrics on the web by **voice or typed title**, turn them into a 
 
 ### Setup
 
-1. **Settings** (main tabs **☰** → **Settings**) → under **AI chart assistant**, paste an [OpenAI API key](https://platform.openai.com/api-keys). A **green check** appears when the key passes a quick API test; **red** if it fails (error text below the field). Tap **OpenAI billing overview** to check your balance on the OpenAI site. Tap **Save** to store the key (encrypted on device).
+1. **Settings** (main tabs **☰** → **Settings**) → expand **Advanced** and paste an [OpenAI API key](https://platform.openai.com/api-keys). A **green check** appears when the key passes a quick API test; **red** if it fails (error text below the field). The key is stored encrypted on the device as you type. Tap **OpenAI billing overview** to check your balance on the OpenAI site.
 2. Grant **microphone** permission when the app asks (first voice use of find chart).
 
 ### Flow
@@ -329,14 +325,14 @@ Find chords and lyrics on the web by **voice or typed title**, turn them into a 
 3. After voice, the app shows **Heard** while it searches. Typed search skips that and searches immediately.
 4. **Web search** — always builds `{title} {artist} chords lyrics` for chord searches, or `{title} {artist} lyrics -chords -tabs` for lyrics-only searches. The suffix is added by the app. The **first** result is fetched and parsed automatically (no result list to tap).
 5. **Extract** — fetches the page (preferring a lyric/chart block when the HTML has one, and including the search snippet) and asks OpenAI for a **line-oriented chart** (`TITLE:` / `ARTIST:` / `[Verse 1]` …), not JSON. If the reply is cut off, complete lines already returned are kept. Lyrics-only results strip chords, capo, and key. If a page cannot be parsed, that result is skipped and the next hit is tried.
-6. **Is this correct?** — PDF preview (transpose and font as before). **Yes** saves to the archive (and the playlist when opened from a playlist). **Try next** parses the following search hit. **Cancel** (or Back from the preview) leaves Find chart.
+6. **Is this correct?** — PDF preview (transpose and font as before; font size 9–20, default still auto-fit from 14). **Yes** saves to the archive (and the playlist when opened from a playlist). **Try next** parses the following search hit. **Cancel** (or Back from the preview) leaves Find chart.
 7. **Preview** — same PDF viewer as songs. Saving still writes the chart file as before.
 
 Voice handles the **command** only when you use the mic. You still confirm with **Yes** before anything is saved.
 
 ### What gets stored
 
-- New **song** row: title, **key** (target key you asked for; omitted for lyrics-only), notes like `AI chart · {source URL}` or `AI lyrics · {source URL}` for lyrics-only results. Pencil edit on an **AI lyrics** song hides the key field and uses **Reformat** (font size preview) instead of **Change key**.
+- New **song** row: title, **key** (target key you asked for; omitted for lyrics-only), notes like `AI chart · {source URL}` or `AI lyrics · {source URL}` for lyrics-only results. Pencil edit on an **AI lyrics** song hides the key field and uses **Reformat** (font size 9–20, same as AI chart preview) instead of **Change key**.
 - PDF file under `Music/StageManager/songs/` (same as share import).
 - **Playlist** link at the end of the current playlist order.
 

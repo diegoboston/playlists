@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -114,9 +114,6 @@ fun SettingsScreen(
     var adjustPageEnabled by remember { mutableStateOf(AppPrefs.isAdjustPageEnabled(context)) }
     var hideSongShareEnabled by remember { mutableStateOf(AppPrefs.isHideSongShareEnabled(context)) }
     var advancedExpanded by remember { mutableStateOf(false) }
-    val savedOpenAiKey = remember { AiCredentialStore.getOpenAiApiKey(context).orEmpty() }
-    val savedSubdomain = remember { AppPrefs.getTunnelRedirectSubdomain(context).orEmpty() }
-    val savedWriteSecret = remember { AppPrefs.getTunnelRedirectSecret(context).orEmpty() }
 
     LaunchedEffect(Unit) {
         librarySizeLabel = withContext(Dispatchers.IO) {
@@ -124,15 +121,23 @@ fun SettingsScreen(
         }
     }
 
+    LaunchedEffect(codeText) {
+        if (AppPrefs.isValidRemoteCode(codeText)) {
+            AppPrefs.setRemoteCode(context, codeText.toInt())
+        }
+    }
+
     LaunchedEffect(openAiKeyText) {
         val key = openAiKeyText.trim()
+        delay(400)
+        if (openAiKeyText.trim() != key) return@LaunchedEffect
+        AiCredentialStore.setOpenAiApiKey(context, key)
         if (key.isEmpty()) {
             openAiKeyStatus = FieldValidationStatus.Unknown
+            AiCredentialStore.setOpenAiKeyValidated(context, false)
             return@LaunchedEffect
         }
         openAiKeyStatus = FieldValidationStatus.Testing
-        delay(600)
-        if (openAiKeyText.trim() != key) return@LaunchedEffect
         val status = withContext(Dispatchers.IO) {
             runCatching { OpenAiClient(key).validateApiKey() }
                 .fold(
@@ -142,21 +147,33 @@ fun SettingsScreen(
         }
         if (openAiKeyText.trim() == key) {
             openAiKeyStatus = status
+            AiCredentialStore.setOpenAiKeyValidated(
+                context,
+                status is FieldValidationStatus.Valid,
+            )
         }
     }
 
     LaunchedEffect(workersSubdomainText, writeSecretText) {
         val subdomain = workersSubdomainText.trim()
         val secret = writeSecretText.trim()
-        if (secret.isEmpty() || !AppPrefs.isValidWorkersSubdomain(subdomain)) {
-            writeSecretStatus = FieldValidationStatus.Unknown
-            return@LaunchedEffect
-        }
-        writeSecretStatus = FieldValidationStatus.Testing
-        delay(600)
+        delay(400)
         if (workersSubdomainText.trim() != subdomain || writeSecretText.trim() != secret) {
             return@LaunchedEffect
         }
+        if (subdomain.isEmpty() || AppPrefs.isValidWorkersSubdomain(subdomain)) {
+            AppPrefs.setTunnelRedirect(
+                context,
+                subdomain = subdomain,
+                secret = secret,
+            )
+        }
+        if (secret.isEmpty() || !AppPrefs.isValidWorkersSubdomain(subdomain)) {
+            writeSecretStatus = FieldValidationStatus.Unknown
+            AppPrefs.setStableRedirectValidated(context, false)
+            return@LaunchedEffect
+        }
+        writeSecretStatus = FieldValidationStatus.Testing
         val workerBase = TunnelRedirectClient.buildWorkerBaseUrl(subdomain)
         val status = withContext(Dispatchers.IO) {
             TunnelRedirectClient.validateWriteSecret(workerBase, secret)
@@ -167,32 +184,10 @@ fun SettingsScreen(
         }
         if (workersSubdomainText.trim() == subdomain && writeSecretText.trim() == secret) {
             writeSecretStatus = status
-        }
-    }
-
-    LaunchedEffect(openAiKeyStatus, openAiKeyText) {
-        val matchesSaved = openAiKeyText.trim() == savedOpenAiKey
-        when {
-            openAiKeyStatus is FieldValidationStatus.Valid && matchesSaved ->
-                AiCredentialStore.setOpenAiKeyValidated(context, true)
-            openAiKeyStatus is FieldValidationStatus.Invalid && matchesSaved ->
-                AiCredentialStore.setOpenAiKeyValidated(context, false)
-            openAiKeyText.trim().isEmpty() && savedOpenAiKey.isEmpty() ->
-                AiCredentialStore.setOpenAiKeyValidated(context, false)
-        }
-    }
-
-    LaunchedEffect(writeSecretStatus, workersSubdomainText, writeSecretText) {
-        val matchesSaved = workersSubdomainText.trim() == savedSubdomain.trim() &&
-            writeSecretText.trim() == savedWriteSecret.trim()
-        when {
-            writeSecretStatus is FieldValidationStatus.Valid && matchesSaved ->
-                AppPrefs.setStableRedirectValidated(context, true)
-            writeSecretStatus is FieldValidationStatus.Invalid && matchesSaved ->
-                AppPrefs.setStableRedirectValidated(context, false)
-            workersSubdomainText.trim().isEmpty() && writeSecretText.trim().isEmpty() &&
-                savedSubdomain.isEmpty() && savedWriteSecret.isEmpty() ->
-                AppPrefs.setStableRedirectValidated(context, false)
+            AppPrefs.setStableRedirectValidated(
+                context,
+                status is FieldValidationStatus.Valid,
+            )
         }
     }
 
@@ -215,42 +210,40 @@ fun SettingsScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Text(
-                text = stringResource(R.string.settings_remote_pin),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_remote_pin),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                )
+                OutlinedTextField(
+                    value = codeText,
+                    onValueChange = { codeText = it.filter { ch -> ch.isDigit() }.take(5) },
+                    modifier = Modifier.width(96.dp),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+            }
             Text(
                 text = stringResource(R.string.settings_remote_pin_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-            OutlinedTextField(
-                value = codeText,
-                onValueChange = { codeText = it.filter { ch -> ch.isDigit() }.take(5) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.padding(top = 4.dp),
             )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp),
+                    .padding(top = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                    Text(
-                        text = stringResource(R.string.settings_adjust_page),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_adjust_page_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.settings_adjust_page),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                )
                 Switch(
                     checked = adjustPageEnabled,
                     onCheckedChange = { enabled ->
@@ -262,26 +255,40 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp),
+                    .padding(top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                    Text(
-                        text = stringResource(R.string.settings_hide_song_share),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_hide_song_share_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.settings_hide_song_share),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                )
                 Switch(
                     checked = hideSongShareEnabled,
                     onCheckedChange = { enabled ->
                         hideSongShareEnabled = enabled
                         AppPrefs.setHideSongShareEnabled(context, enabled)
+                    },
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_app_icon),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(end = 12.dp),
+                )
+                AppIconPicker(
+                    selected = selectedAppIcon,
+                    onSelect = { icon ->
+                        if (icon == selectedAppIcon) return@AppIconPicker
+                        AppIconManager.setSelected(context, icon)
+                        selectedAppIcon = icon
+                        Toast.makeText(context, R.string.settings_app_icon_changed, Toast.LENGTH_SHORT).show()
                     },
                 )
             }
@@ -303,67 +310,13 @@ fun SettingsScreen(
                 onToggleOpenAiKeyVisible = { openAiKeyVisible = !openAiKeyVisible },
                 openAiKeyStatus = openAiKeyStatus,
             )
-            Text(
-                text = stringResource(R.string.settings_app_icon),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
-            )
-            AppIconPicker(
-                selected = selectedAppIcon,
-                onSelect = { icon ->
-                    if (icon == selectedAppIcon) return@AppIconPicker
-                    AppIconManager.setSelected(context, icon)
-                    selectedAppIcon = icon
-                    Toast.makeText(context, R.string.settings_app_icon_changed, Toast.LENGTH_SHORT).show()
-                },
-            )
-            Button(
-                onClick = {
-                    if (!AppPrefs.isValidRemoteCode(codeText)) {
-                        Toast.makeText(context, R.string.settings_remote_code_invalid, Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    if (!AppPrefs.isValidWorkersSubdomain(workersSubdomainText)) {
-                        Toast.makeText(context, R.string.settings_stable_subdomain_invalid, Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    AppPrefs.setRemoteCode(context, codeText.toInt())
-                    AppPrefs.setTunnelRedirect(
-                        context,
-                        subdomain = workersSubdomainText,
-                        secret = writeSecretText,
-                    )
-                    AiCredentialStore.setOpenAiApiKey(context, openAiKeyText)
-                    val openAiTrimmed = openAiKeyText.trim()
-                    AiCredentialStore.setOpenAiKeyValidated(
-                        context,
-                        openAiTrimmed.isNotEmpty() &&
-                            (openAiKeyStatus is FieldValidationStatus.Valid ||
-                                (openAiKeyStatus is FieldValidationStatus.Testing &&
-                                    openAiTrimmed == savedOpenAiKey)),
-                    )
-                    AppPrefs.setStableRedirectValidated(
-                        context,
-                        workersSubdomainText.trim().isNotEmpty() &&
-                            writeSecretText.trim().isNotEmpty() &&
-                            writeSecretStatus is FieldValidationStatus.Valid,
-                    )
-                    Toast.makeText(context, R.string.settings_saved, Toast.LENGTH_SHORT).show()
-                    onBack()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 24.dp),
-            ) {
-                Text(stringResource(R.string.save))
-            }
             SettingsStatusCard(
                 versionName = versionName,
                 librarySizeLabel = librarySizeLabel,
                 updateState = updateState,
                 updateInProgress = updateInProgress,
                 onCheckForUpdates = { viewModel.startAppUpdateDownload(context) },
-                modifier = Modifier.padding(top = 32.dp),
+                modifier = Modifier.padding(top = 16.dp),
             )
         }
     }
@@ -390,7 +343,7 @@ private fun SettingsAdvancedPanel(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggleExpanded)
-            .padding(top = 24.dp, bottom = 8.dp),
+            .padding(top = 16.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -641,8 +594,8 @@ private fun AppIconPicker(
     onSelect: (AppIcon) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         AppIconOption(
             label = stringResource(R.string.settings_app_icon_default),
@@ -672,32 +625,23 @@ private fun AppIconOption(
     } else {
         MaterialTheme.colorScheme.outlineVariant
     }
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(88.dp)
-                .border(
-                    width = if (selected) 3.dp else 1.dp,
-                    color = borderColor,
-                    shape = shape,
-                )
-                .clip(shape)
-                .background(Color.White),
-        ) {
-            Image(
-                painter = painterResource(previewRes),
-                contentDescription = label,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .border(
+                width = if (selected) 3.dp else 1.dp,
+                color = borderColor,
+                shape = shape,
             )
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 8.dp),
+            .clip(shape)
+            .background(Color.White)
+            .clickable(onClick = onClick),
+    ) {
+        Image(
+            painter = painterResource(previewRes),
+            contentDescription = label,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }

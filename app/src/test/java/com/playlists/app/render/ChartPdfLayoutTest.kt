@@ -100,6 +100,30 @@ class ChartPdfLayoutTest {
     }
 
     @Test
+    fun chooseTextSize_acceptsPreferredUpToMaxFont() {
+        val items = lineItems(5)
+        val chosen = ChartPdfLayout.chooseTextSize(
+            items = items,
+            hasNotes = false,
+            lineHeight = { size, _ -> size },
+            preferredSize = 20f,
+        )
+        assertEquals(ChartPdfLayout.MAX_FONT_SIZE, chosen)
+    }
+
+    @Test
+    fun chooseTextSize_clampsPreferredAboveMaxFont() {
+        val items = lineItems(5)
+        val chosen = ChartPdfLayout.chooseTextSize(
+            items = items,
+            hasNotes = false,
+            lineHeight = { size, _ -> size },
+            preferredSize = 24f,
+        )
+        assertEquals(ChartPdfLayout.MAX_FONT_SIZE, chosen)
+    }
+
+    @Test
     fun layoutPages_splitsLongChart() {
         val items = lineItems(80)
         val metrics = metrics(bodyLine = ChartPdfLayout.MAX_BODY_SIZE)
