@@ -2,11 +2,11 @@ package com.playlists.app.ui.components
 
 import android.content.Intent
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,11 +15,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.playlists.app.R
 import com.playlists.app.data.Song
+import com.playlists.app.ui.PdfHelper
 import com.playlists.app.ui.PlaylistsViewModel
-import com.playlists.app.util.AnnotatePdfContract
-import com.playlists.app.util.AnnotatePdfRequest
 import com.playlists.app.util.FileStamp
 import com.playlists.app.util.SongAnnotate
 import com.playlists.app.util.SongStoragePaths
@@ -34,50 +36,71 @@ fun AnnotateHost(
     onFinished: (Song?) -> Unit,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     var prepared by remember { mutableStateOf<Song?>(null) }
     var startedForId by remember { mutableStateOf<Long?>(null) }
     var showXodoPrompt by remember { mutableStateOf(false) }
-    var workingStamp by remember { mutableStateOf<FileStamp?>(null) }
+    var beforeStamp by remember { mutableStateOf<FileStamp?>(null) }
     var destSong by remember { mutableStateOf<Song?>(null) }
 
-    val editorLauncher = rememberLauncherForActivityResult(AnnotatePdfContract()) {
-        val song = destSong
-        val before = workingStamp
+    fun finishSession(song: Song?, before: FileStamp?) {
         destSong = null
-        workingStamp = null
+        beforeStamp = null
         if (song == null || before == null) {
             onFinished(null)
-            return@rememberLauncherForActivityResult
+            return
         }
         scope.launch {
             val dest = SongStoragePaths.resolve(song.filePath)
-            val applied = withContext(Dispatchers.IO) {
-                SongAnnotate.applyWorkingCopy(SongAnnotate.pendingFile(context), dest, before)
+            val changed = withContext(Dispatchers.IO) {
+                val did = SongAnnotate.stampChanged(dest, before)
+                if (did) PdfHelper.invalidate(dest)
+                did
             }
-            if (!applied) {
+            if (!changed) {
                 Toast.makeText(context, R.string.annotate_unchanged, Toast.LENGTH_SHORT).show()
             }
             onFinished(viewModel.getSong(song.id))
         }
     }
 
+    DisposableEffect(destSong, beforeStamp, lifecycleOwner) {
+        val song = destSong
+        val before = beforeStamp
+        if (song == null || before == null) {
+            return@DisposableEffect onDispose { }
+        }
+        var sawPause = false
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> sawPause = true
+                Lifecycle.Event.ON_RESUME -> {
+                    if (sawPause) finishSession(song, before)
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     fun launchEditor(targetPackage: String?) {
         val song = prepared ?: return
         val source = SongStoragePaths.resolve(song.filePath)
-        val preparedCopy = SongAnnotate.prepareWorkingCopy(context, source)
-        if (preparedCopy == null) {
+        val uri = SongAnnotate.songUri(context, source)
+        if (uri == null) {
             Toast.makeText(context, R.string.annotate_failed, Toast.LENGTH_SHORT).show()
             onFinished(null)
             return
         }
         destSong = song
-        workingStamp = preparedCopy.second
+        beforeStamp = SongAnnotate.stampOf(source)
         runCatching {
-            editorLauncher.launch(AnnotatePdfRequest(preparedCopy.first, targetPackage))
+            context.startActivity(SongAnnotate.editorIntent(context, uri, targetPackage))
         }.onFailure {
             destSong = null
-            workingStamp = null
+            beforeStamp = null
             Toast.makeText(context, R.string.annotate_no_editor, Toast.LENGTH_SHORT).show()
             onFinished(null)
         }

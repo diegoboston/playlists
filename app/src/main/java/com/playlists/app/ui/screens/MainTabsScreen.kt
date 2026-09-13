@@ -168,8 +168,9 @@ fun MainTabsScreen(
         .collectAsStateWithLifecycle()
 
     LaunchedEffect(entries, remoteRunning, startupPlaylistId) {
+        val list = entries ?: return@LaunchedEffect
         if (!remoteRunning || startupPlaylistId == null) return@LaunchedEffect
-        PlayRemoteController.refreshSongs(startupPlaylistId, entries)
+        PlayRemoteController.refreshSongs(startupPlaylistId, list)
     }
 
     fun cancelRemoteFlow() {

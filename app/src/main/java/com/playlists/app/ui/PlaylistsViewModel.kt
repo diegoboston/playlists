@@ -65,12 +65,12 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     private var launchUpdatePromptHandled = false
 
-    private val playlistSongsFlows = ConcurrentHashMap<Long, StateFlow<List<PlaylistSongWithDetails>>>()
+    private val playlistSongsFlows = ConcurrentHashMap<Long, StateFlow<List<PlaylistSongWithDetails>?>>()
 
-    fun observePlaylistSongs(playlistId: Long): StateFlow<List<PlaylistSongWithDetails>> =
+    fun observePlaylistSongs(playlistId: Long): StateFlow<List<PlaylistSongWithDetails>?> =
         playlistSongsFlows.getOrPut(playlistId) {
             playlistRepo.observeSongs(playlistId)
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
         }
 
     fun setPendingImport(pending: PendingImport?) {

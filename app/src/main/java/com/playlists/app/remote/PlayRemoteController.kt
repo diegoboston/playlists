@@ -22,9 +22,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 object PlayRemoteController {
     private var server: PlayRemoteServer? = null
@@ -74,6 +76,9 @@ object PlayRemoteController {
 
     /** Playlist id included in the shared start URL, if remote was started with one. */
     fun startupPlaylistId(): Long? = session?.startupPlaylistId
+
+    fun isRunningFor(playlistId: Long): Boolean =
+        isRunning() && startupPlaylistId() == playlistId
 
     fun currentUrl(): String? = if (isRunning()) publicUrl else null
 
@@ -411,10 +416,11 @@ object PlayRemoteController {
         }
     }
 
-    fun refreshSongs(playlistId: Long, entries: List<PlaylistSongWithDetails>) {
+    suspend fun refreshSongs(playlistId: Long, entries: List<PlaylistSongWithDetails>) {
         val remote = server ?: return
-        if (!remote.isAlive) return
-        remote.reconcilePlayback(playlistId, entriesToRemoteSongs(entries))
+        if (!remote.isAlive || !isRunningFor(playlistId)) return
+        val songs = withContext(Dispatchers.IO) { entriesToRemoteSongs(entries) }
+        remote.reconcilePlayback(playlistId, songs)
     }
 
     fun stop() {

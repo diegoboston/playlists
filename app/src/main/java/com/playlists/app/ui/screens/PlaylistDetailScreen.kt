@@ -98,7 +98,8 @@ fun PlaylistDetailScreen(
     val chartSearchReady = rememberOpenAiKeyReady()
     val scope = rememberCoroutineScope()
     var playlist by remember { mutableStateOf<Playlist?>(null) }
-    val entries by viewModel.observePlaylistSongs(playlistId).collectAsStateWithLifecycle()
+    val loadedEntries by viewModel.observePlaylistSongs(playlistId).collectAsStateWithLifecycle()
+    val entries = loadedEntries.orEmpty()
     val listState = rememberLazyListState()
     val displayedKeys = remember { mutableStateListOf<String>() }
     val dragState = remember { ReorderDragState() }
@@ -193,7 +194,9 @@ fun PlaylistDetailScreen(
 
     LaunchedEffect(playlistId) {
         playlist = viewModel.getPlaylist(playlistId)
-        AppPrefs.setLastPlaylistId(context, playlistId)
+        withContext(Dispatchers.IO) {
+            AppPrefs.setLastPlaylistId(context, playlistId)
+        }
     }
 
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
@@ -202,9 +205,10 @@ fun PlaylistDetailScreen(
         syncDisplayedKeys(displayedKeys, dragState.draggingKey, entries.map { "e:${it.id}" })
     }
 
-    LaunchedEffect(entries, remoteRunning, playlistId) {
+    LaunchedEffect(loadedEntries, remoteRunning, playlistId) {
+        val list = loadedEntries ?: return@LaunchedEffect
         if (remoteRunning) {
-            PlayRemoteController.refreshSongs(playlistId, entries)
+            PlayRemoteController.refreshSongs(playlistId, list)
         }
     }
 
@@ -341,7 +345,18 @@ fun PlaylistDetailScreen(
             }
         },
     ) { padding ->
-        if (entries.isEmpty()) {
+        if (loadedEntries == null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(32.dp))
+            }
+        } else if (entries.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()

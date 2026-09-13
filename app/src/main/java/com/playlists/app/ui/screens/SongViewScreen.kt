@@ -40,6 +40,8 @@ import com.playlists.app.ui.components.PlaybackSongMedia
 import com.playlists.app.ui.components.PlaybackStage
 import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.ChartDraftStore
+import com.playlists.app.util.FileStamp
+import com.playlists.app.util.SongAnnotate
 import com.playlists.app.util.SongShare
 import com.playlists.app.util.SongStoragePaths
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +59,7 @@ fun SongViewScreen(
     var song by remember { mutableStateOf<Song?>(null) }
     var showEdit by remember { mutableStateOf(false) }
     var annotateSongId by remember { mutableStateOf<Long?>(null) }
-    var mediaGeneration by remember { mutableIntStateOf(0) }
+    var fileStamp by remember { mutableStateOf(FileStamp(0L, 0L)) }
     var deleteTarget by remember { mutableStateOf<SongDeletePrompt?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -76,12 +78,16 @@ fun SongViewScreen(
         return
     }
 
+    LaunchedEffect(loaded.filePath) {
+        fileStamp = SongAnnotate.stampOf(file)
+    }
+
     val fileType = runCatching { FileType.valueOf(loaded.fileType) }.getOrDefault(FileType.IMAGE)
     val hasChartSource = ChartDraftStore.hasChart(loaded.filePath)
-    var pageCount by remember(file) { mutableIntStateOf(1) }
+    var pageCount by remember(file, fileStamp) { mutableIntStateOf(1) }
     var pageIndex by rememberSaveable(songId) { mutableIntStateOf(0) }
 
-    LaunchedEffect(file, fileType) {
+    LaunchedEffect(file, fileType, fileStamp) {
         pageCount = when (fileType) {
             FileType.IMAGE -> 1
             FileType.PDF -> withContext(Dispatchers.IO) {
@@ -122,7 +128,7 @@ fun SongViewScreen(
             annotateSongId = null
             if (updated != null) {
                 song = updated
-                mediaGeneration++
+                fileStamp = SongAnnotate.stampOf(SongStoragePaths.resolve(updated.filePath))
             }
         },
     )
@@ -206,7 +212,7 @@ fun SongViewScreen(
         },
     ) { padding ->
         PlaybackStage(
-            contentKey = Triple(songId, pageIndex, mediaGeneration),
+            contentKey = Triple(songId, pageIndex, fileStamp),
             canGoPrev = pageIndex > 0,
             canGoNext = pageIndex < pageCount - 1,
             onPrev = { if (pageIndex > 0) pageIndex-- },

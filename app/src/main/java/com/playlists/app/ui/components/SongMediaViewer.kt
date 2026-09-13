@@ -33,6 +33,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.playlists.app.data.FileType
 import com.playlists.app.ui.PdfHelper
+import com.playlists.app.util.SongAnnotate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -170,11 +171,12 @@ private fun PdfPagerViewer(
     enableZoom: Boolean = true,
     onPageChanged: ((page: Int, pageCount: Int) -> Unit)? = null,
 ) {
-    var pageCount by remember(file) { mutableStateOf(0) }
+    val fileStamp = SongAnnotate.stampOf(file)
+    var pageCount by remember(file, fileStamp) { mutableStateOf(0) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val pagerState = rememberPagerState(pageCount = { pageCount.coerceAtLeast(1) })
 
-    LaunchedEffect(file) {
+    LaunchedEffect(file, fileStamp) {
         pageCount = withContext(Dispatchers.IO) { PdfHelper.pageCount(file) }
     }
 
@@ -240,11 +242,12 @@ private fun PdfPageImage(
     width: Int,
     enableZoom: Boolean = true,
 ) {
-    var bitmap by remember(file, pageIndex, width) { mutableStateOf<Bitmap?>(null) }
+    val fileStamp = SongAnnotate.stampOf(file)
+    var bitmap by remember(file, fileStamp, pageIndex, width) { mutableStateOf<Bitmap?>(null) }
     var scale by remember(file, pageIndex) { mutableFloatStateOf(1f) }
     var offset by remember(file, pageIndex) { mutableStateOf(Offset.Zero) }
 
-    LaunchedEffect(file, pageIndex, width) {
+    LaunchedEffect(file, fileStamp, pageIndex, width) {
         if (width <= 0) return@LaunchedEffect
         bitmap = withContext(Dispatchers.IO) {
             PdfHelper.renderPage(file, pageIndex, width)
