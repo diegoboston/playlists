@@ -74,4 +74,11 @@ object AppPrefs {
     fun setAdjustPageEnabled(context: Context, enabled: Boolean) {
         StageManagerState.writeAdjustPageEnabled(context, enabled)
     }
+
+    fun isHideSongShareEnabled(context: Context): Boolean =
+        StageManagerState.readHideSongShareEnabled(context)
+
+    fun setHideSongShareEnabled(context: Context, enabled: Boolean) {
+        StageManagerState.writeHideSongShareEnabled(context, enabled)
+    }
 }

@@ -34,6 +34,11 @@ data class PlaylistSong(
     val position: Int,
 )
 
+data class PlaylistSongCount(
+    val playlistId: Long,
+    val songCount: Int,
+)
+
 data class PlaylistSongWithDetails(
     val id: Long,
     val playlistId: Long,

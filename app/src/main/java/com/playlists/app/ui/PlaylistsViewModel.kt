@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,6 +38,10 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
 
     val playlists: StateFlow<List<Playlist>> = playlistRepo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val playlistSongCounts: StateFlow<Map<Long, Int>> = playlistRepo.observeSongCounts()
+        .map { rows -> rows.associate { it.playlistId to it.songCount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private val _pendingImport = MutableStateFlow<PendingImport?>(null)
     val pendingImport: StateFlow<PendingImport?> = _pendingImport.asStateFlow()
@@ -103,6 +108,10 @@ class PlaylistsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun getSong(id: Long): Song? = songRepo.getById(id)
+
+    suspend fun ensurePdfForAnnotate(id: Long): Song? = withContext(Dispatchers.IO) {
+        songRepo.ensurePdfForAnnotate(id)
+    }
 
     suspend fun getPlaylist(id: Long): Playlist? = playlistRepo.getById(id)
 

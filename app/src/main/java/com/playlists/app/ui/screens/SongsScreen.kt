@@ -49,6 +49,7 @@ import com.playlists.app.ui.SongSortCriterion
 import com.playlists.app.ui.NotesText
 import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.SongTitleWithKey
+import com.playlists.app.ui.components.AnnotateHost
 import com.playlists.app.ui.components.EditSongDialog
 import com.playlists.app.util.ChartDraftStore
 import kotlinx.coroutines.launch
@@ -64,6 +65,7 @@ fun SongsScreen(
     val sortGeneration by viewModel.songSortGeneration.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     var editTarget by remember { mutableStateOf<Song?>(null) }
+    var annotateSongId by remember { mutableStateOf<Long?>(null) }
     var deleteTarget by remember { mutableStateOf<SongDeletePrompt?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
@@ -183,8 +185,15 @@ fun SongsScreen(
                 }
             },
             onNewKey = { onNewKey(song.id) },
+            onAnnotate = { annotateSongId = song.id },
         )
     }
+
+    AnnotateHost(
+        songId = annotateSongId,
+        viewModel = viewModel,
+        onFinished = { annotateSongId = null },
+    )
 
     deleteTarget?.let { prompt ->
         val song = prompt.song

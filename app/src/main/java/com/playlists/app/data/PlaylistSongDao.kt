@@ -10,6 +10,15 @@ import kotlinx.coroutines.flow.Flow
 interface PlaylistSongDao {
     @Query(
         """
+        SELECT playlistId, COUNT(*) AS songCount
+        FROM playlist_songs
+        GROUP BY playlistId
+        """
+    )
+    fun observeSongCounts(): Flow<List<PlaylistSongCount>>
+
+    @Query(
+        """
         SELECT ps.id, ps.playlistId, ps.songId, ps.position,
                s.title, s.keySignature, s.notes, s.filePath, s.fileType
         FROM playlist_songs ps

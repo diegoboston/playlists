@@ -4,6 +4,7 @@ import com.playlists.app.ui.SongDisplay
 import com.playlists.app.util.ChartDraftStore
 import com.playlists.app.util.FileStorage
 import com.playlists.app.util.PlaceholderImageGenerator
+import com.playlists.app.util.SongAnnotate
 import com.playlists.app.util.SongFileOps
 import com.playlists.app.util.SongStoragePaths
 import kotlinx.coroutines.flow.Flow
@@ -86,6 +87,16 @@ class SongRepository(private val songDao: SongDao) {
     }
 
     suspend fun markViewed(id: Long) = songDao.updateLastViewedAt(id, System.currentTimeMillis())
+
+    suspend fun ensurePdfForAnnotate(id: Long): Song? {
+        val song = songDao.getById(id) ?: return null
+        val type = runCatching { FileType.valueOf(song.fileType) }.getOrDefault(FileType.IMAGE)
+        if (type == FileType.PDF) return song
+        val shared = songDao.getAll().count { it.filePath == song.filePath }
+        val converted = SongAnnotate.convertImageToCanonicalPdf(song, shared) ?: return null
+        songDao.update(converted)
+        return converted
+    }
 
     suspend fun search(query: String): List<Song> {
         val trimmed = query.trim()
@@ -186,6 +197,9 @@ class PlaylistRepository(
         }
         return newId
     }
+
+    fun observeSongCounts(): Flow<List<PlaylistSongCount>> =
+        playlistSongDao.observeSongCounts()
 
     fun observeSongs(playlistId: Long): Flow<List<PlaylistSongWithDetails>> =
         playlistSongDao.observeForPlaylist(playlistId)

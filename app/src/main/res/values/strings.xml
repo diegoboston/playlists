@@ -35,6 +35,8 @@
     <string name="adjust_page_warp_failed">Could not straighten that crop — try again or use the original photo</string>
     <string name="settings_adjust_page">Adjust page after camera</string>
     <string name="settings_adjust_page_hint">After each camera photo, drag the page corners to straighten the chart. Off by default.</string>
+    <string name="settings_hide_song_share">Hide song share button</string>
+    <string name="settings_hide_song_share_hint">Hides the download/share icon on song view and playlist playback. Off by default.</string>
     <string name="import_file_failed">Could not import that file</string>
     <string name="import_add_page">Add page</string>
     <plurals name="import_page_count">
@@ -150,6 +152,14 @@
     <string name="quickstart_default_name">Quickstart</string>
     <string name="delete_song">Delete song</string>
     <string name="edit_song">Edit song</string>
+    <string name="annotate">Annotate</string>
+    <string name="annotate_install_xodo_title">Annotate with Xodo</string>
+    <string name="annotate_install_xodo_message">Xodo can save markup back into this song. Install it, or choose another PDF editor (many apps save a copy instead).</string>
+    <string name="annotate_install_xodo">Install Xodo</string>
+    <string name="annotate_use_another_app">Use another app</string>
+    <string name="annotate_failed">Could not prepare this song for annotate</string>
+    <string name="annotate_no_editor">No app installed to annotate this file</string>
+    <string name="annotate_unchanged">No changes were saved back to this song</string>
     <string name="delete_song_confirm">Remove “%1$s” from the song archive and delete its file? This cannot be undone.</string>
     <string name="delete_song_confirm_in_playlists">Remove “%1$s” from the archive and from these playlists: %2$s? Its file will be deleted unless another archive entry shares it.</string>
     <string name="delete_orphan_song_title">Remove from archive?</string>

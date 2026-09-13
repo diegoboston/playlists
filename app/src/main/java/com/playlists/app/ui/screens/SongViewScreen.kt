@@ -34,9 +34,11 @@ import com.playlists.app.ui.PlaylistsViewModel
 import com.playlists.app.ui.SongDeletePrompt
 import com.playlists.app.ui.SongTitleWithKey
 import com.playlists.app.ui.PdfHelper
+import com.playlists.app.ui.components.AnnotateHost
 import com.playlists.app.ui.components.EditSongDialog
 import com.playlists.app.ui.components.PlaybackSongMedia
 import com.playlists.app.ui.components.PlaybackStage
+import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.ChartDraftStore
 import com.playlists.app.util.SongShare
 import com.playlists.app.util.SongStoragePaths
@@ -54,6 +56,8 @@ fun SongViewScreen(
 ) {
     var song by remember { mutableStateOf<Song?>(null) }
     var showEdit by remember { mutableStateOf(false) }
+    var annotateSongId by remember { mutableStateOf<Long?>(null) }
+    var mediaGeneration by remember { mutableIntStateOf(0) }
     var deleteTarget by remember { mutableStateOf<SongDeletePrompt?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -107,8 +111,21 @@ fun SongViewScreen(
                 }
             },
             onNewKey = { onNewKey(loaded.id) },
+            onAnnotate = { annotateSongId = loaded.id },
         )
     }
+
+    AnnotateHost(
+        songId = annotateSongId,
+        viewModel = viewModel,
+        onFinished = { updated ->
+            annotateSongId = null
+            if (updated != null) {
+                song = updated
+                mediaGeneration++
+            }
+        },
+    )
 
     deleteTarget?.let { prompt ->
         androidx.compose.material3.AlertDialog(
@@ -174,10 +191,12 @@ fun SongViewScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        SongShare.share(context, file, loaded.title, fileType)
-                    }) {
-                        Icon(Icons.Default.Download, contentDescription = stringResource(R.string.share_song))
+                    if (!AppPrefs.isHideSongShareEnabled(context)) {
+                        IconButton(onClick = {
+                            SongShare.share(context, file, loaded.title, fileType)
+                        }) {
+                            Icon(Icons.Default.Download, contentDescription = stringResource(R.string.share_song))
+                        }
                     }
                     IconButton(onClick = { showEdit = true }) {
                         Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.edit_song))
@@ -187,7 +206,7 @@ fun SongViewScreen(
         },
     ) { padding ->
         PlaybackStage(
-            contentKey = songId to pageIndex,
+            contentKey = Triple(songId, pageIndex, mediaGeneration),
             canGoPrev = pageIndex > 0,
             canGoNext = pageIndex < pageCount - 1,
             onPrev = { if (pageIndex > 0) pageIndex-- },

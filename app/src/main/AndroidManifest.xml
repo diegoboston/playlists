@@ -23,8 +23,13 @@
         android:required="false" />
 
     <queries>
+        <package android:name="com.xodo.pdf.reader" />
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.EDIT" />
+            <data android:mimeType="application/pdf" />
         </intent>
     </queries>
 

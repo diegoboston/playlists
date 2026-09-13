@@ -34,6 +34,7 @@ fun EditSongDialog(
     onSave: (title: String, key: String, notes: String) -> Unit,
     onDelete: () -> Unit,
     onNewKey: (() -> Unit)? = null,
+    onAnnotate: (() -> Unit)? = null,
 ) {
     var title by remember(song.id) { mutableStateOf(song.title) }
     var key by remember(song.id) { mutableStateOf(song.keySignature) }
@@ -80,6 +81,17 @@ fun EditSongDialog(
                                 if (lyricsOnly) R.string.song_reformat else R.string.song_new_key,
                             ),
                         )
+                    }
+                }
+                if (onAnnotate != null) {
+                    OutlinedButton(
+                        onClick = {
+                            onDismiss()
+                            onAnnotate()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.annotate))
                     }
                 }
                 Row(

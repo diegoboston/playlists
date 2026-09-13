@@ -13,6 +13,7 @@ object StageManagerState {
     private const val KEY_TUNNEL_REDIRECT_SECRET = "tunnel_redirect_secret"
     private const val KEY_TUNNEL_REDIRECT_VALIDATED = "tunnel_redirect_validated"
     private const val KEY_ADJUST_PAGE = "adjust_page"
+    private const val KEY_HIDE_SONG_SHARE = "hide_song_share"
 
     fun readRemoteCode(context: Context): Int {
         readFromFile()?.let { json ->
@@ -167,6 +168,26 @@ object StageManagerState {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_ADJUST_PAGE, enabled)
+            .apply()
+    }
+
+    fun readHideSongShareEnabled(context: Context): Boolean {
+        readFromFile()?.let { json ->
+            if (json.has(KEY_HIDE_SONG_SHARE)) {
+                return json.getBoolean(KEY_HIDE_SONG_SHARE)
+            }
+        }
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_HIDE_SONG_SHARE, false)
+    }
+
+    fun writeHideSongShareEnabled(context: Context, enabled: Boolean) {
+        val json = readFromFile() ?: JSONObject()
+        json.put(KEY_HIDE_SONG_SHARE, enabled)
+        writeToFile(json)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_HIDE_SONG_SHARE, enabled)
             .apply()
     }
 

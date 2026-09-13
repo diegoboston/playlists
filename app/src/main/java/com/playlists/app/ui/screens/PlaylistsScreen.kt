@@ -72,6 +72,7 @@ fun PlaylistsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val songCounts by viewModel.playlistSongCounts.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val displayedKeys = remember { mutableStateListOf<String>() }
     val dragState = remember { ReorderDragState() }
@@ -198,8 +199,7 @@ fun PlaylistsScreen(
                     val playlistId = key.removePrefix("p:").toLongOrNull() ?: return@items
                     val playlist = playlists.find { it.id == playlistId } ?: return@items
                     val paletteIndex = playlists.indexOfFirst { it.id == playlistId }.coerceAtLeast(0)
-                    val playlistSongs by viewModel.observePlaylistSongs(playlist.id)
-                        .collectAsStateWithLifecycle()
+                    val songCount = songCounts[playlist.id] ?: 0
                     DraggableItem(
                         isDragging = dragState.draggingKey == key,
                         dragOffset = dragState.currentDragOffset(listState),
@@ -216,7 +216,7 @@ fun PlaylistsScreen(
                     ) {
                         PlaylistBlock(
                             playlist = playlist,
-                            songCount = playlistSongs.size,
+                            songCount = songCount,
                             fallbackColor = PlaylistAccentColors.palette[paletteIndex % PlaylistAccentColors.palette.size],
                             showPushToServer = stableRedirectReady,
                             pushingToServer = pushingPlaylistId == playlist.id,
@@ -225,9 +225,9 @@ fun PlaylistsScreen(
                             onColor = { colorTarget = playlist },
                             onDelete = { deleteTarget = playlist },
                             onDuplicate = { duplicateTarget = playlist },
-                            onExport = { exportPlaylistPdf(playlist.id, playlistSongs.size) },
+                            onExport = { exportPlaylistPdf(playlist.id, songCount) },
                             onPushToServer = {
-                                pushPlaylistToServer(playlist.id, playlist.name, playlistSongs.size)
+                                pushPlaylistToServer(playlist.id, playlist.name, songCount)
                             },
                         )
                     }

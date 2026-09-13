@@ -33,6 +33,7 @@ import com.playlists.app.ui.SongDisplay
 import com.playlists.app.ui.buildPlaybackFrames
 import com.playlists.app.ui.components.PlaybackSongMedia
 import com.playlists.app.ui.components.PlaybackStage
+import com.playlists.app.util.AppPrefs
 import com.playlists.app.util.SongShare
 import com.playlists.app.util.SongStoragePaths
 import kotlinx.coroutines.Dispatchers
@@ -108,17 +109,19 @@ fun PlaylistPlaybackScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        val item = frame
-                        val file = SongStoragePaths.resolve(item.entry.filePath)
-                        val fileType = runCatching { FileType.valueOf(item.entry.fileType) }
-                            .getOrDefault(FileType.IMAGE)
-                        SongShare.share(context, file, item.entry.title, fileType)
-                    }) {
-                        Icon(
-                            Icons.Default.Download,
-                            contentDescription = stringResource(R.string.share_song),
-                        )
+                    if (!AppPrefs.isHideSongShareEnabled(context)) {
+                        IconButton(onClick = {
+                            val item = frame
+                            val file = SongStoragePaths.resolve(item.entry.filePath)
+                            val fileType = runCatching { FileType.valueOf(item.entry.fileType) }
+                                .getOrDefault(FileType.IMAGE)
+                            SongShare.share(context, file, item.entry.title, fileType)
+                        }) {
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = stringResource(R.string.share_song),
+                            )
+                        }
                     }
                     IconButton(onClick = {
                         currentIndex = 0

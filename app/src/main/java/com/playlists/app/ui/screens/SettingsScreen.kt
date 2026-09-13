@@ -112,6 +112,7 @@ fun SettingsScreen(
     var librarySizeLabel by remember { mutableStateOf<String?>(null) }
     var selectedAppIcon by remember { mutableStateOf(AppIconManager.getSelected(context)) }
     var adjustPageEnabled by remember { mutableStateOf(AppPrefs.isAdjustPageEnabled(context)) }
+    var hideSongShareEnabled by remember { mutableStateOf(AppPrefs.isHideSongShareEnabled(context)) }
     var advancedExpanded by remember { mutableStateOf(false) }
     val savedOpenAiKey = remember { AiCredentialStore.getOpenAiApiKey(context).orEmpty() }
     val savedSubdomain = remember { AppPrefs.getTunnelRedirectSubdomain(context).orEmpty() }
@@ -255,6 +256,32 @@ fun SettingsScreen(
                     onCheckedChange = { enabled ->
                         adjustPageEnabled = enabled
                         AppPrefs.setAdjustPageEnabled(context, enabled)
+                    },
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_hide_song_share),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_hide_song_share_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                Switch(
+                    checked = hideSongShareEnabled,
+                    onCheckedChange = { enabled ->
+                        hideSongShareEnabled = enabled
+                        AppPrefs.setHideSongShareEnabled(context, enabled)
                     },
                 )
             }

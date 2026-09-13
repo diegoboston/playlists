@@ -33,6 +33,8 @@ Update this file when adding features or recording **intentional** differences.
 | Browse song archive | Songs tab — search + sort | `/songs` — search + same sort buttons | Aligned |
 | Quickstart playlist | Quickstart screen | `/` index — paste, match, create | Aligned (remote only UI on index) |
 | 2-up page spread | — | **2-up** toggle on play view | **Intentional** (remote only) |
+| Share / download current song | Toolbar ↓; hidden when **Hide song share button** is on | **↓** always downloads the file | **Intentional** (hide setting is local-only) |
+| Annotate chart (Xodo / PDF editor) | Pencil → **Annotate** (image→PDF, in-place write-back) | — | **Intentional** (phone-local) |
 | Open playlist editor | In-app detail screen | Pencil → `/edit` | Aligned entry points |
 
 ## Server / data
