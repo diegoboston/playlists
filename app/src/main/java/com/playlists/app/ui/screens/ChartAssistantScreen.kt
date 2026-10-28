@@ -15,6 +15,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -186,6 +188,7 @@ fun ChartAssistantScreen(
                         },
                         onReleaseMic = viewModel::stopRecordingAndProcess,
                         onCancelMic = viewModel::cancelRecording,
+                        onPastedText = { text -> viewModel.importPastedText(text, selectedMode) },
                         onTypedSearch = { text ->
                             viewModel.searchFromText(text, selectedMode)
                         },
@@ -218,20 +221,38 @@ private fun IdleSearchContent(
     onReleaseMic: () -> Unit,
     onCancelMic: () -> Unit,
     onTypedSearch: (String) -> Unit,
+    onPastedText: (String) -> Unit,
 ) {
     var typedQuery by rememberSaveable { mutableStateOf("") }
+    var pastedText by rememberSaveable { mutableStateOf("") }
+    var pasteMode by rememberSaveable { mutableStateOf(false) }
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        HoldToRecordMic(
+        if (!pasteMode) HoldToRecordMic(
             isRecording = isRecording,
             onPressMic = onPressMic,
             onReleaseMic = onReleaseMic,
             onCancelMic = onCancelMic,
         )
         if (!isRecording) {
-            OutlinedTextField(
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !pasteMode, onClick = { pasteMode = false },
+                    label = { Text(stringResource(R.string.chart_assistant_search)) })
+                FilterChip(selected = pasteMode, onClick = { pasteMode = true },
+                    label = { Text(stringResource(R.string.chart_assistant_paste_text)) })
+            }
+            if (pasteMode) {
+                OutlinedTextField(
+                    value = pastedText,
+                    onValueChange = { if (it.length <= 30_000) pastedText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.chart_assistant_paste_text)) },
+                    supportingText = { Text(stringResource(R.string.chart_assistant_paste_help)) },
+                    minLines = 6, maxLines = 12,
+                )
+            } else OutlinedTextField(
                 value = typedQuery,
                 onValueChange = { typedQuery = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -249,8 +270,8 @@ private fun IdleSearchContent(
                 onSelected = onSearchModeChange,
             )
             OutlinedButton(
-                onClick = { onTypedSearch(typedQuery) },
-                enabled = typedQuery.isNotBlank(),
+                onClick = { if (pasteMode) onPastedText(pastedText) else onTypedSearch(typedQuery) },
+                enabled = if (pasteMode) pastedText.isNotBlank() else typedQuery.isNotBlank(),
                 modifier = Modifier.align(Alignment.End),
             ) {
                 Icon(
@@ -260,7 +281,7 @@ private fun IdleSearchContent(
                         .padding(end = 8.dp)
                         .size(18.dp),
                 )
-                Text(stringResource(R.string.chart_assistant_search))
+                Text(stringResource(if (pasteMode) R.string.chart_assistant_create_from_text else R.string.chart_assistant_search))
             }
         }
     }

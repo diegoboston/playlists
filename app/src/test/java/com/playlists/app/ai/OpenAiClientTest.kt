@@ -161,6 +161,33 @@ class OpenAiClientTest {
         assertEquals("Funky gallo, come sono bello stamattina", draft.sections[0].lines[0])
     }
 
+    @Test
+    fun extractPastedTextSendsRawContentAndDoesNotInventASourceUrl() {
+        val raw = "Advertisement\nTest song by Artist\n[Verse]\nC Hello\nSubscribe"
+        val chart = "TITLE: Test song\nARTIST: Artist\nKEY: C\n[Verse]\n<C>Hello"
+        repeat(2) {
+            server.enqueue(MockResponse().setBody(JSONObject().put("choices", org.json.JSONArray()
+                .put(JSONObject().put("message", JSONObject().put("content", chart)))).toString()))
+        }
+        val client = clientForServer()
+        val chords = client.extractPastedText(raw, ChartSearchMode.ChordsAndLyrics)!!
+        assertEquals("<C>Hello", chords.sections.first().lines.first())
+        assertEquals(null, chords.sourceUrl)
+        val request = server.takeRequest()
+        assertEquals("/v1/chat/completions", request.path)
+        val messages = JSONObject(request.body.readUtf8()).getJSONArray("messages")
+        assertEquals(raw, messages.getJSONObject(1).getString("content"))
+        assertTrue(messages.getJSONObject(0).getString("content").contains("Remove ads"))
+        val lyrics = client.extractPastedText(raw, ChartSearchMode.LyricsOnly)!!
+        assertEquals("Hello", lyrics.sections.first().lines.first())
+        assertEquals(null, lyrics.key)
+        server.takeRequest()
+        assertThrows(IllegalArgumentException::class.java) {
+            client.extractPastedText("x".repeat(30_001), ChartSearchMode.LyricsOnly)
+        }
+        assertEquals(2, server.requestCount)
+    }
+
     private fun clientForServer(): OpenAiClient {
         val http = OkHttpClient.Builder()
             .addInterceptor { chain ->

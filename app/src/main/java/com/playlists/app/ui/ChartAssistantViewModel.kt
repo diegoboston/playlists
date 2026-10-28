@@ -147,6 +147,38 @@ class ChartAssistantViewModel(
         }
     }
 
+    fun importPastedText(text: String, searchMode: ChartSearchMode) {
+        if (_uiState.value != ChartAssistantUiState.Idle) return
+        _uiState.value = ChartAssistantUiState.Processing
+        launchWork {
+            try {
+                val preview = withContext(Dispatchers.IO) {
+                    val context = getApplication<Application>()
+                    val apiKey = AiCredentialStore.getOpenAiApiKey(context)
+                        ?: throw ChartAssistantException("Add OpenAI API key in Settings")
+                    val playlist = playlistId?.let { playlistRepo.getById(it) }
+                    if (playlistId != null && playlist == null) throw ChartAssistantException("Playlist not found")
+                    val draft = OpenAiClient(apiKey).extractPastedText(text, searchMode)
+                        ?: throw ChartAssistantException("Could not extract a song from the pasted text")
+                    val size = ChartPdfRenderer.resolvedBodyTextSize(draft)
+                    val resolved = draft.copy(bodyTextSize = size)
+                    val file = File.createTempFile("chart-preview-", ".pdf", context.cacheDir)
+                    file.writeBytes(ChartPdfRenderer.render(resolved, size))
+                    ChartAssistantUiState.Preview(
+                        intent = ChartIntent.fromTypedQuery(draft.title, searchMode)!!,
+                        playlist = playlist, sourceDraft = resolved, draft = resolved,
+                        pdfFile = file, transposeNote = null,
+                        chartKeyGuessed = draft.isChartKeyGuessed(), bodyTextSize = size,
+                    )
+                }
+                _uiState.value = preview
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                _uiState.value = ChartAssistantUiState.Error(error.userMessage())
+            }
+        }
+    }
+
     fun retrySearch() {
         val state = _uiState.value
         if (state is ChartAssistantUiState.IntentReady) {

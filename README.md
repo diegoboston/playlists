@@ -341,7 +341,7 @@ Voice handles the **command** only when you use the mic. You still confirm with 
 - **OpenAI only** (Whisper + `gpt-4o-mini` for intent, extract, and scan-image OCR). Extract asks for a line-oriented chart so a truncated reply can still keep complete verses. The page fetch prefers a lyric block when the HTML has one (e.g. lyrics.com `pre#lyric-body-text`).
 - **DuckDuckGo** HTML search — result quality varies; each batch contains up to five hits, unreadable pages are skipped, and **Try next** advances by five.
 - No refine pass yet (“two columns”, “drop chorus”), no “add after song X”, no delete/add-existing voice commands.
-- Not exposed on remote web or HTTP API.
+- Available in the app and in the remote web playlist editor. Choose **Paste text** to supply copied lyrics or a chord chart (up to 30,000 characters). The LLM removes ads, metadata, and page clutter without searching or transcribing audio. Choose **Chords + lyrics** or **Lyrics only**, review the PDF, then confirm to save. Text imports have no **Try next** search batch.
 
 ### Local search simulator
 

@@ -252,4 +252,7 @@
         <item quantity="one">%d shared file path</item>
         <item quantity="other">%d shared file paths</item>
     </plurals>
+    <string name="chart_assistant_paste_text">Paste text</string>
+    <string name="chart_assistant_paste_help">Paste copied lyrics or a chord chart (up to 30,000 characters). AI removes ads and page clutter, then prepares a preview.</string>
+    <string name="chart_assistant_create_from_text">Create from text</string>
 </resources>

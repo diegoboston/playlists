@@ -75,6 +75,17 @@ class OpenAiClient(
             ?.let { draft -> if (lyricsOnly) draft.withoutChords() else draft }
     }
 
+    fun extractPastedText(text: String, searchMode: ChartSearchMode): ChartDraft? {
+        require(text.isNotBlank()) { "Paste some song text" }
+        require(text.length <= 30_000) { "Song text is too long (maximum 30,000 characters)" }
+        val lyricsOnly = searchMode == ChartSearchMode.LyricsOnly
+        val content = chatJson(
+            AiPrompts.extractPastedTextSystem(lyricsOnly), text, jsonObject = false,
+        ) ?: return null
+        return ChartTextParser.parse(content, fallbackTitle = "Untitled song")
+            ?.let { if (lyricsOnly) it.withoutChords() else it }
+    }
+
     fun extractChartFromCandidates(
         candidates: List<ChartCandidatePage>,
         intent: ChartIntent,

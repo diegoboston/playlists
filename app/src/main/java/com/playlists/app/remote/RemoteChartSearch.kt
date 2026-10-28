@@ -36,6 +36,9 @@ class RemoteChartSearch(
     private val save: suspend (Long, ChartDraft, ByteArray, ChartSearchMode) -> Unit,
     private val available: () -> Boolean,
     private val playlistExists: suspend (Long) -> Boolean,
+    private val extractText: suspend (String, ChartSearchMode) -> ChartDraft = { _, _ ->
+        error("Text import unavailable")
+    },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val sessions = mutableMapOf<String, Session>()
@@ -66,15 +69,35 @@ class RemoteChartSearch(
                 "lyrics" -> ChartSearchMode.LyricsOnly
                 else -> error("Invalid search mode")
             }
-            val query = body.optString("query").trim()
+            val input = body.optString("input", "search")
+            require(input == "search" || input == "text") { "Invalid input mode" }
+            val pastedText = body.optString("text").trim()
+            if (input == "text") {
+                require(pastedText.isNotBlank()) { "Paste some song text" }
+                require(pastedText.length <= 30_000) { "Song text is too long (maximum 30,000 characters)" }
+            }
+            val query = if (input == "text") "Pasted song" else body.optString("query").trim()
             require(query.length <= 500) { "Search query is too long" }
             val intent = requireNotNull(ChartIntent.fromTypedQuery(query, mode)) { "Enter a song title" }
             val token = UUID.randomUUID().toString()
             val session = Session(playlistId, intent)
+            if (input == "text") session.hasNextBatch = false
             sessions[token] = session
             work(session) {
                 check(playlistExists(playlistId)) { "Playlist not found" }
-                loadBatch(session, 0)
+                if (input == "text") {
+                    val draft = extractText(pastedText, mode)
+                    currentCoroutineContext().ensureActive()
+                    val pdf = render(draft)
+                    synchronized(this) {
+                        session.hasNextBatch = false
+                        session.draft = draft
+                        session.pdf = pdf
+                        session.state = "preview"
+                    }
+                } else {
+                    loadBatch(session, 0)
+                }
             }
             return snapshot(token, session)
         }
@@ -178,6 +201,14 @@ class RemoteChartSearch(
                         "Add OpenAI API key in the app Settings"
                     }
                     val draft = ChartAssistantService(OpenAiClient(key)).fetchAndExtractChartBatch(results, intent)
+                    draft.copy(bodyTextSize = ChartPdfRenderer.resolvedBodyTextSize(draft))
+                },
+                extractText = { text, mode ->
+                    val key = checkNotNull(AiCredentialStore.getOpenAiApiKey(context)) {
+                        "Add OpenAI API key in the app Settings"
+                    }
+                    val draft = OpenAiClient(key).extractPastedText(text, mode)
+                        ?: error("Could not extract a song from the pasted text")
                     draft.copy(bodyTextSize = ChartPdfRenderer.resolvedBodyTextSize(draft))
                 },
                 render = { ChartPdfRenderer.render(it, it.bodyTextSize) },
