@@ -38,12 +38,32 @@ fun RemotePlayFlowDialog(
     onCancel: () -> Unit,
     onCloseStarted: () -> Unit,
     onStopRemote: () -> Unit,
-    onSelectMode: (RemotePlayMode) -> Unit,
+    canUploadPlaylistPdf: Boolean,
+    onSelectMode: (RemotePlayMode, Boolean) -> Unit,
 ) {
     when (state) {
         RemotePlayFlowState.ChooseMode -> {
             val context = LocalContext.current
             val stableReady = remember { AppPrefs.isStableRedirectReady(context) }
+            var choosePdfUpload by remember { mutableStateOf(false) }
+            if (choosePdfUpload) {
+                AlertDialog(
+                    onDismissRequest = onCancel,
+                    title = { Text(stringResource(R.string.remote_playlist_pdf_title)) },
+                    text = { Text(stringResource(R.string.remote_playlist_pdf_message)) },
+                    confirmButton = {
+                        TextButton(onClick = { onSelectMode(RemotePlayMode.STABLE, true) }) {
+                            Text(stringResource(R.string.remote_playlist_pdf_upload))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { onSelectMode(RemotePlayMode.STABLE, false) }) {
+                            Text(stringResource(R.string.remote_playlist_pdf_skip))
+                        }
+                    },
+                )
+                return
+            }
             AlertDialog(
                 onDismissRequest = onCancel,
                 title = { Text(stringResource(R.string.remote_mode_title)) },
@@ -55,7 +75,13 @@ fun RemotePlayFlowDialog(
                         )
                         if (stableReady) {
                             TextButton(
-                                onClick = { onSelectMode(RemotePlayMode.STABLE) },
+                                onClick = {
+                                    if (canUploadPlaylistPdf) {
+                                        choosePdfUpload = true
+                                    } else {
+                                        onSelectMode(RemotePlayMode.STABLE, false)
+                                    }
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(top = 8.dp),
@@ -64,13 +90,13 @@ fun RemotePlayFlowDialog(
                             }
                         }
                         TextButton(
-                            onClick = { onSelectMode(RemotePlayMode.CLOUDFLARE) },
+                            onClick = { onSelectMode(RemotePlayMode.CLOUDFLARE, false) },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(stringResource(R.string.remote_mode_cloudflare))
                         }
                         TextButton(
-                            onClick = { onSelectMode(RemotePlayMode.LAN) },
+                            onClick = { onSelectMode(RemotePlayMode.LAN, false) },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(stringResource(R.string.remote_mode_lan))
@@ -158,7 +184,6 @@ fun RemotePlayStartedDialog(
     }
 
     LaunchedEffect(mode, refreshTick) {
-        if (mode == RemotePlayMode.LAN) return@LaunchedEffect
         if (!PlayRemoteController.running.value) {
             debug = null
             return@LaunchedEffect
@@ -249,14 +274,19 @@ internal fun RemotePlayStartedDialogContent(
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
-        if (mode != RemotePlayMode.LAN) {
-            debug?.let { info ->
-                Spacer(Modifier.height(16.dp))
-                RemotePlayDebugPanel(
-                    info = info,
-                    onRefresh = onRefreshDebug,
-                )
-            }
+        if (debug == null) {
+            Text(
+                stringResource(R.string.remote_debug_checking),
+                modifier = Modifier.padding(top = 16.dp),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        debug?.let { info ->
+            Spacer(Modifier.height(16.dp))
+            RemotePlayDebugPanel(
+                info = info,
+                onRefresh = onRefreshDebug,
+            )
         }
     }
 }

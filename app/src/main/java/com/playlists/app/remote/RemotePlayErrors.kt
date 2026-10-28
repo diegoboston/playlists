@@ -53,7 +53,12 @@ object RemotePlayErrors {
 
     fun tunnelReachabilityWarning(detail: String): String {
         val base = "Tunnel not reachable yet ($detail)."
-        return if (looksLikeTunnelHostnameUnresolved(detail)) {
+        return if (detail.contains("HTTP 530")) {
+            "$base Cloudflare cannot route this tunnel to a healthy connector. A running " +
+                "cloudflared process alone does not prove it is connected. Check the cloudflared " +
+                "log below, then stop and restart remote play and use the newly shown session URL. " +
+                "If it persists, try another network and check whether a VPN or firewall blocks the tunnel."
+        } else if (looksLikeTunnelHostnameUnresolved(detail)) {
             "$base The tunnel hostname can take 30–60 seconds to appear in DNS after cloudflared " +
                 "starts. Wait, then tap Refresh — checking too early can cache “not found” on " +
                 "mobile networks. If it still fails, toggle airplane mode or use LAN on the same Wi‑Fi."

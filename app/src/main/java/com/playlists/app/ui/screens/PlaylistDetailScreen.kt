@@ -228,7 +228,7 @@ fun PlaylistDetailScreen(
         Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
     }
 
-    fun startRemote(mode: RemotePlayMode) {
+    fun startRemote(mode: RemotePlayMode, uploadPlaylistPdf: Boolean) {
         val generation = remoteStartGeneration + 1
         remoteStartGeneration = generation
         remoteFlow = RemotePlayFlowState.Starting(mode)
@@ -249,6 +249,7 @@ fun PlaylistDetailScreen(
                     playlistName = name,
                     entries = list,
                     mode = mode,
+                    uploadPlaylistPdf = uploadPlaylistPdf,
                     onPhase = { phase ->
                         scope.launch(Dispatchers.Main.immediate) {
                             if (generation == remoteStartGeneration) {
@@ -546,7 +547,8 @@ fun PlaylistDetailScreen(
             onCancel = { cancelRemoteFlow() },
             onCloseStarted = { closeRemoteStartedDialog() },
             onStopRemote = { stopRemoteFlow() },
-            onSelectMode = { mode -> startRemote(mode) },
+            canUploadPlaylistPdf = !loadedEntries.isNullOrEmpty(),
+            onSelectMode = { mode, uploadPdf -> startRemote(mode, uploadPdf) },
         )
     }
 

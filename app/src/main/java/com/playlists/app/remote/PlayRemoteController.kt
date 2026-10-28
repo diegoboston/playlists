@@ -124,6 +124,18 @@ object PlayRemoteController {
     private fun collectDebugInfoForSession(active: RemotePlaySession): RemotePlayDebugInfo {
         val localUrl = "http://127.0.0.1:${active.localPort}/"
         val localProbe = RemotePlayHealth.probeGet(localUrl, timeoutMs = 4_000)
+        val urlProbes = appContext?.let { context ->
+            RemotePlayHealth.probeUrls(
+                RemotePlayUrls.forSession(
+                    context,
+                    SessionSnapshot(
+                        active.mode, active.localPort, active.tunnelBaseUrl, active.publicUrl,
+                        active.stableUrlActive, active.startupPlaylistId,
+                    ),
+                    active.startupPlaylistId,
+                ),
+            )
+        }.orEmpty()
         val cloudflaredRunning = CloudflareTunnel.isRunning()
         val tunnelProbe = active.tunnelBaseUrl?.let {
             RemotePlayHealth.tunnelStatusWhenServing(it, cloudflaredRunning, localProbe.ok)
@@ -131,7 +143,7 @@ object PlayRemoteController {
         val warnings = active.startWarnings
             .filterNot { RemotePlayErrors.isTunnelUnreachableWarning(it) }
             .toMutableList()
-        if (!cloudflaredRunning) {
+        if (active.mode.usesCloudflareTunnel() && !cloudflaredRunning) {
             warnings.add("cloudflared is not running — the public URL will not work.")
             CloudflareTunnel.lastExitCode()?.let { code ->
                 warnings.add("cloudflared last exit code: $code")
@@ -160,6 +172,7 @@ object PlayRemoteController {
             cloudflaredLog = CloudflareTunnel.recentLogs(),
             warnings = warnings,
             checkedAtMs = System.currentTimeMillis(),
+            urlProbes = urlProbes,
         )
     }
 
@@ -190,6 +203,7 @@ object PlayRemoteController {
         playlistName: String,
         entries: List<PlaylistSongWithDetails>,
         mode: RemotePlayMode = RemotePlayMode.CLOUDFLARE,
+        uploadPlaylistPdf: Boolean = true,
         onPhase: (RemotePlayStartPhase) -> Unit = {},
     ): Result<String> {
         stop()
@@ -220,6 +234,7 @@ object PlayRemoteController {
             compatJs = compatJs,
             uploadJs = uploadJs,
             uploadPanelCss = uploadPanelCss,
+            chartSearch = RemoteChartSearch.create(context.applicationContext),
             onLoadPlaylist = { id ->
                 runBlocking { loadPlaylist(id) }
             },
@@ -349,7 +364,7 @@ object PlayRemoteController {
                 val registration = registerStableTunnel(context, tunnelUrl)
                 stableUrlActive = registration.first
                 startWarnings.addAll(registration.second)
-                if (playlistId != null && entries.isNotEmpty()) {
+                if (uploadPlaylistPdf && playlistId != null && entries.isNotEmpty()) {
                     onPhase(RemotePlayStartPhase.UPLOADING_PDF)
                     val pdfWarnings = pushStablePlaylistPdf(
                         context = context,

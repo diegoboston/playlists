@@ -86,6 +86,10 @@
     <string name="remote_mode_stable_hint">Configure Workers subdomain and write secret in Settings</string>
     <string name="remote_mode_lan">LAN only (same Wi‑Fi)</string>
     <string name="remote_starting_stable">Starting stable redirect and Cloudflare tunnel… This can take up to a minute.</string>
+    <string name="remote_playlist_pdf_title">Upload playlist PDF?</string>
+    <string name="remote_playlist_pdf_message">Upload this playlist as a PDF for offline access at the stable URL, or skip to start remote play without uploading. Skipping keeps any previously uploaded PDF.</string>
+    <string name="remote_playlist_pdf_upload">Upload</string>
+    <string name="remote_playlist_pdf_skip">Skip</string>
     <string name="remote_uploading_playlist_pdf">Uploading playlist PDF for offline access…</string>
     <string name="remote_starting_cloudflare">Starting Cloudflare tunnel… This can take up to a minute.</string>
     <string name="remote_starting_lan">Starting local server…</string>
@@ -128,6 +132,8 @@
     <string name="remote_notification_title">Remote: %1$s</string>
     <string name="remote_notification_body">Active — tap to open the app, or Stop to end remote play</string>
     <string name="remote_debug_title">Remote play status</string>
+    <string name="remote_debug_checking">Checking connections…</string>
+    <string name="remote_debug_probe_hint">HTTP checks from this phone. Green = OK; red = failed. LAN access from other devices also depends on Wi-Fi isolation. Tap Refresh to check again.</string>
     <string name="remote_debug_heading">Connection checks</string>
     <string name="remote_debug_local">Local server</string>
     <string name="remote_debug_tunnel">Tunnel URL</string>

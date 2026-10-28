@@ -2,6 +2,10 @@ package com.playlists.app.remote
 
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 
 object RemotePlayHealth {
     data class ProbeResult(
@@ -10,20 +14,33 @@ object RemotePlayHealth {
         val detail: String,
     )
 
+    data class UrlProbe(val label: String, val result: ProbeResult)
+
+    /** Check every advertised address independently, including stable redirects and LAN interfaces. */
+    fun probeUrls(entries: List<RemotePlayUrlEntry>): List<UrlProbe> = runBlocking {
+        entries.distinctBy { it.url }.map { entry ->
+            async(Dispatchers.IO) {
+                UrlProbe(entry.label, probeGet(entry.url, timeoutMs = 4_000))
+            }
+        }.awaitAll()
+    }
+
     fun probeGet(url: String, timeoutMs: Int = 8_000): ProbeResult {
-        val connection = (URL(url).openConnection() as HttpURLConnection)
+        var connection: HttpURLConnection? = null
         return try {
+            connection = URL(url).openConnection() as HttpURLConnection
             connection.connectTimeout = timeoutMs
             connection.readTimeout = timeoutMs
             connection.instanceFollowRedirects = true
+            connection.useCaches = false
             connection.requestMethod = "GET"
             connection.connect()
             val code = connection.responseCode
-            val ok = code in 200..399
+            val ok = code in 200..299
             ProbeResult(
                 label = url,
                 ok = ok,
-                detail = if (ok) "HTTP $code" else "HTTP $code",
+                detail = "HTTP $code",
             )
         } catch (e: Exception) {
             ProbeResult(
@@ -32,7 +49,7 @@ object RemotePlayHealth {
                 detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName,
             )
         } finally {
-            connection.disconnect()
+            connection?.disconnect()
         }
     }
 
@@ -54,31 +71,25 @@ object RemotePlayHealth {
             detail = if (last.ok) {
                 "${last.detail} (attempt $attempt/$attempts)"
             } else {
-                "${last.detail} (after $attempts attempts)"
+                "${last.detail} (after $attempt attempts)"
             },
         )
     }
 
-    /**
-     * The app's HttpURLConnection probe often fails while Chrome on the same phone
-     * loads the tunnel fine (DNS timing, carrier cache, etc.). When cloudflared and
-     * the local server are healthy, treat the tunnel as up without a false FAIL.
-     */
+    /** Process liveness does not prove a connector is attached to Cloudflare's edge. */
     fun tunnelStatusWhenServing(
         tunnelBaseUrl: String,
         cloudflaredRunning: Boolean,
         localOk: Boolean,
     ): ProbeResult {
         val url = tunnelBaseUrl.trimEnd('/') + "/"
-        if (cloudflaredRunning && localOk) {
+        if (!cloudflaredRunning || !localOk) {
             return ProbeResult(
                 label = url,
-                ok = true,
-                detail = "cloudflared running — open the link above in your browser to verify",
+                ok = false,
+                detail = if (!cloudflaredRunning) "cloudflared is not running" else "Local HTTP server is not responding",
             )
         }
-        val probe = probeTunnelWithRetries(tunnelBaseUrl, attempts = 2, pauseMs = 2_000, timeoutMs = 6_000)
-        if (probe.ok) return probe
-        return probe
+        return probeTunnelWithRetries(tunnelBaseUrl, attempts = 2, pauseMs = 1_000, timeoutMs = 4_000)
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -25,6 +26,10 @@ internal fun RemotePlayDebugPanel(
         stringResource(R.string.remote_debug_heading),
         style = MaterialTheme.typography.titleSmall,
     )
+    Text(
+        stringResource(R.string.remote_debug_probe_hint),
+        style = MaterialTheme.typography.bodySmall,
+    )
     info.warnings
         .filter { warning -> cloudflare || !warningLooksCloudflareSpecific(warning) }
         .forEach { warning ->
@@ -37,6 +42,9 @@ internal fun RemotePlayDebugPanel(
     }
     Spacer(Modifier.height(8.dp))
     ProbeLine(stringResource(R.string.remote_debug_local), info.localProbe)
+    info.urlProbes.forEach { probe ->
+        ProbeLine(probe.label, probe.result, showUrl = true)
+    }
     if (cloudflare) {
         info.tunnelProbe?.let { ProbeLine(stringResource(R.string.remote_debug_tunnel), it) }
         Text(
@@ -53,11 +61,13 @@ internal fun RemotePlayDebugPanel(
             ),
             modifier = Modifier.padding(top = 4.dp),
             style = MaterialTheme.typography.bodySmall,
+            color = checkColor(info.tunnelProcessAlive),
         )
     }
     Text(
         stringResource(R.string.remote_debug_server, if (info.serverAlive) "up" else "down"),
         style = MaterialTheme.typography.bodySmall,
+        color = checkColor(info.serverAlive),
     )
     if (cloudflare && info.hasCloudflareIssues() && info.cloudflaredLog.isNotBlank()) {
         Spacer(Modifier.height(8.dp))
@@ -80,17 +90,16 @@ internal fun RemotePlayDebugPanel(
 }
 
 @Composable
-private fun ProbeLine(label: String, probe: RemotePlayHealth.ProbeResult) {
+private fun ProbeLine(label: String, probe: RemotePlayHealth.ProbeResult, showUrl: Boolean = false) {
     val status = if (probe.ok) "OK" else "FAIL"
     Text(
-        "$label: $status — ${probe.detail}",
+        "$label: $status — ${probe.detail}" + if (showUrl) "\n${probe.label}" else "",
         style = MaterialTheme.typography.bodySmall,
-        color = if (probe.ok) {
-            MaterialTheme.colorScheme.onSurface
-        } else {
-            MaterialTheme.colorScheme.error
-        },
+        color = checkColor(probe.ok),
     )
 }
 
 private fun warningLooksCloudflareSpecific(warning: String): Boolean = warning.looksCloudflareSpecific()
+
+private fun checkColor(ok: Boolean): Color =
+    if (ok) Color(0xFF2E7D32) else Color(0xFFC62828)

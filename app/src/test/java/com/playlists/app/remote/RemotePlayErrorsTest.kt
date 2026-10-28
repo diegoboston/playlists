@@ -6,6 +6,28 @@ import org.junit.Test
 
 class RemotePlayErrorsTest {
     @Test
+    fun assignedUrlAloneDoesNotMeanTunnelIsConnected() {
+        assertEquals(false, CloudflareTunnel.isStartupReady("https://abc.trycloudflare.com", false))
+        assertEquals(false, CloudflareTunnel.isStartupReady(null, true))
+        assertEquals(true, CloudflareTunnel.isStartupReady("https://abc.trycloudflare.com", true))
+    }
+
+    @Test
+    fun connectionRegistrationRequiresTheActualCloudflaredEvent() {
+        assertEquals(false, CloudflareTunnel.isRegisteredConnection("Your quick Tunnel has been created!"))
+        assertEquals(false, CloudflareTunnel.isRegisteredConnection("Retrying connection in up to 2s"))
+        assertEquals(true, CloudflareTunnel.isRegisteredConnection("INF Registered tunnel connection connIndex=0 protocol=http2"))
+    }
+
+    @Test
+    fun publicCloudflareErrorExplainsConnectorFailureRatherThanDnsPropagation() {
+        val warning = RemotePlayErrors.tunnelReachabilityWarning("HTTP 530 (after 2 attempts)")
+        assertTrue(warning.contains("healthy connector"))
+        assertTrue(warning.contains("newly shown session URL"))
+        assertEquals(false, warning.contains("30–60 seconds"))
+    }
+
+    @Test
     fun format_includesMessageAndCause() {
         val error = IllegalStateException(
             "Cannot run program \"/data/user/0/com.playlists.app/files/cloudflared\": error=13, Permission denied",

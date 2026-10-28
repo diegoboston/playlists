@@ -28,6 +28,17 @@ class RemotePlayDebugInfoTest {
     )
 
     @Test
+    fun failedAdvertisedUrlIsAnIssueAndIsIncludedInDebugCopy() {
+        val info = sampleInfo().copy(urlProbes = listOf(
+            RemotePlayHealth.UrlProbe("Stable URL", RemotePlayHealth.ProbeResult(
+                "https://play.example.com/", false, "HTTP 530",
+            )),
+        ))
+        assertTrue(info.hasIssues())
+        assertTrue(info.formatForCopy().contains("Stable URL: https://play.example.com/ — FAIL — HTTP 530"))
+    }
+
+    @Test
     fun hasIssues_falseWhenHealthy() {
         assertTrue(!sampleInfo().hasIssues())
     }

@@ -6,6 +6,7 @@ import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
 
@@ -28,13 +29,19 @@ object CloudflareTunnel {
         return null
     }
 
-    private var process: Process? = null
+    @Volatile private var process: Process? = null
     private var outputThread: Thread? = null
     private var waitThread: Thread? = null
     private val logLines = Collections.synchronizedList(mutableListOf<String>())
     private var lastExitCode: Int? = null
 
     private const val MAX_LOG_LINES = 80
+
+    internal fun isRegisteredConnection(line: String): Boolean =
+        line.contains("Registered tunnel connection", ignoreCase = true)
+
+    internal fun isStartupReady(publicUrl: String?, connectionRegistered: Boolean): Boolean =
+        publicUrl != null && connectionRegistered
 
     fun isRunning(): Boolean = process?.isAlive == true
 
@@ -82,6 +89,7 @@ object CloudflareTunnel {
                 .start()
             process = proc
             val urlRef = AtomicReference<String>()
+            val connectionRegistered = AtomicBoolean(false)
             val exitCode = AtomicInteger(-1)
             val outputLines = Collections.synchronizedList(mutableListOf<String>())
             val latch = CountDownLatch(1)
@@ -90,22 +98,29 @@ object CloudflareTunnel {
                 // and kills the tunnel (Cloudflare 530 on the public URL).
                 proc.inputStream.bufferedReader().useLines { lines ->
                     for (line in lines) {
-                        outputLines.add(line)
-                        appendLog(line)
+                        synchronized(outputLines) {
+                            outputLines.add(line)
+                            if (outputLines.size > MAX_LOG_LINES) outputLines.removeAt(0)
+                        }
+                        if (process === proc) appendLog(line)
                         if (urlRef.get() == null) {
                             extractPublicTunnelUrl(line)?.let { url ->
                                 urlRef.set(url)
-                                latch.countDown()
                             }
                         }
+                        if (isRegisteredConnection(line)) connectionRegistered.set(true)
+                        if (isStartupReady(urlRef.get(), connectionRegistered.get())) latch.countDown()
                     }
                 }
             }, "cloudflared-output").apply { isDaemon = true; start() }
             waitThread = Thread({
-                val code = proc.waitFor()
-                exitCode.set(code)
-                lastExitCode = code
-                if (urlRef.get() == null) {
+                try {
+                    val code = proc.waitFor()
+                    exitCode.set(code)
+                    if (process === proc) lastExitCode = code
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                } finally {
                     latch.countDown()
                 }
             }, "cloudflared-wait").apply { isDaemon = true; start() }
@@ -113,21 +128,22 @@ object CloudflareTunnel {
             if (!latch.await(timeoutSeconds, TimeUnit.SECONDS)) {
                 stop()
                 return Result.failure(
-                    tunnelFailure("Cloudflare tunnel timed out after ${timeoutSeconds}s", outputLines),
+                    tunnelFailure("Cloudflare tunnel did not establish a connection within ${timeoutSeconds}s", outputLines),
                 )
             }
             val url = urlRef.get()
-            if (url == null) {
+            if (!isStartupReady(url, connectionRegistered.get()) || !proc.isAlive) {
                 stop()
                 val code = exitCode.get()
-                val prefix = if (code >= 0) {
-                    "cloudflared exited with code $code"
-                } else {
-                    "Cloudflare tunnel did not return a URL"
+                val prefix = when {
+                    code >= 0 -> "cloudflared exited with code $code"
+                    url == null -> "Cloudflare did not return a public tunnel URL"
+                    !connectionRegistered.get() -> "Cloudflare assigned a URL but cloudflared never established a connection"
+                    else -> "cloudflared stopped before tunnel startup completed"
                 }
                 return Result.failure(tunnelFailure(prefix, outputLines))
             }
-            Result.success(url)
+            Result.success(requireNotNull(url))
         } catch (e: Exception) {
             stop()
             Result.failure(e)
@@ -172,7 +188,7 @@ object CloudflareTunnel {
     }
 
     private fun tunnelFailure(prefix: String, outputLines: List<String>): IllegalStateException {
-        val output = outputLines.joinToString("\n").trim()
+        val output = synchronized(outputLines) { outputLines.takeLast(MAX_LOG_LINES).joinToString("\n").trim() }
         val detail = if (output.isNotEmpty()) "$prefix\n\n$output" else prefix
         return IllegalStateException(detail)
     }

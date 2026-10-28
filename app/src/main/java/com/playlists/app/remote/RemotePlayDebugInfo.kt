@@ -14,10 +14,11 @@ data class RemotePlayDebugInfo(
     val cloudflaredLog: String,
     val warnings: List<String>,
     val checkedAtMs: Long,
+    val urlProbes: List<RemotePlayHealth.UrlProbe> = emptyList(),
 ) {
     /** True when something looks wrong — used to decide whether to show checks/logs in the UI. */
     fun hasIssues(): Boolean {
-        if (warnings.isNotEmpty()) return true
+        if (warnings.isNotEmpty() || urlProbes.any { !it.result.ok }) return true
         if (!serverAlive || !localProbe.ok) return true
         if (mode == RemotePlayMode.CLOUDFLARE || mode == RemotePlayMode.STABLE) {
             if (!tunnelProcessAlive) return true
@@ -47,6 +48,9 @@ data class RemotePlayDebugInfo(
         appendLine()
         appendLine("Local probe: ${probeLine(localProbe)}")
         tunnelProbe?.let { appendLine("Tunnel probe: ${probeLine(it)}") }
+        urlProbes.forEach { probe ->
+            appendLine("${probe.label}: ${probe.result.label} — ${probeLine(probe.result)}")
+        }
         if (warnings.isNotEmpty()) {
             appendLine()
             appendLine("Warnings:")

@@ -52,6 +52,7 @@ class PlayRemoteServer(
     private val onMatchQuickstart: ((text: String) -> List<QuickstartMatchJson>)? = null,
     private val onCreateQuickstart: ((name: String, text: String, withPlaceholders: Boolean) -> Result<Long>)? = null,
     private val onGetRemoteUrls: (() -> String)? = null,
+    private val chartSearch: RemoteChartSearch? = null,
     private val onGetAppIcon: (() -> ByteArray?)? = null,
 ) : NanoHTTPD(hostname, port) {
 
@@ -138,6 +139,7 @@ class PlayRemoteServer(
         }
         matchPlaylistRoute(uri)?.let { (playlistId, sub) ->
             return when {
+                sub.startsWith("/ai-search/") -> handleChartSearch(playlistId, sub, session)
                 sub == "/state" -> handleState(playlistId)
                 sub == "/entries" -> handleEntries(playlistId)
                 sub == "/navigate" && session.method == Method.POST -> handleNavigate(playlistId, session)
@@ -181,6 +183,33 @@ class PlayRemoteServer(
             uri == "/api/parse-filename" -> handleParseFilename(session)
             uri == "/api/songs/search" -> handleSearch(session)
             else -> notFound()
+        }
+    }
+
+    override fun stop() {
+        chartSearch?.close()
+        super.stop()
+    }
+
+    private fun handleChartSearch(playlistId: Long, sub: String, session: IHTTPSession): Response {
+        val search = chartSearch ?: return jsonError("AI song search unavailable")
+        val action = sub.removePrefix("/ai-search/")
+        val isRead = action in setOf("available", "status", "preview")
+        if (session.method != if (isRead) Method.GET else Method.POST) return notFound()
+        return try {
+            if (action == "preview") {
+                val pdf = search.preview(playlistId, session.parameters["token"]?.firstOrNull().orEmpty())
+                    ?: return jsonNotFound("Preview expired")
+                newFixedLengthResponse(Response.Status.OK, "application/pdf", ByteArrayInputStream(pdf), pdf.size.toLong())
+                    .apply { addHeader("Cache-Control", "no-store") }
+            } else {
+                val body = if (isRead) org.json.JSONObject().put("token", session.parameters["token"]?.firstOrNull())
+                    else org.json.JSONObject(readPostBody(session).ifBlank { "{}" })
+                jsonResponse(search.request(playlistId, action, body).toString())
+                    .apply { addHeader("Cache-Control", "no-store") }
+            }
+        } catch (error: Exception) {
+            jsonError(error.message ?: "AI song search failed")
         }
     }
 
