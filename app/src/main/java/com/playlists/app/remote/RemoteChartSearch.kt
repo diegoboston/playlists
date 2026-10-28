@@ -30,8 +30,8 @@ import kotlin.coroutines.cancellation.CancellationException
 
 /** Short-lived, playlist-scoped previews. Slow searches run outside the HTTP request. */
 class RemoteChartSearch(
-    private val search: suspend (ChartIntent) -> List<SearchResult>,
-    private val extract: suspend (SearchResult, ChartIntent) -> ChartDraft,
+    private val search: suspend (ChartIntent, Int) -> List<SearchResult>,
+    private val extract: suspend (List<SearchResult>, ChartIntent) -> ChartDraft,
     private val render: (ChartDraft) -> ByteArray,
     private val save: suspend (Long, ChartDraft, ByteArray, ChartSearchMode) -> Unit,
     private val available: () -> Boolean,
@@ -42,7 +42,8 @@ class RemoteChartSearch(
     private class Session(val playlistId: Long, val intent: ChartIntent) {
         var state = "processing"
         var error: String? = null
-        @Volatile var remaining = emptyList<SearchResult>()
+        var nextOffset = BATCH_SIZE
+        var hasNextBatch = true
         var draft: ChartDraft? = null
         var pdf: ByteArray? = null
         var job: Job? = null
@@ -73,8 +74,7 @@ class RemoteChartSearch(
             sessions[token] = session
             work(session) {
                 check(playlistExists(playlistId)) { "Playlist not found" }
-                session.remaining = search(intent)
-                extractNext(session)
+                loadBatch(session, 0)
             }
             return snapshot(token, session)
         }
@@ -92,11 +92,13 @@ class RemoteChartSearch(
             }
             "next" -> {
                 check(session.state == "preview") { "No preview available" }
-                check(session.remaining.isNotEmpty()) { "No more search results" }
+                check(session.hasNextBatch) { "No more search results" }
                 session.state = "processing"
                 session.draft = null
                 session.pdf = null
-                work(session) { extractNext(session) }
+                val offset = session.nextOffset
+                session.nextOffset += BATCH_SIZE
+                work(session) { loadBatch(session, offset) }
             }
             "save" -> {
                 // Keep the saved state until expiry so retries cannot insert the song twice.
@@ -143,46 +145,39 @@ class RemoteChartSearch(
         }
     }
 
-    private suspend fun extractNext(session: Session) {
-        var lastError: Exception? = null
-        while (session.remaining.isNotEmpty()) {
-            currentCoroutineContext().ensureActive()
-            val result = session.remaining.first()
-            session.remaining = session.remaining.drop(1)
-            try {
-                val draft = extract(result, session.intent)
-                currentCoroutineContext().ensureActive()
-                val pdf = render(draft)
-                synchronized(this) {
-                    session.draft = draft
-                    session.pdf = pdf
-                    session.state = "preview"
-                }
-                return
-            } catch (error: Exception) {
-                if (error is CancellationException) throw error
-                lastError = error
-            }
+    private suspend fun loadBatch(session: Session, offset: Int) {
+        val results = search(session.intent, offset)
+        session.hasNextBatch = results.size == BATCH_SIZE
+        if (results.isEmpty()) throw IllegalStateException("No search results")
+        currentCoroutineContext().ensureActive()
+        val draft = extract(results, session.intent)
+        currentCoroutineContext().ensureActive()
+        val pdf = render(draft)
+        synchronized(this) {
+            session.draft = draft
+            session.pdf = pdf
+            session.state = "preview"
         }
-        throw lastError ?: IllegalStateException("No search results")
     }
 
     private fun snapshot(token: String, session: Session): JSONObject = JSONObject()
         .put("token", token).put("state", session.state)
-        .put("hasNext", session.remaining.isNotEmpty())
+        .put("hasNext", session.hasNextBatch)
         .put("title", session.draft?.title.orEmpty())
         .put("error", session.error ?: JSONObject.NULL)
 
     companion object {
+        private const val BATCH_SIZE = 5
+
         fun create(context: Context): RemoteChartSearch {
             val app = context.applicationContext as PlaylistsApp
             return RemoteChartSearch(
-                search = { WebSearchService.search(it.searchQuery()) },
-                extract = { result, intent ->
+                search = { intent, offset -> WebSearchService.search(intent.searchQuery(), offset = offset) },
+                extract = { results, intent ->
                     val key = checkNotNull(AiCredentialStore.getOpenAiApiKey(context)) {
                         "Add OpenAI API key in the app Settings"
                     }
-                    val draft = ChartAssistantService(OpenAiClient(key)).fetchAndExtractChart(result, intent)
+                    val draft = ChartAssistantService(OpenAiClient(key)).fetchAndExtractChartBatch(results, intent)
                     draft.copy(bodyTextSize = ChartPdfRenderer.resolvedBodyTextSize(draft))
                 },
                 render = { ChartPdfRenderer.render(it, it.bodyTextSize) },
@@ -214,4 +209,5 @@ class RemoteChartSearch(
             )
         }
     }
+
 }

@@ -86,14 +86,15 @@ object WebSearchService {
         RegexOption.IGNORE_CASE,
     )
 
-    fun search(query: String, maxResults: Int = 5): List<SearchResult> {
+    fun search(query: String, maxResults: Int = 5, offset: Int = 0): List<SearchResult> {
         val encoded = URLEncoder.encode(query, Charsets.UTF_8.name())
         val request = Request.Builder()
-            .url("https://html.duckduckgo.com/html/?q=$encoded")
+            .url("https://html.duckduckgo.com/html/?q=$encoded&s=$offset")
             .header("User-Agent", "StageManager/1.0")
             .post(
                 okhttp3.FormBody.Builder()
                     .add("q", query)
+                    .add("s", offset.toString())
                     .build(),
             )
             .build()

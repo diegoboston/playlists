@@ -26,24 +26,28 @@ class RemoteChartSearchTest {
         error("Timed out waiting for $expected")
     }
 
-    @Test fun searchSkipsBadPagesAllowsNextAndSavesOnceToTheSelectedPlaylist() {
+    @Test fun searchProcessesFiveResultsAndTryNextAdvancesToTheNextBatch() {
         val saves = AtomicInteger()
         val saving = CountDownLatch(1)
         val releaseSave = CountDownLatch(1)
         val search = RemoteChartSearch(
-            search = { intent ->
+            search = { intent, offset ->
                 assertEquals("Volare", intent.songTitle)
                 assertEquals(ChartSearchMode.LyricsOnly, intent.searchMode)
-                (1..3).map { SearchResult("Result $it", "https://example.com/$it", "") }
+                assertTrue(offset == 0 || offset == 5)
+                (1..(if (offset == 0) 5 else 3)).map { n ->
+                    val result = n + offset
+                    SearchResult("Result $result", "https://example.com/$result", "")
+                }
             },
-            extract = { result, _ ->
-                if (result.url.endsWith("/1")) error("Unreadable page")
-                draft.copy(title = result.title)
+            extract = { results, _ ->
+                assertTrue(results.size in 3..5)
+                draft.copy(title = results.first().title)
             },
             render = { byteArrayOf(1, 2, 3) },
             save = { id, chart, pdf, mode ->
                 assertEquals(1L, id)
-                assertEquals("Result 3", chart.title)
+                assertEquals("Result 6", chart.title)
                 assertArrayEquals(byteArrayOf(1, 2, 3), pdf)
                 assertEquals(ChartSearchMode.LyricsOnly, mode)
                 saves.incrementAndGet()
@@ -55,7 +59,7 @@ class RemoteChartSearchTest {
         try {
             val token = search.request(1, "start", JSONObject().put("query", "Volare").put("mode", "lyrics")).getString("token")
             val preview = awaitState(search, token, "preview")
-            assertEquals("Result 2", preview.getString("title"))
+            assertEquals("Result 1", preview.getString("title"))
             assertTrue(preview.getBoolean("hasNext"))
             assertArrayEquals(byteArrayOf(1, 2, 3), search.preview(1, token))
             assertNull(search.preview(2, token))
@@ -80,7 +84,7 @@ class RemoteChartSearchTest {
     @Test fun validatesCredentialsAndInputBeforeStartingWork() {
         var available = false
         val search = RemoteChartSearch(
-            search = { error("Must not search") }, extract = { _, _ -> error("Must not extract") },
+            search = { _, _ -> error("Must not search") }, extract = { _, _ -> error("Must not extract") },
             render = { error("Must not render") }, save = { _, _, _, _ -> error("Must not save") },
             available = { available }, playlistExists = { true },
         )
@@ -95,7 +99,7 @@ class RemoteChartSearchTest {
 
     @Test fun completedSearchesDoNotUseUpTheActiveSearchLimit() {
         val search = RemoteChartSearch(
-            search = { listOf(SearchResult("Result", "https://example.com", "")) },
+            search = { _, _ -> listOf(SearchResult("Result", "https://example.com", "")) },
             extract = { _, _ -> draft }, render = { byteArrayOf(1) },
             save = { _, _, _, _ -> }, available = { true }, playlistExists = { true },
         )
@@ -111,7 +115,7 @@ class RemoteChartSearchTest {
 
     @Test fun cancelledSearchCannotBePreviewedOrSaved() {
         val search = RemoteChartSearch(
-            search = { listOf(SearchResult("Result", "https://example.com", "")) },
+            search = { _, _ -> listOf(SearchResult("Result", "https://example.com", "")) },
             extract = { _, _ -> draft }, render = { byteArrayOf(1) },
             save = { _, _, _, _ -> fail("Cancelled search must not save") },
             available = { true }, playlistExists = { true },

@@ -13,6 +13,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 class OpenAiClient(
     private val apiKey: String,
@@ -69,6 +73,24 @@ class OpenAiClient(
         ) ?: return null
         return ChartTextParser.parse(content, sourceUrl = sourceUrl, fallbackTitle = songTitle)
             ?.let { draft -> if (lyricsOnly) draft.withoutChords() else draft }
+    }
+
+    fun extractChartFromCandidates(
+        candidates: List<ChartCandidatePage>,
+        intent: ChartIntent,
+    ): ChartDraft? {
+        val sourceText = candidates.mapIndexed { index, candidate ->
+            "--- CANDIDATE ${index + 1} ---\nTITLE: ${candidate.result.title}\nURL: ${candidate.result.url}\n${candidate.text}"
+        }.joinToString("\n\n").take(40_000)
+        val system = AiPrompts.extractChartSystem(
+            lyricsOnly = intent.searchMode == ChartSearchMode.LyricsOnly,
+            sourceUrl = "multiple candidate pages",
+            songTitle = intent.songTitle,
+            artist = intent.artist,
+        ) + "\n" + AiPrompts.EXTRACT_CHART_MULTI_SOURCE_RULES
+        val content = chatJson(system, sourceText, jsonObject = false) ?: return null
+        return ChartTextParser.parse(content, sourceUrl = candidates.first().result.url, fallbackTitle = intent.songTitle)
+            ?.let { draft -> if (intent.searchMode == ChartSearchMode.LyricsOnly) draft.withoutChords() else draft }
     }
 
     /**
@@ -195,6 +217,26 @@ class ChartAssistantService(
 ) {
     fun searchWeb(query: String): List<SearchResult> = WebSearchService.search(query)
 
+    suspend fun fetchAndExtractChartBatch(
+        results: List<SearchResult>,
+        intent: ChartIntent,
+    ): ChartDraft {
+        val candidates = coroutineScope {
+            results.map { result ->
+                async(Dispatchers.IO) {
+                    runCatching {
+                        val text = PageFetcher.fetchText(result.url) ?: error("Could not fetch page")
+                        ChartCandidatePage(result, PageFetcher.withSearchSnippet(result.snippet, text).take(8_000))
+                    }.getOrNull()
+                }
+            }.awaitAll().filterNotNull()
+        }
+        if (candidates.isEmpty()) throw ChartAssistantException("Could not fetch any search result pages")
+        val draft = openAiClient.extractChartFromCandidates(candidates, intent)
+            ?: throw ChartAssistantException("Could not extract chart from search results")
+        return draft.copy(sourceUrl = candidates.first().result.url)
+    }
+
     fun fetchAndExtractChart(
         result: SearchResult,
         intent: ChartIntent,
@@ -211,6 +253,11 @@ class ChartAssistantService(
         return draft.copy(sourceUrl = result.url)
     }
 }
+
+data class ChartCandidatePage(
+    val result: SearchResult,
+    val text: String,
+)
 
 class ChartAssistantException(message: String) : Exception(message)
 

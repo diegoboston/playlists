@@ -71,6 +71,7 @@ sealed class ChartAssistantUiState {
         val bodyTextSize: Float? = null,
         val remainingResults: List<SearchResult> = emptyList(),
         val sourceResult: SearchResult? = null,
+        val nextSearchOffset: Int = 5,
     ) : ChartAssistantUiState()
     data class Error(val message: String) : ChartAssistantUiState()
 }
@@ -161,9 +162,7 @@ class ChartAssistantViewModel(
         }
         state.pdfFile.delete()
         _uiState.value = ChartAssistantUiState.Processing
-        launchWork {
-            extractFromQueue(state.intent, state.playlist, state.remainingResults)
-        }
+        searchForIntent(state.intent, state.playlist, state.nextSearchOffset)
     }
 
     /**
@@ -406,12 +405,12 @@ class ChartAssistantViewModel(
         }
     }
 
-    private fun searchForIntent(intent: ChartIntent, playlist: Playlist?) {
+    private fun searchForIntent(intent: ChartIntent, playlist: Playlist?, offset: Int = 0) {
         _uiState.value = ChartAssistantUiState.Processing
         launchWork {
             val results = runCatching {
                 withContext(Dispatchers.IO) {
-                    WebSearchService.search(intent.searchQuery())
+                    WebSearchService.search(intent.searchQuery(), offset = offset)
                 }
             }.getOrElse {
                 if (it is CancellationException) throw it
@@ -422,7 +421,48 @@ class ChartAssistantViewModel(
                 _uiState.value = ChartAssistantUiState.Error("No search results")
                 return@launchWork
             }
-            extractFromQueue(intent, playlist, results)
+            extractFromBatch(intent, playlist, results, offset)
+        }
+    }
+
+    private suspend fun extractFromBatch(
+        intent: ChartIntent,
+        playlist: Playlist?,
+        results: List<SearchResult>,
+        offset: Int,
+    ) {
+        val context = getApplication<Application>()
+        val apiKey = AiCredentialStore.getOpenAiApiKey(context)
+            ?: run {
+                _uiState.value = ChartAssistantUiState.Error("Add OpenAI API key in Settings")
+                return
+            }
+        runCatching {
+            withContext(Dispatchers.IO) {
+                val service = ChartAssistantService(OpenAiClient(apiKey))
+                val draft = service.fetchAndExtractChartBatch(results, intent)
+                val previewFile = File(context.cacheDir, "chart-preview-${System.currentTimeMillis()}.pdf")
+                val resolvedSize = ChartPdfRenderer.resolvedBodyTextSize(draft)
+                previewFile.writeBytes(ChartPdfRenderer.render(draft, resolvedSize))
+                draft.copy(bodyTextSize = resolvedSize) to PreviewBundle(previewFile, resolvedSize)
+            }
+        }.onSuccess { (draft, bundle) ->
+            _uiState.value = ChartAssistantUiState.Preview(
+                intent = intent,
+                playlist = playlist,
+                sourceDraft = draft,
+                draft = draft,
+                pdfFile = bundle.file,
+                transposeNote = null,
+                chartKeyGuessed = draft.isChartKeyGuessed(),
+                bodyTextSize = bundle.bodyTextSize,
+                remainingResults = results.takeIf { it.size == 5 } ?: emptyList(),
+                sourceResult = results.firstOrNull(),
+                nextSearchOffset = offset + results.size,
+            )
+        }.onFailure {
+            if (it is CancellationException) throw it
+            _uiState.value = ChartAssistantUiState.Error(it.userMessage())
         }
     }
 
