@@ -110,21 +110,30 @@ object CloudflareTunnel {
             outputThread = Thread({
                 // Keep reading until cloudflared exits — closing stdout early sends SIGPIPE
                 // and kills the tunnel (Cloudflare 530 on the public URL).
-                proc.inputStream.bufferedReader().useLines { lines ->
-                    for (line in lines) {
-                        synchronized(outputLines) {
-                            outputLines.add(line)
-                            if (outputLines.size > MAX_LOG_LINES) outputLines.removeAt(0)
-                        }
-                        if (process === proc) appendLog(line)
-                        if (urlRef.get() == null) {
-                            extractPublicTunnelUrl(line)?.let { url ->
-                                urlRef.set(url)
+                // Process teardown closes the stream while this thread may still be reading.
+                // That is expected during timeout/failure cleanup; do not let the reader
+                // exception escape an uncaught background thread and crash the app before
+                // the startup Result.failure can be shown to the user.
+                try {
+                    proc.inputStream.bufferedReader().useLines { lines ->
+                        for (line in lines) {
+                            synchronized(outputLines) {
+                                outputLines.add(line)
+                                if (outputLines.size > MAX_LOG_LINES) outputLines.removeAt(0)
                             }
+                            if (process === proc) appendLog(line)
+                            if (urlRef.get() == null) {
+                                extractPublicTunnelUrl(line)?.let { url ->
+                                    urlRef.set(url)
+                                }
+                            }
+                            if (isRegisteredConnection(line)) connectionRegistered.set(true)
+                            if (isStartupReady(urlRef.get(), connectionRegistered.get())) latch.countDown()
                         }
-                        if (isRegisteredConnection(line)) connectionRegistered.set(true)
-                        if (isStartupReady(urlRef.get(), connectionRegistered.get())) latch.countDown()
                     }
+                } catch (_: Exception) {
+                    // The process is routinely stopped while startup is unwinding. The
+                    // collected output is already used by tunnelFailure for the UI error.
                 }
             }, "cloudflared-output").apply { isDaemon = true; start() }
             waitThread = Thread({
