@@ -256,7 +256,7 @@ bash scripts/fetch-cloudflared.sh   # requires Go 1.22+, Android NDK (CGO), writ
 ./gradlew :app:assembleRelease
 ```
 
-Requires Android SDK (API 34 platform + build-tools 34.0.0) and JDK 17. Set `sdk.dir` in `local.properties` or via `ANDROID_HOME`. Release builds that include remote play need Go 1.22+ and the Android NDK (`ndk;26.1.10909125` or newer) to run `fetch-cloudflared.sh` — the bundled `cloudflared` must be built with CGO or DNS fails on device. The binary is gitignored and CI builds it on every release workflow run.
+Requires Android SDK (API 34 platform + build-tools 34.0.0) and JDK 17. Set `sdk.dir` in `local.properties` or via `ANDROID_HOME`. Release builds that include remote play need Go 1.22+ and the Android NDK (`ndk;26.1.10909125` or newer) to run `fetch-cloudflared.sh` — the bundled `cloudflared` uses CGO and an Android DNS bootstrap. At startup the app passes the active network’s DNS servers to the bootstrap, which configures Go’s resolver for SRV/TXT lookups as well as host lookups; CGO alone does not fix SRV/TXT resolution on Android. The binary is gitignored and CI builds it on every release workflow run.
 
 The Gradle wrapper (`gradlew`, `gradle/wrapper/`) is committed so `./gradlew` works after clone. Keep `local.properties` (SDK path) out of git — it is in `.gitignore`.
 
