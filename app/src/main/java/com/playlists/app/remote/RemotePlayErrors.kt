@@ -32,7 +32,7 @@ object RemotePlayErrors {
         val body = parts.joinToString("\n\n")
         return if (looksLikeDnsFailure(body)) {
             "$body\n\nHint: Cloudflare could not resolve hostnames on this device. " +
-                "Install the latest app update (fixes cloudflared DNS), or use LAN only on the same Wi‑Fi."
+                "Reconnect to Wi‑Fi or mobile data and try again, or use LAN only on the same Wi‑Fi."
         } else {
             body
         }

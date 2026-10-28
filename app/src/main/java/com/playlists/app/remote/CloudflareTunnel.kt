@@ -1,6 +1,7 @@
 package com.playlists.app.remote
 
 import android.content.Context
+import android.net.ConnectivityManager
 import java.io.File
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
@@ -84,7 +85,20 @@ object CloudflareTunnel {
             "http://127.0.0.1:$localPort",
         )
         return try {
+            val connectivity = context.getSystemService(ConnectivityManager::class.java)
+            val dnsServers = connectivity?.activeNetwork?.let { network ->
+                connectivity.getLinkProperties(network)?.dnsServers
+            }.orEmpty()
+            check(dnsServers.isNotEmpty()) {
+                "No DNS servers available for the active network. Reconnect to Wi‑Fi or mobile data and try again."
+            }
             val proc = ProcessBuilder(command)
+                .apply {
+                    environment()["PLAYLISTS_DNS_SERVERS"] = dnsServers.joinToString(",") { address ->
+                        val host = requireNotNull(address.hostAddress)
+                        if (host.contains(':')) "[$host]:53" else "$host:53"
+                    }
+                }
                 .redirectErrorStream(true)
                 .start()
             process = proc

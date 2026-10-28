@@ -72,6 +72,9 @@ trap 'rm -rf "$TMP"' EXIT
 git clone --depth 1 https://github.com/cloudflare/cloudflared.git "$TMP/cloudflared"
 (
   cd "$TMP/cloudflared"
+  # Go's SRV/TXT lookups do not use Android libc even with CGO enabled.
+  # Install our resolver bootstrap in the main package before compiling.
+  cp "$ROOT/scripts/cloudflared/playlists_dns.go" cmd/cloudflared/playlists_dns.go
   export CGO_ENABLED=1
   export GOOS=android
   export GOARCH=arm64
