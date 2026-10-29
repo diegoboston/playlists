@@ -39,6 +39,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlists.app.R
 import com.playlists.app.remote.PlayRemoteController
 import com.playlists.app.remote.RemotePlayStartedDialog
+import com.playlists.app.remote.TunnelTransport
+import com.playlists.app.remote.TunnelConnectionException
 import com.playlists.app.remote.RemotePlayErrorDialog
 import com.playlists.app.remote.RemotePlayErrors
 import com.playlists.app.remote.RemotePlayFlowDialog
@@ -75,6 +77,7 @@ fun MainTabsScreen(
     val remoteRunning by PlayRemoteController.running.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var remoteError by remember { mutableStateOf<String?>(null) }
+    var retryRemoteTcp by remember { mutableStateOf<(() -> Unit)?>(null) }
     var remoteFlow by remember { mutableStateOf<RemotePlayFlowState?>(null) }
     var remoteStartGeneration by remember { mutableIntStateOf(0) }
     var showRemoteDebug by remember { mutableStateOf(false) }
@@ -189,7 +192,14 @@ fun MainTabsScreen(
         Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
     }
 
-    fun startRemote(playlistId: Long?, mode: RemotePlayMode, uploadPlaylistPdf: Boolean) {
+    fun startRemote(
+        playlistId: Long?,
+        mode: RemotePlayMode,
+        uploadPlaylistPdf: Boolean,
+        transport: TunnelTransport = TunnelTransport.AUTO,
+    ) {
+        remoteError = null
+        retryRemoteTcp = null
         val generation = remoteStartGeneration + 1
         remoteStartGeneration = generation
         remoteFlow = RemotePlayFlowState.Starting(mode)
@@ -212,6 +222,7 @@ fun MainTabsScreen(
                     entries = list,
                     mode = mode,
                     uploadPlaylistPdf = uploadPlaylistPdf,
+                    transport = transport,
                     onPhase = { phase ->
                         scope.launch(Dispatchers.Main.immediate) {
                             if (generation == remoteStartGeneration) {
@@ -227,6 +238,9 @@ fun MainTabsScreen(
                 .onFailure { error ->
                     remoteFlow = null
                     remoteError = RemotePlayErrors.format(error)
+                    if (error is TunnelConnectionException && mode != RemotePlayMode.LAN) {
+                        retryRemoteTcp = { startRemote(playlistId, mode, uploadPlaylistPdf, TunnelTransport.TCP) }
+                    }
                 }
         }
     }
@@ -305,12 +319,13 @@ fun MainTabsScreen(
     }
 
     remoteError?.let { message ->
-        RemotePlayErrorDialog(message = message, onDismiss = { remoteError = null })
+        RemotePlayErrorDialog(message = message, onDismiss = { remoteError = null }, onRetryTcp = retryRemoteTcp)
     }
 
     remoteFlow?.let { flow ->
         RemotePlayFlowDialog(
             state = flow,
+            onRetryTcp = { mode -> startRemote(PlayRemoteController.startupPlaylistId(), mode, false, TunnelTransport.TCP) },
             onCancel = { cancelRemoteFlow() },
             onCloseStarted = { closeRemoteStartedDialog() },
             onStopRemote = { stopRemoteFlow() },
@@ -326,6 +341,10 @@ fun MainTabsScreen(
         RemotePlayStartedDialog(
             mode = statusMode,
             titleRes = R.string.remote_debug_title,
+            onRetryTcp = {
+                showRemoteDebug = false
+                startRemote(PlayRemoteController.startupPlaylistId(), statusMode, false, TunnelTransport.TCP)
+            },
             onDismiss = { showRemoteDebug = false },
             onStop = {
                 showRemoteDebug = false

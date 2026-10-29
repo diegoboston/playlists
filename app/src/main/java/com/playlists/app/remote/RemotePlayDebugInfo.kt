@@ -15,7 +15,17 @@ data class RemotePlayDebugInfo(
     val warnings: List<String>,
     val checkedAtMs: Long,
     val urlProbes: List<RemotePlayHealth.UrlProbe> = emptyList(),
+    val lastRegisteredProtocol: String? = null,
 ) {
+    fun connectionSummary(): String = when {
+        !serverAlive || !localProbe.ok -> "Local web server is unavailable"
+        !mode.usesCloudflareTunnel() -> "Local web server is responding; check LAN addresses below"
+        !tunnelProcessAlive -> "Local web server is responding; tunnel process is stopped"
+        tunnelProbe?.ok == true -> "Public tunnel responded to an HTTP check from this phone"
+        tunnelProbe == null -> "Tunnel process is running; public reachability is unverified"
+        else -> "Tunnel process is running; public HTTP check failed"
+    }
+
     /** True when something looks wrong — used to decide whether to show checks/logs in the UI. */
     fun hasIssues(): Boolean {
         if (warnings.isNotEmpty() || urlProbes.any { !it.result.ok }) return true
@@ -40,10 +50,12 @@ data class RemotePlayDebugInfo(
         appendLine("Checked: ${java.text.SimpleDateFormat.getDateTimeInstance().format(java.util.Date(checkedAtMs))}")
         appendLine("Mode: $mode")
         appendLine("Public URL: $publicUrl")
-        appendLine("Local URL: $localUrl")
+        appendLine("Local URL (internal address — this phone only): $localUrl")
         tunnelBaseUrl?.let { appendLine("Tunnel base: $it") }
         appendLine("HTTP server alive: $serverAlive")
-        appendLine("cloudflared running: $tunnelProcessAlive")
+        appendLine("cloudflared running (process only): $tunnelProcessAlive")
+        appendLine("Connection: ${connectionSummary()}")
+        lastRegisteredProtocol?.let { appendLine("Last registered transport: $it") }
         tunnelExitCode?.let { appendLine("cloudflared exit code: $it") }
         appendLine()
         appendLine("Local probe: ${probeLine(localProbe)}")

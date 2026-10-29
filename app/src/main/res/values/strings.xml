@@ -133,11 +133,11 @@
     <string name="remote_notification_body">Active — tap to open the app, or Stop to end remote play</string>
     <string name="remote_debug_title">Remote play status</string>
     <string name="remote_debug_checking">Checking connections…</string>
-    <string name="remote_debug_probe_hint">HTTP checks from this phone. Green = OK; red = failed. LAN access from other devices also depends on Wi-Fi isolation. Tap Refresh to check again.</string>
+    <string name="remote_debug_probe_hint">HTTP checks from this phone. Green = OK; red = failed. A stable URL may serve the offline PDF when the phone tunnel is unavailable. LAN access from other devices also depends on Wi-Fi isolation. Tap Refresh to check again.</string>
     <string name="remote_debug_heading">Connection checks</string>
-    <string name="remote_debug_local">Local server</string>
+    <string name="remote_debug_local">Local server (internal address — this phone only)</string>
     <string name="remote_debug_tunnel">Tunnel URL</string>
-    <string name="remote_debug_cloudflared">cloudflared: %1$s</string>
+    <string name="remote_debug_cloudflared">Tunnel process: %1$s (process status only)</string>
     <string name="remote_debug_running">running</string>
     <string name="remote_debug_stopped">stopped (exit %1$s)</string>
     <string name="remote_debug_server">HTTP server: %1$s</string>
@@ -255,4 +255,6 @@
     <string name="chart_assistant_paste_text">Paste text</string>
     <string name="chart_assistant_paste_help">Paste copied lyrics or a chord chart (up to 30,000 characters). AI removes ads and page clutter, then prepares a preview.</string>
     <string name="chart_assistant_create_from_text">Create from text</string>
+    <string name="remote_retry_tcp">Retry using TCP</string>
+    <string name="remote_retry_tcp_hint">Starts a new tunnel session. Use the new session link; the stable bookmark stays the same.</string>
 </resources>

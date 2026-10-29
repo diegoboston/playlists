@@ -40,6 +40,7 @@ fun RemotePlayFlowDialog(
     onStopRemote: () -> Unit,
     canUploadPlaylistPdf: Boolean,
     onSelectMode: (RemotePlayMode, Boolean) -> Unit,
+    onRetryTcp: (RemotePlayMode) -> Unit,
 ) {
     when (state) {
         RemotePlayFlowState.ChooseMode -> {
@@ -120,6 +121,7 @@ fun RemotePlayFlowDialog(
         is RemotePlayFlowState.Started -> {
             RemotePlayStartedDialog(
                 mode = state.mode,
+                onRetryTcp = { onRetryTcp(state.mode) },
                 onDismiss = onCloseStarted,
                 onStop = onStopRemote,
             )
@@ -175,6 +177,7 @@ fun RemotePlayStartedDialog(
     onDismiss: () -> Unit,
     onStop: () -> Unit,
     titleRes: Int = R.string.remote_started,
+    onRetryTcp: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var debug by remember { mutableStateOf<RemotePlayDebugInfo?>(null) }
@@ -191,12 +194,8 @@ fun RemotePlayStartedDialog(
         val info = withContext(Dispatchers.IO) { PlayRemoteController.collectDebugInfo() }
         if (!isActive || !PlayRemoteController.running.value) return@LaunchedEffect
         debug = info
-        if (info?.hasIssues() != false) {
-            delay(15_000)
-            if (isActive && PlayRemoteController.running.value) {
-                refreshTick++
-            }
-        }
+        delay(15_000)
+        if (isActive && PlayRemoteController.running.value) refreshTick++
     }
 
     AlertDialog(
@@ -208,6 +207,7 @@ fun RemotePlayStartedDialog(
                 pin = pin,
                 debug = debug,
                 onRefreshDebug = { refreshTick++ },
+                onRetryTcp = onRetryTcp,
             )
         },
         confirmButton = {
@@ -229,6 +229,7 @@ internal fun RemotePlayStartedDialogContent(
     pin: String?,
     debug: RemotePlayDebugInfo?,
     onRefreshDebug: () -> Unit,
+    onRetryTcp: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val playlistId = PlayRemoteController.startupPlaylistId()
@@ -286,6 +287,7 @@ internal fun RemotePlayStartedDialogContent(
             RemotePlayDebugPanel(
                 info = info,
                 onRefresh = onRefreshDebug,
+                onRetryTcp = onRetryTcp,
             )
         }
     }

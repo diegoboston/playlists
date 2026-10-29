@@ -11,6 +11,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
 
+enum class TunnelTransport(val argument: String) { AUTO("auto"), TCP("http2") }
+
+class TunnelConnectionException(message: String) : IllegalStateException(message)
+
 object CloudflareTunnel {
     internal const val CLOUDFLARED_LIB_NAME = "libcloudflared.so"
 
@@ -35,6 +39,9 @@ object CloudflareTunnel {
     private var waitThread: Thread? = null
     private val logLines = Collections.synchronizedList(mutableListOf<String>())
     private var lastExitCode: Int? = null
+    @Volatile private var registeredProtocol: String? = null
+
+    fun lastRegisteredProtocol(): String? = registeredProtocol
 
     private const val MAX_LOG_LINES = 80
 
@@ -55,6 +62,7 @@ object CloudflareTunnel {
     internal fun clearLogs() {
         synchronized(logLines) { logLines.clear() }
         lastExitCode = null
+        registeredProtocol = null
     }
 
     private fun appendLog(line: String) {
@@ -67,7 +75,22 @@ object CloudflareTunnel {
     fun binaryPath(context: Context): File =
         File(context.applicationInfo.nativeLibraryDir, CLOUDFLARED_LIB_NAME)
 
-    fun start(context: Context, localPort: Int, timeoutSeconds: Long = 60): Result<String> {
+    internal fun command(binary: File, localPort: Int, transport: TunnelTransport): List<String> = listOf(
+        binary.absolutePath, "tunnel", "--no-autoupdate", "--protocol", transport.argument,
+        "--url", "http://127.0.0.1:$localPort",
+    )
+
+    internal fun connectedProtocol(log: String): String? =
+        log.lineSequence().filter { isRegisteredConnection(it) }
+            .mapNotNull { Regex("protocol=(quic|http2)\\b").find(it)?.groupValues?.get(1) }
+            .lastOrNull()
+
+    fun start(
+        context: Context,
+        localPort: Int,
+        timeoutSeconds: Long = 60,
+        transport: TunnelTransport = TunnelTransport.AUTO,
+    ): Result<String> {
         stop()
         clearLogs()
         val binaryResult = ensureBinary(context)
@@ -77,13 +100,7 @@ object CloudflareTunnel {
             )
         }
         val binary = binaryResult.getOrThrow()
-        val command = listOf(
-            binary.absolutePath,
-            "tunnel",
-            "--no-autoupdate",
-            "--url",
-            "http://127.0.0.1:$localPort",
-        )
+        val command = command(binary, localPort, transport)
         return try {
             val connectivity = context.getSystemService(ConnectivityManager::class.java)
             val dnsServers = connectivity?.activeNetwork?.let { network ->
@@ -127,7 +144,10 @@ object CloudflareTunnel {
                                     urlRef.set(url)
                                 }
                             }
-                            if (isRegisteredConnection(line)) connectionRegistered.set(true)
+                            if (isRegisteredConnection(line)) {
+                                connectionRegistered.set(true)
+                                if (process === proc) registeredProtocol = connectedProtocol(line)
+                            }
                             if (isStartupReady(urlRef.get(), connectionRegistered.get())) latch.countDown()
                         }
                     }
@@ -213,6 +233,6 @@ object CloudflareTunnel {
     private fun tunnelFailure(prefix: String, outputLines: List<String>): IllegalStateException {
         val output = synchronized(outputLines) { outputLines.takeLast(MAX_LOG_LINES).joinToString("\n").trim() }
         val detail = if (output.isNotEmpty()) "$prefix\n\n$output" else prefix
-        return IllegalStateException(detail)
+        return TunnelConnectionException(detail)
     }
 }

@@ -61,6 +61,7 @@ object PlayRemoteController {
         val startWarnings: List<String>,
         val stableUrlActive: Boolean = false,
         val startupPlaylistId: Long? = null,
+        val transport: TunnelTransport = TunnelTransport.AUTO,
     )
 
     private val _running = MutableStateFlow(false)
@@ -170,6 +171,7 @@ object PlayRemoteController {
             localProbe = localProbe,
             tunnelProbe = tunnelProbe,
             cloudflaredLog = CloudflareTunnel.recentLogs(),
+            lastRegisteredProtocol = CloudflareTunnel.lastRegisteredProtocol(),
             warnings = warnings,
             checkedAtMs = System.currentTimeMillis(),
             urlProbes = urlProbes,
@@ -192,6 +194,7 @@ object PlayRemoteController {
             localProbe = failedProbe,
             tunnelProbe = null,
             cloudflaredLog = CloudflareTunnel.recentLogs(),
+            lastRegisteredProtocol = CloudflareTunnel.lastRegisteredProtocol(),
             warnings = listOf("Debug check failed ($detail)."),
             checkedAtMs = System.currentTimeMillis(),
         )
@@ -204,6 +207,7 @@ object PlayRemoteController {
         entries: List<PlaylistSongWithDetails>,
         mode: RemotePlayMode = RemotePlayMode.CLOUDFLARE,
         uploadPlaylistPdf: Boolean = true,
+        transport: TunnelTransport = TunnelTransport.AUTO,
         onPhase: (RemotePlayStartPhase) -> Unit = {},
     ): Result<String> {
         stop()
@@ -320,7 +324,7 @@ object PlayRemoteController {
             }
             val tunnelUrl = when (mode) {
                 RemotePlayMode.STABLE, RemotePlayMode.CLOUDFLARE -> {
-                    val tunnelResult = CloudflareTunnel.start(context.applicationContext, listeningPort)
+                    val tunnelResult = CloudflareTunnel.start(context.applicationContext, listeningPort, transport = transport)
                     if (tunnelResult.isFailure) {
                         stopHttpServerBlocking(remote)
                         return Result.failure(
@@ -410,6 +414,7 @@ object PlayRemoteController {
                     startWarnings = startWarnings,
                     stableUrlActive = stableUrlActive,
                     startupPlaylistId = playlistId,
+                    transport = transport,
                 )
                 _running.value = true
             }
@@ -472,7 +477,7 @@ object PlayRemoteController {
         if (!RemotePlayTunnelRecovery.recordRestartAttempt(System.currentTimeMillis())) {
             return false
         }
-        val tunnelResult = CloudflareTunnel.start(ctx, active.localPort)
+        val tunnelResult = CloudflareTunnel.start(ctx, active.localPort, transport = active.transport)
         if (tunnelResult.isFailure) {
             synchronized(stopLock) {
                 session?.let { current ->

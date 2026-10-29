@@ -57,6 +57,8 @@ import com.playlists.app.data.PlaylistSongWithDetails
 import com.playlists.app.data.Song
 import com.playlists.app.remote.PlayRemoteController
 import com.playlists.app.remote.RemotePlayStartedDialog
+import com.playlists.app.remote.TunnelTransport
+import com.playlists.app.remote.TunnelConnectionException
 import com.playlists.app.remote.RemotePlayErrorDialog
 import com.playlists.app.remote.RemotePlayErrors
 import com.playlists.app.remote.RemotePlayFlowDialog
@@ -110,6 +112,7 @@ fun PlaylistDetailScreen(
     var showAddSong by remember { mutableStateOf(false) }
     var orphanDeleteTarget by remember { mutableStateOf<Song?>(null) }
     var remoteError by remember { mutableStateOf<String?>(null) }
+    var retryRemoteTcp by remember { mutableStateOf<(() -> Unit)?>(null) }
     var remoteFlow by remember { mutableStateOf<RemotePlayFlowState?>(null) }
     var remoteStartGeneration by remember { mutableIntStateOf(0) }
     var showRemoteDebug by remember { mutableStateOf(false) }
@@ -228,28 +231,44 @@ fun PlaylistDetailScreen(
         Toast.makeText(context, R.string.remote_stopped, Toast.LENGTH_SHORT).show()
     }
 
-    fun startRemote(mode: RemotePlayMode, uploadPlaylistPdf: Boolean) {
+    fun startRemote(
+        mode: RemotePlayMode,
+        uploadPlaylistPdf: Boolean,
+        transport: TunnelTransport = TunnelTransport.AUTO,
+        targetPlaylistId: Long? = playlistId,
+    ) {
+        remoteError = null
+        retryRemoteTcp = null
         val generation = remoteStartGeneration + 1
         remoteStartGeneration = generation
         remoteFlow = RemotePlayFlowState.Starting(mode)
         scope.launch {
-            val list = viewModel.getPlaylistSongs(playlistId)
-            if (list.isEmpty()) {
+            val remotePlaylist = targetPlaylistId?.let { viewModel.getPlaylist(it) }
+            if (targetPlaylistId != null && remotePlaylist == null) {
+                if (generation == remoteStartGeneration) {
+                    remoteFlow = null
+                    Toast.makeText(context, R.string.remote_playlist_gone, Toast.LENGTH_LONG).show()
+                }
+                return@launch
+            }
+            val list = targetPlaylistId?.let { viewModel.getPlaylistSongs(it) }.orEmpty()
+            if (targetPlaylistId != null && list.isEmpty()) {
                 if (generation == remoteStartGeneration) {
                     remoteFlow = null
                     Toast.makeText(context, R.string.remote_empty, Toast.LENGTH_LONG).show()
                 }
                 return@launch
             }
-            val name = playlist?.name.orEmpty()
+            val name = remotePlaylist?.name ?: context.getString(R.string.app_name)
             val result = withContext(Dispatchers.IO) {
                 PlayRemoteController.start(
                     context = context,
-                    playlistId = playlistId,
+                    playlistId = targetPlaylistId,
                     playlistName = name,
                     entries = list,
                     mode = mode,
                     uploadPlaylistPdf = uploadPlaylistPdf,
+                    transport = transport,
                     onPhase = { phase ->
                         scope.launch(Dispatchers.Main.immediate) {
                             if (generation == remoteStartGeneration) {
@@ -265,6 +284,9 @@ fun PlaylistDetailScreen(
                 .onFailure { error ->
                     remoteFlow = null
                     remoteError = RemotePlayErrors.format(error)
+                    if (error is TunnelConnectionException && mode != RemotePlayMode.LAN) {
+                        retryRemoteTcp = { startRemote(mode, uploadPlaylistPdf, TunnelTransport.TCP, targetPlaylistId) }
+                    }
                 }
         }
     }
@@ -538,12 +560,15 @@ fun PlaylistDetailScreen(
     }
 
     remoteError?.let { message ->
-        RemotePlayErrorDialog(message = message, onDismiss = { remoteError = null })
+        RemotePlayErrorDialog(message = message, onDismiss = { remoteError = null }, onRetryTcp = retryRemoteTcp)
     }
 
     remoteFlow?.let { flow ->
         RemotePlayFlowDialog(
             state = flow,
+            onRetryTcp = { mode ->
+                startRemote(mode, false, TunnelTransport.TCP, PlayRemoteController.startupPlaylistId())
+            },
             onCancel = { cancelRemoteFlow() },
             onCloseStarted = { closeRemoteStartedDialog() },
             onStopRemote = { stopRemoteFlow() },
@@ -557,6 +582,10 @@ fun PlaylistDetailScreen(
         RemotePlayStartedDialog(
             mode = statusMode,
             titleRes = R.string.remote_debug_title,
+            onRetryTcp = {
+                showRemoteDebug = false
+                startRemote(statusMode, false, TunnelTransport.TCP, PlayRemoteController.startupPlaylistId())
+            },
             onDismiss = { showRemoteDebug = false },
             onStop = {
                 showRemoteDebug = false

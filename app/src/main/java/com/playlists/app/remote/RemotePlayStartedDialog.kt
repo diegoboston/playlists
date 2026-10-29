@@ -19,6 +19,7 @@ import com.playlists.app.R
 internal fun RemotePlayDebugPanel(
     info: RemotePlayDebugInfo,
     onRefresh: () -> Unit,
+    onRetryTcp: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val cloudflare = info.mode == RemotePlayMode.CLOUDFLARE || info.mode == RemotePlayMode.STABLE
@@ -30,6 +31,18 @@ internal fun RemotePlayDebugPanel(
         stringResource(R.string.remote_debug_probe_hint),
         style = MaterialTheme.typography.bodySmall,
     )
+    Text(info.connectionSummary(), style = MaterialTheme.typography.bodyMedium)
+    if (cloudflare) {
+        val protocol = info.lastRegisteredProtocol
+        Text(
+            "Last registered transport: " + when (protocol) {
+                "quic" -> "QUIC (UDP)"
+                "http2" -> "HTTP/2 (TCP)"
+                else -> "No registered connection observed"
+            },
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
     info.warnings
         .filter { warning -> cloudflare || !warningLooksCloudflareSpecific(warning) }
         .forEach { warning ->
@@ -80,6 +93,11 @@ internal fun RemotePlayDebugPanel(
             modifier = Modifier.padding(top = 4.dp),
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
         )
+    }
+    if (cloudflare && info.hasCloudflareIssues() && info.localProbe.ok &&
+        info.tunnelProbe?.detail?.startsWith("HTTP 502") != true && onRetryTcp != null) {
+        Text(stringResource(R.string.remote_retry_tcp_hint), style = MaterialTheme.typography.bodySmall)
+        TextButton(onClick = onRetryTcp) { Text(stringResource(R.string.remote_retry_tcp)) }
     }
     TextButton(onClick = onRefresh, modifier = Modifier.padding(top = 4.dp)) {
         Text(stringResource(R.string.remote_debug_refresh))

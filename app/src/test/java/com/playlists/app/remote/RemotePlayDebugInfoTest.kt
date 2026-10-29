@@ -95,4 +95,24 @@ class RemotePlayDebugInfoTest {
         assertTrue(text.contains("cloudflared is not running"))
         assertTrue(text.contains("cloudflared exited"))
     }
+    @Test
+    fun statusDoesNotConfuseRunningProcessWithPublicReachability() {
+        assertTrue(sampleInfo(tunnelOk = false).connectionSummary().contains("public HTTP check failed"))
+        assertTrue(sampleInfo().copy(tunnelProbe = null).connectionSummary().contains("unverified"))
+        assertTrue(sampleInfo(tunnelProcessAlive = false).connectionSummary().contains("process is stopped"))
+        assertTrue(sampleInfo(localOk = false).connectionSummary().contains("Local web server is unavailable"))
+    }
+
+    @Test
+    fun workingStableUrlDoesNotHideBrokenDirectTunnel() {
+        val info = sampleInfo(mode = RemotePlayMode.STABLE, tunnelOk = false).copy(
+            urlProbes = listOf(RemotePlayHealth.UrlProbe("Stable URL",
+                RemotePlayHealth.ProbeResult("https://play.example.com", true, "HTTP 200"))),
+            lastRegisteredProtocol = "http2",
+        )
+        assertTrue(info.connectionSummary().contains("public HTTP check failed"))
+        assertTrue(info.hasCloudflareIssues())
+        assertTrue(info.formatForCopy().contains("Last registered transport: http2"))
+        assertTrue(info.formatForCopy().contains("this phone only"))
+    }
 }

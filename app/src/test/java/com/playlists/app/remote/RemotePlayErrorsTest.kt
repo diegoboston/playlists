@@ -84,4 +84,47 @@ class RemotePlayErrorsTest {
         assertTrue(warning.contains("30–60 seconds"))
         assertTrue(warning.contains("airplane mode"))
     }
+    @Test
+    fun transportFailuresExplainWhichNetworkPathFailed() {
+        val quic = "ERR Failed to dial a quic connection: timeout: no recent network activity"
+        val tcp = "ERR dial tcp 198.41.200.13:7844: i/o timeout"
+        assertTrue(RemotePlayErrors.format(TunnelConnectionException(quic)).contains("Retry using TCP"))
+        assertTrue(RemotePlayErrors.transportFailureHint(tcp)!!.contains("TCP port 7844"))
+        assertTrue(RemotePlayErrors.transportFailureHint("$quic\n$tcp")!!.contains("Both UDP and TCP"))
+    }
+
+    @Test
+    fun apiTimeoutAndDnsFailureAreNotClassifiedAsBlockedTunnelTcp() {
+        assertEquals(null, RemotePlayErrors.transportFailureHint("dial tcp 1.2.3.4:443: i/o timeout"))
+        assertEquals(null, RemotePlayErrors.transportFailureHint("lookup api.trycloudflare.com: DNS timeout"))
+        assertEquals(null, RemotePlayErrors.transportFailureHint("protocol=http2 connected\nAPI request timeout"))
+    }
+
+    @Test
+    fun badGatewayExplainsOriginFailure() {
+        val warning = RemotePlayErrors.tunnelReachabilityWarning("HTTP 502 (after 2 attempts)")
+        assertTrue(warning.contains("local web server"))
+        assertTrue(warning.contains("local server result"))
+        assertEquals(false, warning.contains("Wait a few seconds"))
+    }
+
+    @Test
+    fun transportIsTakenFromRegistrationRatherThanAttemptOrFallback() {
+        assertEquals(null, CloudflareTunnel.connectedProtocol("Initial protocol quic"))
+        assertEquals(null, CloudflareTunnel.connectedProtocol("Switching to fallback protocol http2"))
+        assertEquals("http2", CloudflareTunnel.connectedProtocol(
+            "Registered tunnel connection protocol=quic\nRegistered tunnel connection protocol=http2",
+        ))
+        assertEquals(null, CloudflareTunnel.connectedProtocol("Registered tunnel connection protocol=http2other"))
+    }
+
+    @Test
+    fun tcpRetryUsesHttp2AndKeepsTheLocalOrigin() {
+        val binary = java.io.File("/native/libcloudflared.so")
+        val command = CloudflareTunnel.command(binary, 52341, TunnelTransport.TCP)
+        assertEquals("http2", command[command.indexOf("--protocol") + 1])
+        assertEquals("http://127.0.0.1:52341", command[command.indexOf("--url") + 1])
+        val auto = CloudflareTunnel.command(binary, 52341, TunnelTransport.AUTO)
+        assertEquals("auto", auto[auto.indexOf("--protocol") + 1])
+    }
 }

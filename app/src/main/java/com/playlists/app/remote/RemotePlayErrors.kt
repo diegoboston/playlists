@@ -30,11 +30,31 @@ object RemotePlayErrors {
             current = current.cause
         }
         val body = parts.joinToString("\n\n")
-        return if (looksLikeDnsFailure(body)) {
+        val transportHint = transportFailureHint(body)
+        return if (transportHint != null) {
+            "$body\n\n$transportHint"
+        } else if (looksLikeDnsFailure(body)) {
             "$body\n\nHint: Cloudflare could not resolve hostnames on this device. " +
                 "Reconnect to Wi‑Fi or mobile data and try again, or use LAN only on the same Wi‑Fi."
         } else {
             body
+        }
+    }
+
+    internal fun transportFailureHint(text: String): String? {
+        val lower = text.lowercase()
+        val lines = lower.lines()
+        fun timedOut(line: String) = line.contains("timeout") || line.contains("timed out") ||
+            line.contains("no recent network activity")
+        val quicTimeout = lines.any { it.contains("quic") && timedOut(it) }
+        val tcpTimeout = lines.any {
+            (it.contains("dial tcp") && it.contains(":7844") || it.contains("protocol=http2")) && timedOut(it)
+        }
+        return when {
+            quicTimeout && tcpTimeout -> "Both UDP and TCP tunnel connections timed out. This network may block Cloudflare tunnel traffic on port 7844. Try another network or LAN only on the same Wi-Fi."
+            quicTimeout -> "The UDP tunnel connection timed out. UDP port 7844 may be blocked. Retry using TCP; it also needs port 7844."
+            tcpTimeout -> "The TCP tunnel connection timed out. This network may block TCP port 7844. Try another network or LAN only on the same Wi-Fi."
+            else -> null
         }
     }
 
@@ -53,7 +73,9 @@ object RemotePlayErrors {
 
     fun tunnelReachabilityWarning(detail: String): String {
         val base = "Tunnel not reachable yet ($detail)."
-        return if (detail.contains("HTTP 530")) {
+        return if (Regex("HTTP 502\\b").containsMatchIn(detail)) {
+            "$base Cloudflare returned 502: the connector may be unable to reach the phone’s local web server. Check the local server result below before restarting the tunnel."
+        } else if (detail.contains("HTTP 530")) {
             "$base Cloudflare cannot route this tunnel to a healthy connector. A running " +
                 "cloudflared process alone does not prove it is connected. Check the cloudflared " +
                 "log below, then stop and restart remote play and use the newly shown session URL. " +
@@ -80,6 +102,7 @@ object RemotePlayErrors {
 fun RemotePlayErrorDialog(
     message: String,
     onDismiss: () -> Unit,
+    onRetryTcp: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     AlertDialog(
@@ -93,6 +116,10 @@ fun RemotePlayErrorDialog(
                     .verticalScroll(rememberScrollState()),
             ) {
                 Text(message, style = MaterialTheme.typography.bodyMedium)
+                onRetryTcp?.let { retry ->
+                    Text(stringResource(R.string.remote_retry_tcp_hint), style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = retry) { Text(stringResource(R.string.remote_retry_tcp)) }
+                }
             }
         },
         confirmButton = {
