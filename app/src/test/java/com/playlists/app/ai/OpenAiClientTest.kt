@@ -164,7 +164,7 @@ class OpenAiClientTest {
     @Test
     fun extractPastedTextSendsRawContentAndDoesNotInventASourceUrl() {
         val raw = "Advertisement\nTest song by Artist\n[Verse]\n[C]Hello\nSubscribe"
-        val chart = """{"title":"Test song","artist":"Artist","key":"C","lineKinds":["clutter","metadata","section","lyrics","clutter"]}"""
+        val chart = """{"title":"Test song","artist":"Artist","key":"C","lineKinds":{"1":"clutter","2":"metadata","3":"section","4":"lyrics","5":"clutter"}}"""
         repeat(2) {
             server.enqueue(MockResponse().setBody(JSONObject().put("choices", org.json.JSONArray()
                 .put(JSONObject().put("finish_reason", "stop").put("message", JSONObject().put("content", chart)))).toString()))
@@ -175,8 +175,17 @@ class OpenAiClientTest {
         assertEquals(null, chords.sourceUrl)
         val request = server.takeRequest()
         assertEquals("/v1/chat/completions", request.path)
-        val messages = JSONObject(request.body.readUtf8()).getJSONArray("messages")
-        assertEquals(PastedSongParser.lines(raw), org.json.JSONArray(messages.getJSONObject(1).getString("content")).let { a -> (0 until a.length()).map { a.getString(it) } })
+        val payload = JSONObject(request.body.readUtf8())
+        val messages = payload.getJSONArray("messages")
+        val input = JSONObject(messages.getJSONObject(1).getString("content"))
+        assertEquals(PastedSongParser.lines(raw), (1..input.length()).map { input.getString(it.toString()) })
+        val format = payload.getJSONObject("response_format")
+        assertEquals("json_schema", format.getString("type"))
+        assertTrue(format.getJSONObject("json_schema").getBoolean("strict"))
+        val lineSchema = format.getJSONObject("json_schema").getJSONObject("schema")
+            .getJSONObject("properties").getJSONObject("lineKinds")
+        assertEquals(5, lineSchema.getJSONArray("required").length())
+        assertFalse(lineSchema.getBoolean("additionalProperties"))
         assertTrue(messages.getJSONObject(0).getString("content").contains("never deduplicate"))
         val lyrics = client.extractPastedText(raw, ChartSearchMode.LyricsOnly)!!
         assertEquals("Hello", lyrics.sections.first().lines.first())
@@ -200,6 +209,57 @@ class OpenAiClientTest {
             assertTrue(error.message!!.contains("Nothing was imported"))
             assertTrue(logs.any { it.contains("finish_reason=") })
             assertFalse(logs.any { it.contains("sk-test") })
+        }
+    }
+
+    @Test
+    fun pastedTextBatchesLongInputAndPreservesLinesAcrossTheBoundary() {
+        val lines = (1..103).map { "Original lyric line $it" }
+        for (count in listOf(100, 3)) {
+            val kinds = JSONObject().apply { (1..count).forEach { put(it.toString(), "lyrics") } }
+            val plan = JSONObject().put("title", "Test song").put("artist", "").put("key", "").put("capo", "")
+                .put("lineKinds", kinds)
+            server.enqueue(MockResponse().setBody(JSONObject().put("choices", org.json.JSONArray().put(
+                JSONObject().put("finish_reason", "stop").put("message", JSONObject().put("content", plan.toString()))
+            )).toString()))
+        }
+        val draft = clientForServer().extractPastedText(lines.joinToString("\n"), ChartSearchMode.LyricsOnly)!!
+        assertEquals(lines, draft.sections.flatMap { it.lines })
+        repeat(2) { index ->
+            val payload = JSONObject(server.takeRequest().body.readUtf8())
+            val input = JSONObject(payload.getJSONArray("messages").getJSONObject(1).getString("content"))
+            assertEquals(if (index == 0) 100 else 3, input.length())
+            assertEquals(lines[index * 100], input.getString("1"))
+        }
+    }
+
+    @Test
+    fun pastedSongReplays38Of41FailureThenImportsAllOriginalLyricsWithCompleteIds() {
+        val text = javaClass.getResource("/pasted-hard-days-night.txt")!!.readText()
+        val lines = PastedSongParser.lines(text)
+        assertEquals(41, lines.size)
+        for (count in listOf(38, 41)) {
+            val plan = JSONObject().put("title", "A Hard Day's Night").put("artist", "The Beatles")
+                .put("key", "").put("capo", "").put("lineKinds", JSONObject().apply {
+                    (1..count).forEach { put(it.toString(), if (it <= 2) "metadata" else "lyrics") }
+                })
+            server.enqueue(MockResponse().setBody(JSONObject().put("choices", org.json.JSONArray().put(
+                JSONObject().put("finish_reason", "stop").put("message", JSONObject().put("content", plan.toString()))
+            )).toString()))
+        }
+        val client = clientForServer()
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            client.extractPastedText(text, ChartSearchMode.LyricsOnly)
+        }
+        assertTrue(error.message!!.contains("received 38 of 41"))
+        val draft = client.extractPastedText(text, ChartSearchMode.LyricsOnly)!!
+        assertEquals(lines.drop(2), draft.sections.flatMap { it.lines })
+        assertEquals("A Hard Day's Night", draft.title)
+        assertEquals("The Beatles", draft.artist)
+        repeat(2) {
+            val payload = JSONObject(server.takeRequest().body.readUtf8())
+            val schema = payload.getJSONObject("response_format").getJSONObject("json_schema").getJSONObject("schema")
+            assertEquals(41, schema.getJSONObject("properties").getJSONObject("lineKinds").getJSONArray("required").length())
         }
     }
 

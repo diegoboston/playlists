@@ -81,12 +81,32 @@ class OpenAiClient(
         require(text.length <= 30_000) { "Song text is too long (maximum 30,000 characters)" }
         val lines = PastedSongParser.lines(text)
         diagnostic("Pasted input: ${text.length} characters, ${lines.size} nonempty lines. Classifying lines; original text will be preserved.")
-        val content = chatJson(
-            AiPrompts.CLASSIFY_PASTED_TEXT, JSONArray(lines).toString(),
-            temperature = 0.0, requireComplete = true,
-        ) ?: throw OpenAiException("Empty classification response. Nothing was imported.")
-        val plan = AiJsonHelper.parseObject(content)
-            ?: throw OpenAiException("Invalid classification JSON. Nothing was imported.")
+        val plan = JSONObject()
+        val allKinds = JSONObject()
+        // Bound the schema size and response length for long copied pages.
+        lines.chunked(100).forEachIndexed { batchIndex, batch ->
+            diagnostic("Classifying batch ${batchIndex + 1}: ${batch.size} lines using required line IDs.")
+            val content = chatJson(
+                AiPrompts.CLASSIFY_PASTED_TEXT, PastedSongParser.indexedInput(batch).toString(),
+                temperature = 0.0, requireComplete = true,
+                responseFormat = PastedSongParser.responseFormat(batch.size),
+            ) ?: throw OpenAiException("Empty classification response. Nothing was imported.")
+            val batchPlan = AiJsonHelper.parseObject(content)
+                ?: throw OpenAiException("Invalid classification JSON. Nothing was imported.")
+            val kinds = batchPlan.getJSONObject("lineKinds")
+            require(kinds.length() == batch.size && batch.indices.all { kinds.has((it + 1).toString()) }) {
+                "Incomplete line classification: received ${kinds.length()} of ${batch.size} lines in batch ${batchIndex + 1}. Nothing was imported."
+            }
+            batch.indices.forEach { index ->
+                allKinds.put((batchIndex * 100 + index + 1).toString(), kinds.getString((index + 1).toString()))
+            }
+            listOf("title", "artist", "key", "capo").forEach { field ->
+                if (plan.optString(field).normalizeOptionalField() == null) {
+                    plan.put(field, batchPlan.optString(field))
+                }
+            }
+        }
+        plan.put("lineKinds", allKinds)
         return PastedSongParser.parse(text, plan, searchMode, diagnostic)
     }
 
@@ -144,6 +164,7 @@ class OpenAiClient(
         temperature: Double? = null,
         jsonObject: Boolean = true,
         requireComplete: Boolean = false,
+        responseFormat: JSONObject? = null,
     ): String? {
         val payload = JSONObject()
             .put("model", CHAT_MODEL)
@@ -153,7 +174,9 @@ class OpenAiClient(
                     .put(JSONObject().put("role", "system").put("content", system))
                     .put(JSONObject().put("role", "user").put("content", userContent)),
             )
-        if (jsonObject) {
+        if (responseFormat != null) {
+            payload.put("response_format", responseFormat)
+        } else if (jsonObject) {
             payload.put("response_format", JSONObject().put("type", "json_object"))
         }
         if (maxTokens != null) payload.put("max_tokens", maxTokens)

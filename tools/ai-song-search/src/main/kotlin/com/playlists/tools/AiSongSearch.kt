@@ -39,6 +39,17 @@ private fun run(args: Array<String>) {
         return
     }
 
+    options.textFile?.let { path ->
+        val apiKey = System.getenv("OPENAI_API_KEY")?.trim()?.takeIf { it.isNotEmpty() }
+            ?: throw UsageException("Set OPENAI_API_KEY to classify pasted text.")
+        val mode = options.mode ?: ChartSearchMode.LyricsOnly
+        val draft = OpenAiClient(apiKey, diagnostic = { System.err.println(it) })
+            .extractPastedText(java.io.File(path).readText(), mode)
+            ?: throw ChartAssistantException("No song found in pasted text")
+        printDraft(draft, mode)
+        return
+    }
+
     val interactive = System.console() != null
     val queryText = options.query?.trim()?.takeIf { it.isNotEmpty() }
         ?: if (interactive) readLinePrompt("Song (SONG TITLE by ARTIST)") else null
@@ -116,6 +127,7 @@ private data class Options(
     val mode: ChartSearchMode? = null,
     val yes: Boolean = false,
     val query: String? = null,
+    val textFile: String? = null,
 )
 
 private class UsageException(message: String) : Exception(message)
@@ -124,6 +136,7 @@ private fun parseArgs(args: Array<String>): Options {
     var help = false
     var mode: ChartSearchMode? = null
     var yes = false
+    var textFile: String? = null
     val queryParts = mutableListOf<String>()
     var i = 0
     while (i < args.size) {
@@ -132,6 +145,10 @@ private fun parseArgs(args: Array<String>): Options {
             "--lyrics" -> mode = ChartSearchMode.LyricsOnly
             "--chords" -> mode = ChartSearchMode.ChordsAndLyrics
             "--yes" -> yes = true
+            "--text-file" -> {
+                textFile = args.getOrNull(i + 1) ?: throw UsageException("Missing path for --text-file")
+                i++
+            }
             "--mode" -> {
                 val value = args.getOrNull(i + 1)
                     ?: throw UsageException("Missing value for --mode (lyrics|chords)")
@@ -152,6 +169,7 @@ private fun parseArgs(args: Array<String>): Options {
         i++
     }
     return Options(
+        textFile = textFile,
         help = help,
         mode = mode,
         yes = yes,
@@ -242,11 +260,13 @@ private fun helpText(): String = """
 
     Usage:
       bash scripts/ai-song-search.sh [--lyrics|--chords] [--yes] [query...]
+      bash scripts/ai-song-search.sh [--lyrics|--chords] --text-file PATH
 
     Options:
       --lyrics            Lyrics only (app toggle)
       --chords            Chords + lyrics (app default)
       --mode lyrics|chords
+      --text-file PATH    Classify copied song text directly; print draft and debug counts
       --yes               Accept the first chart that parses (no prompt)
       -h, --help          Show this help
 
@@ -258,6 +278,7 @@ private fun helpText(): String = """
     Examples:
       export OPENAI_API_KEY=sk-...
       bash scripts/ai-song-search.sh
+      bash scripts/ai-song-search.sh --lyrics --text-file /path/to/song.txt
       bash scripts/ai-song-search.sh --lyrics Volare
       bash scripts/ai-song-search.sh --lyrics --yes "X Colpa di chi"
 """.trimIndent()
