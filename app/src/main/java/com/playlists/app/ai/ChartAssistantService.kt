@@ -21,6 +21,7 @@ import kotlinx.coroutines.coroutineScope
 class OpenAiClient(
     private val apiKey: String,
     private val httpClient: OkHttpClient = defaultClient(),
+    private val diagnostic: (String) -> Unit = {},
 ) {
     fun transcribeAudio(audioFile: File): String {
         val body = MultipartBody.Builder()
@@ -78,12 +79,15 @@ class OpenAiClient(
     fun extractPastedText(text: String, searchMode: ChartSearchMode): ChartDraft? {
         require(text.isNotBlank()) { "Paste some song text" }
         require(text.length <= 30_000) { "Song text is too long (maximum 30,000 characters)" }
-        val lyricsOnly = searchMode == ChartSearchMode.LyricsOnly
+        val lines = PastedSongParser.lines(text)
+        diagnostic("Pasted input: ${text.length} characters, ${lines.size} nonempty lines. Classifying lines; original text will be preserved.")
         val content = chatJson(
-            AiPrompts.extractPastedTextSystem(lyricsOnly), text, jsonObject = false,
-        ) ?: return null
-        return ChartTextParser.parse(content, fallbackTitle = "Untitled song")
-            ?.let { if (lyricsOnly) it.withoutChords() else it }
+            AiPrompts.CLASSIFY_PASTED_TEXT, JSONArray(lines).toString(),
+            temperature = 0.0, requireComplete = true,
+        ) ?: throw OpenAiException("Empty classification response. Nothing was imported.")
+        val plan = AiJsonHelper.parseObject(content)
+            ?: throw OpenAiException("Invalid classification JSON. Nothing was imported.")
+        return PastedSongParser.parse(text, plan, searchMode, diagnostic)
     }
 
     fun extractChartFromCandidates(
@@ -139,6 +143,7 @@ class OpenAiClient(
         maxTokens: Int? = null,
         temperature: Double? = null,
         jsonObject: Boolean = true,
+        requireComplete: Boolean = false,
     ): String? {
         val payload = JSONObject()
             .put("model", CHAT_MODEL)
@@ -160,12 +165,14 @@ class OpenAiClient(
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .build()
         val json = postJson(request)
-        return json.optJSONArray("choices")
-            ?.optJSONObject(0)
-            ?.optJSONObject("message")
-            ?.optString("content")
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+        val choice = json.optJSONArray("choices")?.optJSONObject(0)
+        val finishReason = choice?.optString("finish_reason").orEmpty()
+        val usage = json.optJSONObject("usage")
+        diagnostic("Model: $CHAT_MODEL; finish_reason=${finishReason.ifBlank { "missing" }}; tokens: prompt=${usage?.optInt("prompt_tokens") ?: "unknown"}, completion=${usage?.optInt("completion_tokens") ?: "unknown"}.")
+        if (requireComplete && finishReason != "stop") {
+            throw OpenAiException("Incomplete model response (finish_reason=${finishReason.ifBlank { "missing" }}). Nothing was imported; try again.")
+        }
+        return choice?.optJSONObject("message")?.optString("content")?.trim()?.takeIf { it.isNotEmpty() }
     }
 
     /** Lightweight auth check — GET /v1/models (limit 1). */
@@ -192,7 +199,9 @@ class OpenAiClient(
     }
 
     private fun postJson(request: Request): JSONObject {
+        val started = System.nanoTime()
         httpClient.newCall(request).execute().use { response ->
+            diagnostic("OpenAI HTTP ${response.code}; elapsed ${(System.nanoTime() - started) / 1_000_000} ms; request_id=${response.header("x-request-id") ?: "unavailable"}.")
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw openAiHttpError(response.code, body)

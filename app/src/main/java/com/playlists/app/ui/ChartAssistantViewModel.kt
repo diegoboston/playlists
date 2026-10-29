@@ -91,6 +91,9 @@ class ChartAssistantViewModel(
     private val _savedSongId = MutableSharedFlow<Long>()
     val savedSongId: SharedFlow<Long> = _savedSongId.asSharedFlow()
 
+    private val _diagnostics = MutableStateFlow<List<String>>(emptyList())
+    val diagnostics: StateFlow<List<String>> = _diagnostics.asStateFlow()
+
     private var workJob: Job? = null
     private var pendingSearchMode: ChartSearchMode = ChartSearchMode.ChordsAndLyrics
 
@@ -149,6 +152,7 @@ class ChartAssistantViewModel(
 
     fun importPastedText(text: String, searchMode: ChartSearchMode) {
         if (_uiState.value != ChartAssistantUiState.Idle) return
+        _diagnostics.value = emptyList()
         _uiState.value = ChartAssistantUiState.Processing
         launchWork {
             try {
@@ -158,12 +162,15 @@ class ChartAssistantViewModel(
                         ?: throw ChartAssistantException("Add OpenAI API key in Settings")
                     val playlist = playlistId?.let { playlistRepo.getById(it) }
                     if (playlistId != null && playlist == null) throw ChartAssistantException("Playlist not found")
-                    val draft = OpenAiClient(apiKey).extractPastedText(text, searchMode)
+                    val draft = OpenAiClient(apiKey, diagnostic = { message ->
+                        _diagnostics.value = _diagnostics.value + message
+                    }).extractPastedText(text, searchMode)
                         ?: throw ChartAssistantException("Could not extract a song from the pasted text")
                     val size = ChartPdfRenderer.resolvedBodyTextSize(draft)
                     val resolved = draft.copy(bodyTextSize = size)
                     val file = File.createTempFile("chart-preview-", ".pdf", context.cacheDir)
                     file.writeBytes(ChartPdfRenderer.render(resolved, size))
+                    _diagnostics.value = _diagnostics.value + "PDF rendered: ${file.length()} bytes. Ready for preview."
                     ChartAssistantUiState.Preview(
                         intent = ChartIntent.fromTypedQuery(draft.title, searchMode)!!,
                         playlist = playlist, sourceDraft = resolved, draft = resolved,
@@ -174,6 +181,7 @@ class ChartAssistantViewModel(
                 _uiState.value = preview
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
+                _diagnostics.value = _diagnostics.value + "Import failed: ${error.javaClass.simpleName}"
                 _uiState.value = ChartAssistantUiState.Error(error.userMessage())
             }
         }

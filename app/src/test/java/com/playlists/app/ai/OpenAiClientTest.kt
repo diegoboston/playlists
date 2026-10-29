@@ -163,11 +163,11 @@ class OpenAiClientTest {
 
     @Test
     fun extractPastedTextSendsRawContentAndDoesNotInventASourceUrl() {
-        val raw = "Advertisement\nTest song by Artist\n[Verse]\nC Hello\nSubscribe"
-        val chart = "TITLE: Test song\nARTIST: Artist\nKEY: C\n[Verse]\n<C>Hello"
+        val raw = "Advertisement\nTest song by Artist\n[Verse]\n[C]Hello\nSubscribe"
+        val chart = """{"title":"Test song","artist":"Artist","key":"C","lineKinds":["clutter","metadata","section","lyrics","clutter"]}"""
         repeat(2) {
             server.enqueue(MockResponse().setBody(JSONObject().put("choices", org.json.JSONArray()
-                .put(JSONObject().put("message", JSONObject().put("content", chart)))).toString()))
+                .put(JSONObject().put("finish_reason", "stop").put("message", JSONObject().put("content", chart)))).toString()))
         }
         val client = clientForServer()
         val chords = client.extractPastedText(raw, ChartSearchMode.ChordsAndLyrics)!!
@@ -176,8 +176,8 @@ class OpenAiClientTest {
         val request = server.takeRequest()
         assertEquals("/v1/chat/completions", request.path)
         val messages = JSONObject(request.body.readUtf8()).getJSONArray("messages")
-        assertEquals(raw, messages.getJSONObject(1).getString("content"))
-        assertTrue(messages.getJSONObject(0).getString("content").contains("Remove ads"))
+        assertEquals(PastedSongParser.lines(raw), org.json.JSONArray(messages.getJSONObject(1).getString("content")).let { a -> (0 until a.length()).map { a.getString(it) } })
+        assertTrue(messages.getJSONObject(0).getString("content").contains("never deduplicate"))
         val lyrics = client.extractPastedText(raw, ChartSearchMode.LyricsOnly)!!
         assertEquals("Hello", lyrics.sections.first().lines.first())
         assertEquals(null, lyrics.key)
@@ -188,7 +188,22 @@ class OpenAiClientTest {
         assertEquals(2, server.requestCount)
     }
 
-    private fun clientForServer(): OpenAiClient {
+    @Test
+    fun pastedTextRejectsTruncatedClassificationAndLogsFinishReason() {
+        for (reason in listOf("length", "content_filter", "")) {
+            server.enqueue(MockResponse().setBody(JSONObject().put("choices", org.json.JSONArray()
+                .put(JSONObject().put("finish_reason", reason).put("message", JSONObject().put("content", "{}")))).toString()))
+            val logs = mutableListOf<String>()
+            val error = assertThrows(OpenAiException::class.java) {
+                clientForServer(logs::add).extractPastedText("Hello", ChartSearchMode.LyricsOnly)
+            }
+            assertTrue(error.message!!.contains("Nothing was imported"))
+            assertTrue(logs.any { it.contains("finish_reason=") })
+            assertFalse(logs.any { it.contains("sk-test") })
+        }
+    }
+
+    private fun clientForServer(log: (String) -> Unit = {}): OpenAiClient {
         val http = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val url = chain.request().url.newBuilder()
@@ -199,6 +214,6 @@ class OpenAiClientTest {
                 chain.proceed(chain.request().newBuilder().url(url).build())
             }
             .build()
-        return OpenAiClient("sk-test", http)
+        return OpenAiClient("sk-test", http, log)
     }
 }

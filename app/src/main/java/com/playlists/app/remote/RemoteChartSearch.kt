@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
@@ -36,13 +37,14 @@ class RemoteChartSearch(
     private val save: suspend (Long, ChartDraft, ByteArray, ChartSearchMode) -> Unit,
     private val available: () -> Boolean,
     private val playlistExists: suspend (Long) -> Boolean,
-    private val extractText: suspend (String, ChartSearchMode) -> ChartDraft = { _, _ ->
+    private val extractText: suspend (String, ChartSearchMode, (String) -> Unit) -> ChartDraft = { _, _, _ ->
         error("Text import unavailable")
     },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val sessions = mutableMapOf<String, Session>()
     private class Session(val playlistId: Long, val intent: ChartIntent) {
+        val logs = mutableListOf<String>()
         var state = "processing"
         var error: String? = null
         var nextOffset = BATCH_SIZE
@@ -86,9 +88,12 @@ class RemoteChartSearch(
             work(session) {
                 check(playlistExists(playlistId)) { "Playlist not found" }
                 if (input == "text") {
-                    val draft = extractText(pastedText, mode)
+                    val draft = extractText(pastedText, mode) { message ->
+                        synchronized(this) { session.logs.add(message.take(1000)) }
+                    }
                     currentCoroutineContext().ensureActive()
                     val pdf = render(draft)
+                    synchronized(this) { session.logs.add("PDF rendered: ${pdf.size} bytes. Ready for preview.") }
                     synchronized(this) {
                         session.hasNextBatch = false
                         session.draft = draft
@@ -161,6 +166,7 @@ class RemoteChartSearch(
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 synchronized(this@RemoteChartSearch) {
+                    session.logs.add("Operation failed: ${error.javaClass.simpleName}")
                     session.error = error.message ?: "AI song search failed"
                     session.state = "error"
                 }
@@ -185,6 +191,7 @@ class RemoteChartSearch(
 
     private fun snapshot(token: String, session: Session): JSONObject = JSONObject()
         .put("token", token).put("state", session.state)
+        .put("logs", JSONArray(session.logs))
         .put("hasNext", session.hasNextBatch)
         .put("title", session.draft?.title.orEmpty())
         .put("error", session.error ?: JSONObject.NULL)
@@ -203,11 +210,11 @@ class RemoteChartSearch(
                     val draft = ChartAssistantService(OpenAiClient(key)).fetchAndExtractChartBatch(results, intent)
                     draft.copy(bodyTextSize = ChartPdfRenderer.resolvedBodyTextSize(draft))
                 },
-                extractText = { text, mode ->
+                extractText = { text, mode, log ->
                     val key = checkNotNull(AiCredentialStore.getOpenAiApiKey(context)) {
                         "Add OpenAI API key in the app Settings"
                     }
-                    val draft = OpenAiClient(key).extractPastedText(text, mode)
+                    val draft = OpenAiClient(key, diagnostic = log).extractPastedText(text, mode)
                         ?: error("Could not extract a song from the pasted text")
                     draft.copy(bodyTextSize = ChartPdfRenderer.resolvedBodyTextSize(draft))
                 },

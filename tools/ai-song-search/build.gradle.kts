@@ -18,6 +18,7 @@ val appJava = rootProject.layout.projectDirectory.dir("app/src/main/java")
 val sharedSrc = layout.buildDirectory.dir("generated/shared-app-src")
 val sharedRelPaths = listOf(
     "com/playlists/app/ai/AiPrompts.kt",
+    "com/playlists/app/ai/PastedSongParser.kt",
     "com/playlists/app/ai/AiJsonHelper.kt",
     "com/playlists/app/ai/ChartIntent.kt",
     "com/playlists/app/ai/ChartDraft.kt",

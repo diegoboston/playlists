@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -94,6 +96,8 @@ fun ChartAssistantScreen(
         factory = ChartAssistantViewModelFactory(app, playlistId),
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
+    var showDiagnostics by rememberSaveable { mutableStateOf(false) }
     val pendingChartImport by playlistsViewModel.pendingChartImport.collectAsStateWithLifecycle()
     val openAiKeyReady = rememberOpenAiKeyReady()
     var searchMode by rememberSaveable { mutableStateOf(ChartSearchMode.ChordsAndLyrics.name) }
@@ -128,6 +132,20 @@ fun ChartAssistantScreen(
     BackHandler(onBack = handleBack)
 
     Scaffold(
+        bottomBar = {
+            if (diagnostics.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                OutlinedButton(onClick = { showDiagnostics = !showDiagnostics }) {
+                    Text(stringResource(R.string.chart_assistant_debug_logs))
+                }
+                if (showDiagnostics) SelectionContainer {
+                    Text(
+                        diagnostics.joinToString("\n"),
+                        modifier = Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.chart_assistant_title)) },

@@ -257,4 +257,5 @@
     <string name="chart_assistant_create_from_text">Create from text</string>
     <string name="remote_retry_tcp">Retry using TCP</string>
     <string name="remote_retry_tcp_hint">Starts a new tunnel session. Use the new session link; the stable bookmark stays the same.</string>
+    <string name="chart_assistant_debug_logs">Debug logs (select to copy)</string>
 </resources>

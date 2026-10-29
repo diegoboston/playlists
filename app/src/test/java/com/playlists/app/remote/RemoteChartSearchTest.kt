@@ -87,7 +87,8 @@ class RemoteChartSearchTest {
         val search = RemoteChartSearch(
             search = { _, _ -> error("Text import must not search") },
             extract = { _, _ -> error("Text import must not fetch pages") },
-            extractText = { text, mode ->
+            extractText = { text, mode, log ->
+                log("All lines preserved")
                 assertEquals(raw, text)
                 assertEquals(ChartSearchMode.LyricsOnly, mode)
                 draft.copy(sourceUrl = null)
@@ -111,6 +112,7 @@ class RemoteChartSearchTest {
             val token = search.request(1, "start", JSONObject()
                 .put("input", "text").put("text", raw).put("mode", "lyrics")).getString("token")
             val preview = awaitState(search, token, "preview")
+            assertEquals("All lines preserved", preview.getJSONArray("logs").getString(0))
             assertFalse(preview.getBoolean("hasNext"))
             assertEquals("Test song", preview.getString("title"))
             assertThrows(IllegalStateException::class.java) { search.request(1, "next", body(token)) }

@@ -86,6 +86,9 @@
         <button id="aiSubmit" type="submit">Search</button>
       </form>
       <p id="aiStatus" role="status" aria-live="polite"></p>
+      <details id="aiDebug" hidden><summary>Debug logs</summary>
+        <pre id="aiLogs" style="white-space:pre-wrap;overflow-wrap:anywhere;user-select:text"></pre>
+      </details>
       <div id="aiReview" hidden>
         <a id="aiPreviewLink" target="_blank" rel="noopener">Open PDF preview</a>
         <iframe id="aiPreview" title="AI song chart preview"></iframe>
@@ -408,6 +411,10 @@
     }
 
     function aiUpdate(ok, data) {
+      if (data && data.logs) {
+        document.getElementById('aiLogs').textContent = data.logs.join('\n') + (data.error ? '\nError: ' + data.error : '');
+        RemoteCompat.setHidden(document.getElementById('aiDebug'), data.logs.length === 0 && !data.error);
+      }
       if (!ok || !data) {
         aiControls(false);
         aiStatus.textContent = (data && data.error) || 'Could not reach AI song search. Cancel and try again.';
@@ -450,6 +457,10 @@
 
     function aiAction(action, body) {
       var generation = aiGeneration;
+      if (action === 'start') {
+        document.getElementById('aiLogs').textContent = '';
+        RemoteCompat.setHidden(document.getElementById('aiDebug'), true);
+      }
       aiControls(true);
       RemoteCompat.setHidden(aiReview, true);
       aiStatus.textContent = action === 'save' ? 'Saving chart…' : aiWorkingMessage();
